@@ -6,8 +6,8 @@ import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/comp
 import { Chip } from "@/components/ui/chip";
 import { ModuleGrid } from "@/components/ui/module-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { getDashboard, getFirm } from "@/lib/data";
-import { formatDate, formatINR, formatNumber, todayISO } from "@/lib/format";
+import { getDashboard, getFirm, getToday } from "@/lib/data";
+import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { toMT } from "@/lib/sales";
 
 /** Owner and office: the whole business today. */
@@ -36,7 +36,7 @@ export function OwnerHome() {
 export async function TodayLine() {
   await connection();
   const firm = await getFirm();
-  return `${formatDate(todayISO())} · ${firm.name}`;
+  return `${formatDate(getToday())} · ${firm.name}`;
 }
 
 async function Dashboard() {
