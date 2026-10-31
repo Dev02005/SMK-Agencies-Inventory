@@ -30,7 +30,7 @@ export default function SalaryPage() {
 }
 
 async function SalaryData() {
-  const thisMonth = getToday().slice(0, 7);
+  const thisMonth = (await getToday()).slice(0, 7);
   const lastMonth = shiftMonth(thisMonth, -1);
   const [current, previous, loans, staff] = await Promise.all([getSalarySheet(thisMonth), getSalarySheet(lastMonth), getLoans(), getEmployees()]);
 

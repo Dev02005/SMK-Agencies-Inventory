@@ -76,8 +76,8 @@ async function ReportBody({ params, searchParams }: { params: Params; searchPara
   const period: Period = def.periods?.find((p) => p === asked) ?? def.periods?.[0] ?? "today";
   const by = def.groupings?.find((g) => g.key === sp.by)?.key ?? def.groupings?.[0]?.key;
 
-  const [result, firm, user] = await Promise.all([def.run(period, by), getFirm(), getCurrentUser()]);
-  const periodLabel = def.periods ? periodRange(period).label : `As of ${formatDate(getToday())}`;
+  const [result, firm, user, today, range] = await Promise.all([def.run(period, by), getFirm(), getCurrentUser(), getToday(), periodRange(period)]);
+  const periodLabel = def.periods ? range.label : `As of ${formatDate(today)}`;
   const groupingLabel = def.groupings?.find((g) => g.key === by)?.label;
   const href = (p: Period | undefined, b: string | undefined) => {
     const q = new URLSearchParams();
@@ -104,7 +104,7 @@ async function ReportBody({ params, searchParams }: { params: Params; searchPara
             firmName={firm.name}
             title={def.title}
             periodLabel={[groupingLabel, periodLabel].filter(Boolean).join(" · ")}
-            fileName={`SKA ${def.title} ${def.periods ? periodLabels[period] : getToday()}`.replace(/[^\w -]+/g, "").replace(/\s+/g, " ")}
+            fileName={`SKA ${def.title} ${def.periods ? periodLabels[period] : today}`.replace(/[^\w -]+/g, "").replace(/\s+/g, " ")}
             columns={result.columns}
             rows={result.rows}
             totals={result.totals}
@@ -126,7 +126,7 @@ async function ReportBody({ params, searchParams }: { params: Params; searchPara
             {groupingLabel && <span className="font-normal"> · {groupingLabel.toLowerCase()}</span>}
           </p>
           <p className="text-[11px] text-[#6e6e73]">
-            {periodLabel} · printed {formatDate(getToday())} by {user.fullName}
+            {periodLabel} · printed {formatDate(today)} by {user.fullName}
           </p>
         </div>
       </header>

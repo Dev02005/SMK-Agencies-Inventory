@@ -2,14 +2,26 @@
 
 import { Bell } from "lucide-react";
 import Link from "next/link";
+import { Suspense, use } from "react";
 import type { Role } from "@/lib/data/types";
 import { noticesFor, type Notice } from "@/lib/notices";
 import { useReadNotices } from "@/lib/notices-read";
 
-export function NotificationBell({ notices, role, profileId }: { notices: Notice[]; role: Role; profileId: string }) {
-  const [read] = useReadNotices();
-  const unread = noticesFor(notices, role, profileId).filter((n) => !read.has(n.id)).length;
+/** Notices are worked out for today at request time, so the count streams in; the bell shows at once. */
+export function NotificationBell({ notices, role, profileId }: { notices: Promise<Notice[]>; role: Role; profileId: string }) {
+  return (
+    <Suspense fallback={<BellLink unread={0} />}>
+      <UnreadBell notices={notices} role={role} profileId={profileId} />
+    </Suspense>
+  );
+}
 
+function UnreadBell({ notices, role, profileId }: { notices: Promise<Notice[]>; role: Role; profileId: string }) {
+  const [read] = useReadNotices();
+  return <BellLink unread={noticesFor(use(notices), role, profileId).filter((n) => !read.has(n.id)).length} />;
+}
+
+function BellLink({ unread }: { unread: number }) {
   return (
     <Link
       href="/notifications"

@@ -16,7 +16,7 @@ export function TopBar({
 }: {
   user: Profile;
   role: Role;
-  notices: Notice[];
+  notices: Promise<Notice[]>;
   onRoleChange: (role: Role) => void;
   onQuickAdd: () => void;
 }) {

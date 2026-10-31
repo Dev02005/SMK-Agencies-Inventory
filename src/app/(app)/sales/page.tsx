@@ -30,5 +30,5 @@ export default function SalesPage() {
 
 async function SalesData() {
   const [sales, products] = await Promise.all([getSales(), getProducts()]);
-  return <SalesList sales={sales} products={products} today={getToday()} />;
+  return <SalesList sales={sales} products={products} today={await getToday()} />;
 }

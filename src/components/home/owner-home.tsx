@@ -1,12 +1,12 @@
 import { IndianRupee } from "lucide-react";
 import Link from "next/link";
-import { connection } from "next/server";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
+import { LiveTime } from "@/components/ui/live-clock";
 import { ModuleGrid } from "@/components/ui/module-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { getDashboard, getFirm, getToday } from "@/lib/data";
+import { getDashboard, getFirm, getNow, getToday } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { toMT } from "@/lib/sales";
 
@@ -32,11 +32,16 @@ export function OwnerHome() {
   );
 }
 
-/** Rendered per request so the date is always today's; the rest of the page stays in the static shell. */
+const weekday = new Intl.DateTimeFormat("en-IN", { weekday: "long", timeZone: "UTC" });
+
+/** "Sunday, 1 Nov 2026 · 10:42 am · firm". Rendered per request so it is always today; the time keeps ticking. */
 export async function TodayLine() {
-  await connection();
-  const firm = await getFirm();
-  return `${formatDate(getToday())} · ${firm.name}`;
+  const [firm, today, now] = await Promise.all([getFirm(), getToday(), getNow()]);
+  return (
+    <>
+      {weekday.format(new Date(`${today}T00:00:00Z`))}, {formatDate(today)} · <LiveTime now={now} /> · {firm.name}
+    </>
+  );
 }
 
 async function Dashboard() {

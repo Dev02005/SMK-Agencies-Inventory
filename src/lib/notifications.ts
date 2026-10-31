@@ -32,7 +32,7 @@ import type { Notice } from "@/lib/notices";
 const when = (days: number) => (days < 0 ? `${-days} ${days === -1 ? "day" : "days"} overdue` : days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days`);
 
 export async function getNotifications(): Promise<Notice[]> {
-  const today = getToday();
+  const today = await getToday();
   const [dashboard, sales, parties, ageing, vehicles, balances, products, godowns, orders, transfers, cash, deliveries, suspense, purchases, policies, profiles] =
     await Promise.all([
       getDashboard(),

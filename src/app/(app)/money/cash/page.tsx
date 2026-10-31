@@ -5,8 +5,9 @@ import { Suspense } from "react";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { getCashSummary, getToday } from "@/lib/data";
-import { formatDate, formatINR } from "@/lib/format";
+import { Today } from "@/components/ui/today";
+import { getCashSummary } from "@/lib/data";
+import { formatINR } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
 import { CountChip } from "./count-chip";
 
@@ -17,7 +18,7 @@ export default function StaffCashPage() {
     <div className="animate-fade-up">
       <PageHeader
         title="Staff cash"
-        subtitle={`Opening + cash in − cash out = closing · ${formatDate(getToday())}`}
+        subtitle={<>Opening + cash in − cash out = closing · <Today fallback="today" /></>}
         actions={
           <>
             <SampleChip />

@@ -32,8 +32,9 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
   const { id } = await params;
   const e = await getEmployee(id);
   if (!e) notFound();
-  const thisWeek = e.visits.filter((v) => v.date >= getToday()).slice(0, 8);
-  const thisMonth = getToday().slice(0, 7);
+  const today = await getToday();
+  const thisWeek = e.visits.filter((v) => v.date >= today).slice(0, 8);
+  const thisMonth = today.slice(0, 7);
   const slip = e.slips.find((s) => s.month === thisMonth);
 
   return (
@@ -53,10 +54,10 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Attendance" action={<AttendanceChip record={e.today} />}>
-          <p className="text-[13px] text-ink-secondary">{formatMonth(getToday().slice(0, 7))}</p>
+          <p className="text-[13px] text-ink-secondary">{formatMonth(thisMonth)}</p>
           <div className="mt-2 grid grid-cols-7 gap-1.5" aria-label="Attendance this month">
             {e.attendance
-              .filter((a) => a.date.startsWith(getToday().slice(0, 7)))
+              .filter((a) => a.date.startsWith(thisMonth))
               .map((a) => (
                 <span
                   key={a.date}

@@ -5,6 +5,7 @@ import { SimpleForm } from "@/components/forms/simple-form";
 import { TargetBar } from "@/components/people/target-bar";
 import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
+import { Today } from "@/components/ui/today";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getEmployees, getTargets, getToday } from "@/lib/data";
 import { formatINR, formatMonth, formatNumber, shiftMonth } from "@/lib/format";
@@ -15,7 +16,7 @@ export default function TargetsPage() {
   return (
     <>
       <PageHeader
-        title={`Targets · ${formatMonth(getToday().slice(0, 7))}`}
+        title={<>Targets · <Today as="month" fallback="this month" /></>}
         subtitle="Sales and collections for each staff member's parties. The thin line marks how much of the month has gone."
         actions={<SampleChip />}
       />
@@ -27,7 +28,8 @@ export default function TargetsPage() {
 }
 
 async function Targets() {
-  const [targets, staff] = await Promise.all([getTargets(), getEmployees()]);
+  const [targets, staff, today] = await Promise.all([getTargets(), getEmployees(), getToday()]);
+  const thisMonth = today.slice(0, 7);
   const sum = (key: "sales" | "salesActual" | "collections" | "collectionsActual") => targets.reduce((s, t) => s + t[key], 0);
 
   return (
@@ -64,7 +66,7 @@ async function Targets() {
             submitLabel="Save target"
             fields={[
               { name: "staff", label: "Staff member", type: "select", options: staff.filter((s) => s.role === "field").map((s) => ({ value: s.id, label: s.fullName })) },
-              { name: "month", label: "Month", type: "select", options: [1, 2].map((n) => shiftMonth(getToday().slice(0, 7), n)).map((m) => ({ value: m, label: formatMonth(m) })) },
+              { name: "month", label: "Month", type: "select", options: [1, 2].map((n) => shiftMonth(thisMonth, n)).map((m) => ({ value: m, label: formatMonth(m) })) },
               { name: "sales", label: "Sales target", type: "number", prefix: "₹", required: true },
               { name: "collections", label: "Collections target", type: "number", prefix: "₹", required: true },
             ]}

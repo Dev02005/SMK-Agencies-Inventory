@@ -35,5 +35,5 @@ async function MoneyData() {
   const [receipts, payments, profiles] = await Promise.all([getReceipts(), getPayments(), getProfiles()]);
   const staff = Object.fromEntries(profiles.map((p) => [p.id, p.fullName]));
   const fieldStaff = profiles.filter((p) => p.role === "field").map((p) => p.id);
-  return <MoneyLists receipts={receipts} payments={payments} staff={staff} fieldStaff={fieldStaff} month={getToday().slice(0, 7)} />;
+  return <MoneyLists receipts={receipts} payments={payments} staff={staff} fieldStaff={fieldStaff} month={(await getToday()).slice(0, 7)} />;
 }

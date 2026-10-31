@@ -16,7 +16,7 @@ import { TopBar } from "./top-bar";
  * Phone (< 768px): frosted top bar + bottom tab bar.
  * Tablet (768–1023px): icon-only sidebar. Desktop (≥ 1024px): full 240px sidebar.
  */
-export function AppShell({ profiles, notices, children }: { profiles: Profile[]; notices: Notice[]; children: ReactNode }) {
+export function AppShell({ profiles, notices, children }: { profiles: Profile[]; notices: Promise<Notice[]>; children: ReactNode }) {
   const [role, setRole] = useViewAs();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const user = profiles.find((p) => p.role === role) ?? profiles[0];

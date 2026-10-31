@@ -11,7 +11,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Without Supabase keys the app runs on the sample data in `src/lib/data` and shows a "Sample data" chip.
+Open http://localhost:3000. The app opens on the sign-in page; the sample login is ID `123456789`, password `123456789` (change them with `SKA_LOGIN_ID` and `SKA_LOGIN_PASSWORD`). Everyone is signed out at 12 midnight India time.
+
+Without Supabase keys the app runs on the sample data in `src/lib/data` and shows a "Sample data" chip. The sample records follow the real calendar: they are rebuilt each day around today's date in India, so "today" on every screen is the real today.
 
 ## What is built (frontend phases F0–F6)
 
@@ -19,8 +21,10 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 
 | Area | Screens |
 | --- | --- |
-| Shell | Sidebar (desktop), icon rail (tablet), tab bar + quick-add sheet (phone), search (Ctrl K), profile menu with **View as** role switcher, login (`/login`) |
-| Home | `/` dashboard: today's sales, cash with staff, collected / outstanding / overdue, approvals, dues |
+| Shell | Sidebar (desktop), icon rail (tablet), tab bar + quick-add sheet (phone), search (Ctrl K), profile menu with **View as** role switcher, Account and Sign out |
+| Sign-in | `/login` first: every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
+| Account | `/account`: who is signed in, login ID, when they signed in, a countdown to the midnight sign-out, change password, sign out |
+| Home | `/` dashboard with today's real date and a live clock: today's sales, cash with staff, collected / outstanding / overdue, approvals, dues |
 | Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill |
 | Quotations | `/quotations`, `/quotations/new`, `/quotations/[id]` in the SKA paper format, printable |
 | Purchases | `/purchases`, `/purchases/new`, `/purchases/[id]` |
@@ -48,7 +52,7 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Dropdowns | Every dropdown is the app's own (`src/components/ui/select.tsx`), so it looks the same on every device: a panel under the field on tablets and computers, a bottom sheet with large rows on phones, search for lists longer than eight, full keyboard and screen-reader support |
 | SEO and sharing | The sign-in page is indexable with a description, canonical address, business details for Google (schema.org) and a branded preview image for WhatsApp and social links; `robots.txt` and `sitemap.xml` list only it. Every page behind sign-in is marked noindex, because it holds business records |
 
-The Personal PIN is checked on the server (`src/lib/personal-lock.ts`): a correct PIN sets a signed, httpOnly cookie for 30 minutes, and each Personal page checks it before reading any record, so nothing private reaches a locked browser. "View as" still picks the role in the browser; with login the server renders only the signed-in person's screens and notifications.
+The Personal PIN is checked on the server (`src/lib/personal-lock.ts`): a correct PIN sets a signed, httpOnly cookie for 30 minutes, and each Personal page checks it before reading any record, so nothing private reaches a locked browser. "View as" still picks the role in the browser; once each staff member has their own login, the server renders only the signed-in person's screens and notifications.
 
 The map uses OpenStreetMap's public tiles, which is fine for development; before go-live switch to a tile provider account (their usage policy limits heavy use). GPS positions are sample data until a GPS provider is chosen.
 
@@ -63,13 +67,13 @@ The frontend is complete. Next: connect Supabase.
 1. Create a Supabase project in the Mumbai region (staging first).
 2. Run `supabase/migrations/20261026000000_phase1_core.sql` in the SQL editor (or `supabase db push` with the CLI), then `supabase/seed.sql`.
 3. Create the owner's login in Authentication, then add their row to `profiles` with `role = 'owner'`.
-4. Copy `.env.example` to `.env.local` and fill in the project URL and publishable key, plus `PERSONAL_PIN`, `PERSONAL_LOCK_SECRET` and `NEXT_PUBLIC_SITE_URL` (the app's public address, used for link previews and the sitemap).
+4. Copy `.env.example` to `.env.local` and fill in the project URL and publishable key, plus `SESSION_SECRET`, `PERSONAL_PIN`, `PERSONAL_LOCK_SECRET` and `NEXT_PUBLIC_SITE_URL` (the app's public address, used for link previews and the sitemap).
 
 ## Where things are
 
 - `src/app/globals.css`: design tokens from the Design plan (colours, radius, shadows, frosted bar). No dark mode anywhere.
 - `src/lib/sales.ts`: sale rules (units to MT, totals, credit check, discount limits), shared with the database function.
-- `src/lib/data`: every screen's data. `getToday()` there is the one place "today" comes from (the sample date for now, the real date in India time once connected).
+- `src/lib/data`: every screen's data. `getToday()` there is the one place "today" comes from: the real date in India time, read at request time.
 - `src/lib/limits.ts`: business limits used on several screens (low stock, cash a staff member may carry); they become owner settings later.
 - `src/lib/sections.ts`: every module, its icon and colour; drives the sidebar, tab bar, search and module grid.
 - `src/lib/reports.ts`: every report, worked out from the same data functions as the screens so the two never disagree.
@@ -88,4 +92,5 @@ The frontend is complete. Next: connect Supabase.
 
 - Every page is sent with security headers (`next.config.ts`): no framing by other sites, no MIME sniffing, a strict referrer policy, HSTS, and only location and camera allowed.
 - Database: row-level security on every table; sales, ledger and stock are only written through checked functions. Field staff can only add cash-only parties assigned to themselves and record receipts they collected from their own parties. `npm audit` reports no known vulnerabilities in the app's packages.
-- Before go-live: set `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET`; make the app layout send only the signed-in user's notifications (see the note in `src/app/(app)/layout.tsx`); switch the map to a paid tile provider.
+- Sign-in: the session cookie is signed (HMAC) with `SESSION_SECRET`, httpOnly, same-site and secure in production; a wrong login waits 0.6 s before answering, which slows guessing.
+- Before go-live: set `SESSION_SECRET`, `SKA_LOGIN_ID`, `SKA_LOGIN_PASSWORD` (until Supabase Auth replaces them), `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET`; make the app layout send only the signed-in user's notifications (see the note in `src/app/(app)/layout.tsx`); switch the map to a paid tile provider.

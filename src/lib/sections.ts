@@ -3,6 +3,7 @@ import {
   CalendarCheck,
   ChartColumn,
   CircleSlash,
+  CircleUserRound,
   ClipboardList,
   FileText,
   Fuel,
@@ -204,6 +205,14 @@ const sections: Section[] = [
     tone: "grey",
     roles: ["owner", "office"],
   },
+  {
+    href: "/account",
+    title: "Account",
+    description: "Your sign-in, password and automatic sign-out",
+    icon: CircleUserRound,
+    tone: "grey",
+    roles: everyone,
+  },
 ];
 
 const byHref = (href: string) => sections.find((s) => s.href === href)!;
@@ -216,7 +225,7 @@ export const sidebarGroups: { label?: string; items: Section[] }[] = [
   { label: "Records", items: ["/parties", "/stock", "/people", "/fleet"].map(byHref) },
   { label: "Insights", items: [byHref("/reports")] },
   { label: "Private", items: [byHref("/personal")] },
-  { items: [byHref("/settings")] },
+  { items: ["/settings", "/account"].map(byHref) },
 ];
 
 export type Tab = { href: string; title: string; icon: LucideIcon };

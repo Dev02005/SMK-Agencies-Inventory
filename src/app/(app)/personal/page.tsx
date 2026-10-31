@@ -36,7 +36,7 @@ const days = (n: number) => (n < 0 ? `${-n} days late` : n === 0 ? "today" : n =
 async function Overview() {
   // Checked here, next to the data: the layout alone cannot stop a page from rendering.
   if (!(await isPersonalUnlocked())) return null;
-  const [banks, chits, rentals, policies, notes] = await Promise.all([getBankAccounts("personal"), getChits(), getRentals(), getPolicies(), getNotes()]);
+  const [banks, chits, rentals, policies, notes, today] = await Promise.all([getBankAccounts("personal"), getChits(), getRentals(), getPolicies(), getNotes(), getToday()]);
   const nextChit = chits.filter((c) => c.nextDue).sort((a, b) => a.daysToDue - b.daysToDue)[0];
   const rentDue = rentals.filter((r) => r.direction === "received" && r.status !== "paid");
 
@@ -47,8 +47,8 @@ async function Overview() {
       .filter((r) => r.status !== "paid")
       .map((r) => ({ key: r.id, title: `Rent ${r.direction === "received" ? "from" : "to"} ${r.counterparty}`, detail: formatINR(r.amountDue), days: r.status === "overdue" ? -1 : 0, href: "/personal/rents" })),
     ...notes
-      .filter((n) => n.remindOn && n.remindOn >= getToday())
-      .map((n) => ({ key: n.id, title: n.title, detail: `Reminder ${formatShortDate(n.remindOn!)}`, days: Math.round((Date.parse(n.remindOn!) - Date.parse(getToday())) / 86_400_000), href: "/personal/notes" })),
+      .filter((n) => n.remindOn && n.remindOn >= today)
+      .map((n) => ({ key: n.id, title: n.title, detail: `Reminder ${formatShortDate(n.remindOn!)}`, days: Math.round((Date.parse(n.remindOn!) - Date.parse(today)) / 86_400_000), href: "/personal/notes" })),
   ].sort((a, b) => a.days - b.days);
 
   return (

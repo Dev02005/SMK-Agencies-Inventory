@@ -30,5 +30,5 @@ export default function ToursPage() {
 
 async function ToursData() {
   const [visits, staff] = await Promise.all([getVisits(), getEmployees()]);
-  return <ToursBoard visits={visits} staff={staff.filter((s) => s.role === "field").map((s) => ({ id: s.id, name: s.fullName }))} today={getToday()} />;
+  return <ToursBoard visits={visits} staff={staff.filter((s) => s.role === "field").map((s) => ({ id: s.id, name: s.fullName }))} today={await getToday()} />;
 }

@@ -21,5 +21,5 @@ export default function NotificationsPage() {
 
 async function NotificationData() {
   const [notices, profiles] = await Promise.all([getNotifications(), getProfiles()]);
-  return <NotificationList notices={notices} profiles={profiles} today={getToday()} />;
+  return <NotificationList notices={notices} profiles={profiles} today={await getToday()} />;
 }

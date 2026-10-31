@@ -5,9 +5,10 @@ import { AttendanceChip } from "@/components/people/attendance-chip";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { Today } from "@/components/ui/today";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { getAttendanceCorrections, getAttendanceToday, getToday } from "@/lib/data";
-import { formatDate, formatMonth, formatShortDate } from "@/lib/format";
+import { formatMonth, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
 import { CheckInCard } from "./check-in-card";
 
@@ -16,7 +17,7 @@ export const metadata: Metadata = { title: "Attendance" };
 export default function AttendancePage() {
   return (
     <>
-      <PageHeader title="Attendance" subtitle={`Today, ${formatDate(getToday())}. Weekly off on Sundays.`} actions={<SampleChip />} />
+      <PageHeader title="Attendance" subtitle={<><Today />. Weekly off on Sundays.</>} actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton />}>
         <AttendanceData />
       </Suspense>
@@ -72,7 +73,7 @@ async function AttendanceData() {
         ]}
       />
 
-      <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">{formatMonth(getToday().slice(0, 7))} so far</h2>
+      <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">{formatMonth((await getToday()).slice(0, 7))} so far</h2>
       <DataTable
         rows={rows}
         rowKey={(r) => r.id}

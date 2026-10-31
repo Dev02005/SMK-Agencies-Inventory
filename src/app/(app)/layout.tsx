@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { AppShell } from "@/components/shell/app-shell";
+import { MidnightSignOut } from "@/components/shell/midnight-sign-out";
+import { requireSession } from "@/lib/auth";
 import { getProfiles } from "@/lib/data";
 import { getNotifications } from "@/lib/notifications";
 
@@ -11,13 +13,23 @@ export const metadata: Metadata = {
 
 /**
  * Sample mode sends every role's notifications and the staff list, because "View as" picks the role in the
- * browser. With login this must read the signed-in user and send only noticesFor(their role, their id).
+ * browser. With Supabase this must send only noticesFor(the signed-in user's role, their id).
+ * Notices are for today, so they stream in (the shell doesn't wait for them).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const [profiles, notices] = await Promise.all([getProfiles(), getNotifications()]);
   return (
-    <AppShell profiles={profiles} notices={notices}>
-      {children}
-    </AppShell>
+    <>
+      <AppShell profiles={await getProfiles()} notices={getNotifications()}>
+        {children}
+      </AppShell>
+      <Suspense>
+        <SessionCheck />
+      </Suspense>
+    </>
   );
+}
+
+async function SessionCheck() {
+  const { until } = await requireSession();
+  return <MidnightSignOut until={until} />;
 }

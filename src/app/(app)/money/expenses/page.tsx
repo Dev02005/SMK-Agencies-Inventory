@@ -29,5 +29,5 @@ export default function ExpensesPage() {
 }
 
 async function ExpensesData() {
-  return <ExpensesList expenses={await getExpenses()} month={getToday().slice(0, 7)} />;
+  return <ExpensesList expenses={await getExpenses()} month={(await getToday()).slice(0, 7)} />;
 }

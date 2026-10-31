@@ -3,23 +3,66 @@
  * becomes a query (or a call to a database view), and the screens stay unchanged.
  */
 import "server-only";
+import { connection } from "next/server";
+import { todayISO } from "@/lib/format";
 import { checkCredit, toMT } from "@/lib/sales";
-import * as sample from "./sample";
-import * as phase2 from "./sample-phase2";
-import * as phase3 from "./sample-phase3";
-import * as phase4 from "./sample-phase4";
+import * as base from "./sample";
+import * as base2 from "./sample-phase2";
+import * as base3 from "./sample-phase3";
+import * as base4 from "./sample-phase4";
 import * as phase5 from "./sample-phase5";
 import type { Ageing, BankEntry, CashHolder, LedgerEntry, Party, Profile, Sale } from "./types";
 
 export type * from "./types";
-export { OPENING_DATE } from "./sample";
+
+/** The fixed records (firm, products, people, banks, vehicles' chart) plus the dated ones built for `today`. */
+function buildBooks(today: string) {
+  const book = base.buildSample(today);
+  const [dated2, dated3, dated4] = [base2.buildPhase2(book), base3.buildPhase3(book), base4.buildPhase4(book)];
+  return {
+    sample: { ...base, ...book },
+    phase2: { ...base2, ...dated2 },
+    phase3: { ...base3, ...dated3 },
+    phase4: { ...base4, ...dated4 },
+  };
+}
+type Books = ReturnType<typeof buildBooks>;
+let builtFor = "";
+let sample: Books["sample"];
+let phase2: Books["phase2"];
+let phase3: Books["phase3"];
+let phase4: Books["phase4"];
 
 /**
- * "Today" (YYYY-MM-DD) for every screen. On sample data it is the sample date so the figures line up;
- * once Supabase is connected it becomes todayISO() from lib/format (India time).
+ * Today's date in India (YYYY-MM-DD), with the sample records brought up to it; they are rebuilt when the date
+ * changes. Every reader of dated records awaits this first. It waits for the request (connection), so a date is
+ * never frozen into a page at build time. With Supabase, the queries take its place.
  */
-export function getToday() {
-  return sample.SAMPLE_TODAY;
+async function live() {
+  await connection();
+  const today = todayISO();
+  if (today !== builtFor) {
+    ({ sample, phase2, phase3, phase4 } = buildBooks(today));
+    builtFor = today;
+  }
+  return today;
+}
+
+/** Today (YYYY-MM-DD) in India time, for every screen. */
+export async function getToday() {
+  return live();
+}
+
+/** The time now (ms since 1970), read at request time; clocks on the page tick on from it. */
+export async function getNow() {
+  await connection();
+  return Date.now();
+}
+
+/** The day the books were opened (opening balances and stock), for "all time" reports. */
+export async function getOpeningDate() {
+  await live();
+  return sample.OPENING_DATE;
 }
 
 export type PartyWithBalance = Party & {
@@ -29,33 +72,31 @@ export type PartyWithBalance = Party & {
 };
 export type SaleWithParty = Sale & { partyName: string };
 
-const { OPENING_DATE } = sample;
-
 // ── Masters ──────────────────────────────────────────────────────────────────
 
 export async function getFirm() {
-  return sample.firm;
+  return base.firm;
 }
 
-/** The signed-in user. Until login exists this is always the owner. */
+/** The signed-in user. The sample login (lib/session) is the owner's. */
 export async function getCurrentUser(): Promise<Profile> {
-  return sample.profiles[0];
+  return base.profiles[0];
 }
 
 export async function getProfiles() {
-  return sample.profiles;
+  return base.profiles;
 }
 
 export async function getProfile(id: string | undefined) {
-  return sample.profiles.find((p) => p.id === id);
+  return base.profiles.find((p) => p.id === id);
 }
 
 export async function getGodowns() {
-  return sample.godowns;
+  return base.godowns;
 }
 
 export async function getProducts() {
-  return sample.products;
+  return base.products;
 }
 
 // ── Parties and ledgers ──────────────────────────────────────────────────────
@@ -66,7 +107,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
   const rows: Omit<LedgerEntry, "balance">[] = [];
   if (party.openingBalance !== 0) {
     rows.push({
-      date: OPENING_DATE,
+      date: sample.OPENING_DATE,
       kind: "opening",
       ref: "Opening",
       narration: "Opening balance",
@@ -180,19 +221,23 @@ function withBalance(party: Party): PartyWithBalance {
 }
 
 export async function getParties(): Promise<PartyWithBalance[]> {
+  await live();
   return sample.parties.map(withBalance);
 }
 
 export async function getParty(id: string): Promise<PartyWithBalance | undefined> {
+  await live();
   const party = sample.parties.find((p) => p.id === id);
   return party && withBalance(party);
 }
 
 export async function getPartyLedger(id: string) {
+  await live();
   return ledgerFor(id);
 }
 
 export async function getPartyAgeing(id: string) {
+  await live();
   return ageingFor(id);
 }
 
@@ -203,47 +248,55 @@ const newestFirst = <T extends { date?: string; billDate?: string }>(a: T, b: T)
   (b.billDate ?? b.date ?? "").localeCompare(a.billDate ?? a.date ?? "");
 
 export async function getSales(): Promise<SaleWithParty[]> {
+  await live();
   return sample.sales
     .map((s) => ({ ...s, partyName: partyName(s.partyId) }))
     .sort((a, b) => newestFirst(a, b) || b.billNo - a.billNo);
 }
 
 export async function getSale(id: string): Promise<SaleWithParty | undefined> {
+  await live();
   const sale = sample.sales.find((s) => s.id === id);
   return sale && { ...sale, partyName: partyName(sale.partyId) };
 }
 
 export async function getQuotations() {
+  await live();
   return [...sample.quotations].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function getQuotation(id: string) {
+  await live();
   return sample.quotations.find((q) => q.id === id);
 }
 
 /** Standard terms printed on every new quotation; editable per quotation. */
 export async function getQuotationTerms() {
-  return sample.defaultTerms();
+  return base.defaultTerms();
 }
 
 export async function getPurchases() {
+  await live();
   return sample.purchases
     .map((p) => ({ ...p, companyName: partyName(p.companyId) }))
     .sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
 }
 
 export async function getPurchase(id: string) {
+  await live();
   const purchase = sample.purchases.find((p) => p.id === id);
   return purchase && { ...purchase, companyName: partyName(purchase.companyId) };
 }
 
 export async function getReceipts() {
+  await live();
   return sample.receipts
     .map((r) => ({ ...r, partyName: partyName(r.partyId) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.receiptNo - a.receiptNo);
 }
 
 export async function getPayments() {
+  await live();
   return sample.payments
     .map((p) => ({ ...p, partyName: partyName(p.partyId) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.paymentNo - a.paymentNo);
@@ -252,6 +305,7 @@ export async function getPayments() {
 // ── Stock ────────────────────────────────────────────────────────────────────
 
 export async function getStockBalances() {
+  await live();
   const totals = new Map<string, { godownId: string; productId: string; qty: number }>();
   for (const m of sample.stockMovements) {
     const key = `${m.godownId}|${m.productId}`;
@@ -264,16 +318,19 @@ export async function getStockBalances() {
 
 /** Every movement including opening stock, for the stock summary report. */
 export async function getAllStockMovements() {
+  await live();
   return [...sample.stockMovements];
 }
 
 export async function getStockMovements() {
+  await live();
   return [...sample.stockMovements].filter((m) => m.kind !== "opening").sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function getDashboard() {
+  await live();
   const today = sample.SAMPLE_TODAY;
   const todays = sample.sales.filter((s) => s.billDate === today && s.status === "saved");
   const lineQty = (category: "cement" | "steel") =>
@@ -400,7 +457,7 @@ function cashDays(holder: CashHolder): CashDay[] {
   const entries = cashEntries(holder);
   const days: CashDay[] = [];
   let balance = phase2.openingCash[holder] ?? 0;
-  for (let day = OPENING_DATE; day <= sample.SAMPLE_TODAY; day = nextDay(day)) {
+  for (let day = sample.OPENING_DATE; day <= sample.SAMPLE_TODAY; day = nextDay(day)) {
     const todays = entries.filter((e) => e.date === day);
     const cashIn = todays.filter((e) => e.amount > 0).reduce((s, e) => s + e.amount, 0);
     const cashOut = Math.abs(todays.filter((e) => e.amount < 0).reduce((s, e) => s + e.amount, 0));
@@ -435,6 +492,7 @@ async function getCashHolders() {
 }
 
 export async function getCashSummary() {
+  await live();
   const holders = await getCashHolders();
   return holders.map((h) => {
     const today = cashDays(h.holder).at(-1)!;
@@ -449,6 +507,7 @@ export async function getCashSummary() {
 }
 
 export async function getCashBook(holder: CashHolder) {
+  await live();
   const holders = await getCashHolders();
   const info = holders.find((h) => h.holder === holder);
   if (!info) return undefined;
@@ -459,10 +518,11 @@ export async function getCashBook(holder: CashHolder) {
 // ── Expenses ─────────────────────────────────────────────────────────────────
 
 export async function getVehicleNames() {
-  return phase2.vehicleNames;
+  return base2.vehicleNames;
 }
 
 export async function getExpenses() {
+  await live();
   return [...phase2.expenses]
     .map((e) => ({
       ...e,
@@ -474,6 +534,7 @@ export async function getExpenses() {
 // ── Advances and cement commitments ─────────────────────────────────────────
 
 export async function getCommitments() {
+  await live();
   return sample.commitments.map((c) => {
     const partySales = sample.sales
       .filter((s) => s.partyId === c.partyId && s.status === "saved" && s.billDate >= c.date)
@@ -512,12 +573,14 @@ export async function getCommitments() {
 }
 
 export async function getCommitment(id: string) {
+  await live();
   return (await getCommitments()).find((c) => c.id === id);
 }
 
 // ── Ageing, reminders and bad debts ─────────────────────────────────────────
 
 export async function getAgeingReport() {
+  await live();
   const parties = (await getParties()).filter((p) => p.kind === "customer" || p.kind === "sub_dealer");
   return parties
     .map((p) => {
@@ -543,10 +606,12 @@ export async function getAgeingReport() {
 }
 
 export async function getReminders() {
+  await live();
   return [...phase2.reminders].map((r) => ({ ...r, partyName: partyName(r.partyId) })).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function getBadDebts() {
+  await live();
   return phase2.badDebts.map((b) => ({ ...b, partyName: partyName(b.partyId), approvedByName: holderName(b.approvedBy) }));
 }
 
@@ -575,12 +640,14 @@ function bankEntries(accountId: string): (BankEntry & { balance: number })[] {
 }
 
 export async function getBankAccounts(scope: "business" | "personal" = "business") {
+  await live();
   return phase2.bankAccounts
     .filter((a) => a.scope === scope)
     .map((a) => ({ ...a, balance: bankEntries(a.id).at(-1)?.balance ?? a.openingBalance }));
 }
 
 export async function getBankEntries(accountId: string) {
+  await live();
   return bankEntries(accountId).reverse();
 }
 
@@ -596,6 +663,7 @@ function monthOffset(iso: string, months: number, day: number) {
 }
 
 export async function getChits() {
+  await live();
   return phase2.chits.map((c) => {
     const nextDue = c.paidMonths < c.months ? monthOffset(c.startDate, c.paidMonths, c.dueDay) : undefined;
     return {
@@ -609,6 +677,7 @@ export async function getChits() {
 }
 
 export async function getRentals() {
+  await live();
   const thisMonth = sample.SAMPLE_TODAY.slice(0, 7);
   const today = Number(sample.SAMPLE_TODAY.slice(8, 10));
   return phase2.rentals.map((r) => {
@@ -622,16 +691,19 @@ export async function getRentals() {
 }
 
 export async function getPolicies() {
+  await live();
   return phase2.policies
     .map((p) => ({ ...p, daysLeft: daysBetween(sample.SAMPLE_TODAY, p.nextDue) }))
     .sort((a, b) => a.nextDue.localeCompare(b.nextDue));
 }
 
 export async function getNotes() {
+  await live();
   return [...phase2.notes].sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
 export async function getDocuments() {
+  await live();
   return [...phase2.documents].sort((a, b) => b.addedOn.localeCompare(a.addedOn));
 }
 
@@ -657,6 +729,7 @@ function loanBalance(loan: (typeof phase3.loans)[number]) {
 }
 
 export async function getEmployees() {
+  await live();
   return phase3.employees.map((e) => {
     const profile = sample.profiles.find((p) => p.id === e.profileId)!;
     return {
@@ -671,6 +744,7 @@ export async function getEmployees() {
 }
 
 export async function getEmployee(id: string) {
+  await live();
   const employee = (await getEmployees()).find((e) => e.id === id);
   if (!employee) return undefined;
   const parties = (await getParties()).filter((p) => p.assignedTo === id);
@@ -686,11 +760,13 @@ export async function getEmployee(id: string) {
 }
 
 export async function getAttendanceToday() {
+  await live();
   return (await getEmployees()).map((e) => ({ id: e.id, name: e.fullName, role: e.role, record: e.today, month: e.month }));
 }
 
 /** Attendance records someone corrected, newest first, with whose record it was. */
 export async function getAttendanceCorrections() {
+  await live();
   return phase3.attendance
     .filter((a) => a.correctedBy)
     .map((a) => ({ ...a, name: staffName(a.profileId) }))
@@ -698,12 +774,14 @@ export async function getAttendanceCorrections() {
 }
 
 export async function getVisits() {
+  await live();
   return phase3.visits
     .map((v) => ({ ...v, staffName: staffName(v.profileId), partyName: v.partyId ? partyName(v.partyId) : (v.prospect ?? "New party") }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export async function getTargets() {
+  await live();
   const month = sample.SAMPLE_TODAY.slice(0, 7);
   const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
   return phase3.targets.map((t) => {
@@ -723,10 +801,12 @@ export async function getTargets() {
 }
 
 export async function getLoans() {
+  await live();
   return phase3.loans.map((l) => ({ ...l, name: staffName(l.profileId), balance: loanBalance(l) }));
 }
 
 export async function getSalarySheet(month: string) {
+  await live();
   return phase3
     .salarySlips()
     .filter((s) => s.month === month)
@@ -736,6 +816,7 @@ export async function getSalarySheet(month: string) {
 // ── Orders and deliveries ────────────────────────────────────────────────────
 
 export async function getOrders() {
+  await live();
   return phase3.orders.map((o) => {
     const bills = o.saleIds.map((id) => sample.sales.find((s) => s.id === id)).filter((s): s is Sale => Boolean(s));
     const dispatchedQty = (productId: string) => bills.flatMap((b) => b.lines).filter((l) => l.productId === productId).reduce((s, l) => s + l.qty, 0);
@@ -750,10 +831,12 @@ export async function getOrders() {
 }
 
 export async function getOrder(id: string) {
+  await live();
   return (await getOrders()).find((o) => o.id === id);
 }
 
 export async function getDeliveries() {
+  await live();
   return phase3.deliveries.map((d) => {
     const sale = sample.sales.find((s) => s.id === d.saleId)!;
     return {
@@ -771,6 +854,7 @@ export async function getDeliveries() {
 
 /** Sales and collection staff: today's visits, parties to collect from, cash in hand, target progress. */
 export async function getFieldHome(profileId: string) {
+  await live();
   const today = sample.SAMPLE_TODAY;
   const [visits, ageing, cash, targets, orders] = await Promise.all([getVisits(), getAgeingReport(), getCashSummary(), getTargets(), getOrders()]);
   const myParties = new Set(sample.parties.filter((p) => p.assignedTo === profileId).map((p) => p.id));
@@ -787,6 +871,7 @@ export async function getFieldHome(profileId: string) {
 
 /** Godown in-charge: stock on hand, lorries arriving today, bills to load and orders waiting. */
 export async function getGodownHome() {
+  await live();
   const today = sample.SAMPLE_TODAY;
   const [balances, products, godowns, orders] = await Promise.all([getStockBalances(), getProducts(), getGodowns(), getOrders()]);
   return {
@@ -814,6 +899,7 @@ export async function getGodownHome() {
 
 /** Driver: today's deliveries, cash in hand and vehicle renewals. */
 export async function getDriverHome(profileId: string) {
+  await live();
   const today = sample.SAMPLE_TODAY;
   const [deliveries, cash, policies] = await Promise.all([getDeliveries(), getCashSummary(), getPolicies()]);
   return {
@@ -832,6 +918,7 @@ export async function getDriverHome(profileId: string) {
 const godownName = (id: string) => sample.godowns.find((g) => g.id === id)?.name ?? id;
 
 export async function getTransfers() {
+  await live();
   return [...phase4.transfers]
     .map((t) => ({ ...t, fromName: godownName(t.from), toName: godownName(t.to) }))
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -839,6 +926,7 @@ export async function getTransfers() {
 
 /** Loads sold straight off a lorry: loaded, sold (bills with that lorry number) and still on the truck. */
 export async function getLorryLoads() {
+  await live();
   return sample.purchases
     .filter((p) => p.onLorry)
     .map((p) => {
@@ -861,6 +949,7 @@ export async function getLorryLoads() {
 }
 
 export async function getSuspenseLoads() {
+  await live();
   return phase4.suspenseLoads
     .map((s) => ({
       ...s,
@@ -898,10 +987,12 @@ function vehicleSummary(v: (typeof phase4.vehicles)[number]) {
 }
 
 export async function getVehicles() {
+  await live();
   return phase4.vehicles.map(vehicleSummary);
 }
 
 export async function getVehicle(id: string) {
+  await live();
   const v = phase4.vehicles.find((x) => x.id === id);
   if (!v) return undefined;
   return {
@@ -912,6 +1003,7 @@ export async function getVehicle(id: string) {
 }
 
 export async function getTrips() {
+  await live();
   return phase4.trips.map((t) => {
     const vehicle = phase4.vehicles.find((v) => v.id === t.vehicleId)!;
     const label = phase4.vehicleLabel(vehicle);
@@ -929,11 +1021,12 @@ export async function getTrips() {
 }
 
 export async function getFreightRates() {
-  return phase4.freightRates;
+  return base4.freightRates;
 }
 
 /** Own drivers (cash given, spent and returned) and lorry owners we rent from. */
 export async function getDrivers() {
+  await live();
   const cash = await getCashSummary();
   const own = sample.profiles
     .filter((p) => p.role === "driver")
@@ -964,6 +1057,7 @@ export async function getDrivers() {
 
 /** Vehicles with a GPS position, today's route for the lorry, and the places on the freight chart. */
 export async function getFleetMap() {
+  await live();
   return {
     vehicles: (await getVehicles()).filter((v) => v.gps),
     route: phase4.routeToday,
@@ -975,6 +1069,7 @@ export async function getFleetMap() {
 
 /** Templates, rules and a few real overdue parties to preview the messages with. */
 export async function getReminderSetup() {
+  await live();
   const ageing = await getAgeingReport();
   const previews = ageing
     .filter((r) => r.overdue > 0)

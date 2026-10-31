@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Download, LogOut } from "lucide-react";
+import { Check, Download, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { signOut } from "@/app/login/actions";
 import { cn } from "@/lib/cn";
 import type { Profile, Role } from "@/lib/data/types";
 import { promptInstall, useInstall } from "@/lib/install";
@@ -93,14 +94,26 @@ export function ProfileMenu({
               </button>
             )}
             <Link
-              href="/login"
+              href="/account"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 rounded-xl px-3 py-2 text-[15px] text-ink-secondary hover:bg-card-subtle"
             >
+              <UserRound size={16} strokeWidth={1.75} aria-hidden />
+              Account
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                void signOut();
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[15px] text-ink-secondary hover:bg-card-subtle"
+            >
               <LogOut size={16} strokeWidth={1.75} aria-hidden />
               Sign out
-            </Link>
+            </button>
           </div>
         </div>
       )}

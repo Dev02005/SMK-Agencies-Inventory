@@ -30,5 +30,5 @@ export default function OrdersPage() {
 
 async function OrdersData() {
   const [orders, products] = await Promise.all([getOrders(), getProducts()]);
-  return <OrdersBoard orders={orders} products={products} today={getToday()} />;
+  return <OrdersBoard orders={orders} products={products} today={await getToday()} />;
 }
