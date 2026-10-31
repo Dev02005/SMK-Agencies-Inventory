@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens from the "Design plan" tab of the project plan.
+ * Light theme only: there are deliberately no dark-mode styles anywhere.
+ */
+:root {
+  color-scheme: light;
+
+  --page: #f5f5f7;
+  --card: #ffffff;
+  --card-subtle: #fafafc;
+  --hairline: #e8e8ed;
+  --divider: #d2d2d7;
+  --text: #1d1d1f;
+  /* Greys, blue and green are a shade darker than Apple's web values so small text passes WCAG AA (4.5:1)
+     on white, the page grey and the tinted chip backgrounds. Checked in the F6 accessibility pass. */
+  --text-secondary: #636368;
+  --text-tertiary: #707075;
+  --accent: #0068d1;
+  --accent-soft: #e8f1fc;
+  --link: #0066cc;
+  --good: #1f7d37;
+  --good-soft: #e9f7ee;
+  --warning: #b25000;
+  --warning-soft: #fff4e5;
+  --danger: #d70015;
+  --danger-soft: #fdecee;
+  --teal: #0e7c86;
+  --purple: #8944ab;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-card-subtle: var(--card-subtle);
+  --color-hairline: var(--hairline);
+  --color-divider: var(--divider);
+  --color-ink: var(--text);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-tertiary: var(--text-tertiary);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-link: var(--link);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-teal: var(--teal);
+  --color-purple: var(--purple);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, var(--font-inter), "Noto Sans Telugu", system-ui, sans-serif;
+
+  --radius-card: 24px;
+  --radius-sheet: 28px;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Apple-style frosted bar used for the top bar and the phone tab bar. */
+@utility frosted {
+  background-color: rgba(245, 245, 247, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* OrbWeather-style white card: 24px corners, hairline border, near-invisible shadow. */
+@utility surface {
+  background-color: var(--card);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.2px;
+  -webkit-tap-highlight-color: transparent;
+  /* Keeps content clear of the notch when a phone is turned sideways (zero on every other screen). */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Grid children may shrink below their content, so long names truncate instead of pushing phone pages sideways.
+   In the base layer so any min-w-* utility still wins. */
+@layer base {
+  .grid > * {
+    min-width: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Sideways-scrolling rows (tabs, chips, stat cards) swipe without showing a scrollbar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Wrong-PIN shake on the personal PIN pad. */
+@keyframes shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 300ms ease-out both;
+}
+
+@utility animate-sheet-up {
+  animation: sheet-up 300ms ease-out both;
+}
+
+/* Leaflet map labels in the app's type and colours. */
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+.ska-map-label,
+.ska-map-vehicle {
+  border: 0;
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  font-size: 12px;
+  padding: 2px 6px;
+}
+.ska-map-label {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
+}
+.ska-map-vehicle {
+  background: var(--card);
+  font-weight: 600;
+}
+.ska-map-label::before,
+.ska-map-vehicle::before {
+  display: none;
+}
+
+/* Printed bills and quotations: A4, white page, no app chrome. */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+/* Reports with many columns print sideways. */
+@page landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+.print-landscape {
+  page: landscape;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

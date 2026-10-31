@@ -1,0 +1,129 @@
+import { IndianRupee } from "lucide-react";
+import Link from "next/link";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
+import { Chip } from "@/components/ui/chip";
+import { ModuleGrid } from "@/components/ui/module-grid";
+import { PageHeader } from "@/components/ui/page-header";
+import { getDashboard, getFirm } from "@/lib/data";
+import { formatDate, formatINR, formatNumber, todayISO } from "@/lib/format";
+import { toMT } from "@/lib/sales";
+
+/** Owner and office: the whole business today. */
+export function OwnerHome() {
+  return (
+    <div className="animate-fade-up">
+      <PageHeader
+        title="Today"
+        subtitle={
+          <Suspense fallback="Sri Kameswari Agencies">
+            <TodayLine />
+          </Suspense>
+        }
+        actions={<SampleChip />}
+      />
+      <Suspense fallback={<ListSkeleton rows={8} />}>
+        <Dashboard />
+      </Suspense>
+      <h2 className="mb-3 mt-8 text-[22px] font-semibold tracking-[-0.3px] text-ink">All modules</h2>
+      <ModuleGrid />
+    </div>
+  );
+}
+
+/** Rendered per request so the date is always today's; the rest of the page stays in the static shell. */
+export async function TodayLine() {
+  await connection();
+  const firm = await getFirm();
+  return `${formatDate(todayISO())} · ${firm.name}`;
+}
+
+async function Dashboard() {
+  const d = await getDashboard();
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      <section className="surface p-5 md:col-span-2 md:p-6">
+        <div className="flex items-center gap-3">
+          <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
+            <IndianRupee size={16} strokeWidth={2} aria-hidden />
+          </span>
+          <h2 className="text-[15px] text-ink-secondary">Today&apos;s sales</h2>
+          <Link href="/sales/new" className="ml-auto text-[15px] text-link hover:underline">
+            New sale ›
+          </Link>
+        </div>
+        <p className="mt-4 text-[40px] font-semibold leading-[44px] tracking-[-0.5px] tabular-nums text-ink">
+          {formatINR(d.sales.amount)}
+        </p>
+        <p className="mt-2 text-[15px] text-ink-secondary">
+          {formatNumber(d.sales.cementBags)} bags cement ({formatNumber(toMT(d.sales.cementBags, "bag"))} MT) ·{" "}
+          {formatNumber(d.sales.steelMT)} MT steel · {d.sales.bills} bills
+        </p>
+      </section>
+
+      <SectionCard title="Cash with staff">
+        <ul className="divide-y divide-hairline">
+          {d.cashWithStaff.map((person) => (
+            <li key={person.id} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] text-ink">{person.name}</p>
+                <Chip tone={person.handedOver ? "good" : "warning"} className="mt-1">
+                  {person.handedOver ? "Handed over" : "With staff"}
+                </Chip>
+              </div>
+              <span className="text-[15px] font-medium tabular-nums text-ink">{formatINR(person.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+
+      <StatRow className="md:col-span-3">
+        <StatCard label="Collected today" value={formatINR(d.collected)} />
+        <StatCard label="Outstanding" value={formatINR(d.outstanding)} />
+        <StatCard label="Overdue 30+ days" value={formatINR(d.overdue30)} tone="danger" />
+      </StatRow>
+
+      <SectionCard
+        title="Needs your approval"
+        action={<Chip tone={d.approvals.length ? "danger" : "neutral"}>{d.approvals.length}</Chip>}
+        className="md:col-span-3 lg:col-span-2"
+      >
+        {d.approvals.length === 0 ? (
+          <p className="py-3 text-[15px] text-ink-secondary">Nothing waiting.</p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {d.approvals.map((item) => (
+              <li key={item.id}>
+                <Link href={item.href} className="flex items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] text-ink">{item.title}</p>
+                    <p className="text-[13px] text-danger">{item.detail}</p>
+                  </div>
+                  <span className="text-[15px] text-link">Review ›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Due this week" className="md:col-span-3 lg:col-span-1">
+        {d.upcoming.length === 0 ? (
+          <p className="py-3 text-[15px] text-ink-secondary">Nothing due this week.</p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {d.upcoming.map((item) => (
+              <li key={item.id}>
+                <Link href={item.href} className="flex items-center gap-3 py-3">
+                  <span className="flex-1 text-[15px] text-ink">{item.title}</span>
+                  <Chip tone={item.when === "overdue" ? "danger" : "warning"}>{item.when}</Chip>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
