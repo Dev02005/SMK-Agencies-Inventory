@@ -34,7 +34,7 @@ export default async function LoginPage() {
         <div className="mb-8 flex flex-col items-center text-center">
           <Image src="/icon.svg" alt="" width={64} height={64} unoptimized className="mb-5 rounded-[16px]" />
           <h1 className="text-[28px] font-semibold tracking-[-0.4px] text-ink">Sign in to SKA</h1>
-          <p className="mt-1 text-[15px] text-ink-secondary">{firm.name} · Polaki</p>
+          <p className="mt-1 text-[15px] text-ink-secondary">{firm.name}</p>
           <div className="mt-3">
             <SampleChip />
           </div>

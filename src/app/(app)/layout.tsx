@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { AppShell } from "@/components/shell/app-shell";
-import { MidnightSignOut } from "@/components/shell/midnight-sign-out";
+import { MidnightSignOut, SignedInSync } from "@/components/shell/midnight-sign-out";
 import { requireSession } from "@/lib/auth";
-import { getProfiles } from "@/lib/data";
+import { getCurrentUser, getFirm, getProfiles } from "@/lib/data";
 import { getNotifications } from "@/lib/notifications";
 
 /** Everything behind sign-in holds business records, so search engines are told not to list or follow it. */
@@ -17,9 +17,10 @@ export const metadata: Metadata = {
  * Notices are for today, so they stream in (the shell doesn't wait for them).
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
+  const [profiles, firm] = await Promise.all([getProfiles(), getFirm()]);
   return (
     <>
-      <AppShell profiles={await getProfiles()} notices={getNotifications()}>
+      <AppShell profiles={profiles} firmName={firm.name} notices={getNotifications()}>
         {children}
       </AppShell>
       <Suspense>
@@ -30,6 +31,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 }
 
 async function SessionCheck() {
-  const { until } = await requireSession();
-  return <MidnightSignOut until={until} />;
+  const [{ until }, user] = await Promise.all([requireSession(), getCurrentUser()]);
+  return (
+    <>
+      <MidnightSignOut until={until} />
+      <SignedInSync id={user.id} role={user.role} />
+    </>
+  );
 }

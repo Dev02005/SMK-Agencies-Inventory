@@ -5,8 +5,11 @@ import { useState } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import type { Expense, ExpenseHead } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
 import { expenseHeadLabels } from "@/lib/labels";
 
@@ -15,10 +18,14 @@ type Row = Expense & { paidFromLabel: string };
 export function ExpensesList({ expenses, month }: { expenses: Row[]; month: string }) {
   const [head, setHead] = useState<ExpenseHead | "all">("all");
   const [query, setQuery] = useState("");
+  const dates = useDateFilter();
 
   const q = query.trim().toLowerCase();
   const rows = expenses.filter(
-    (e) => (head === "all" || e.head === head) && (!q || `${e.description} ${e.tag?.label ?? ""} ${e.paidFromLabel}`.toLowerCase().includes(q)),
+    (e) =>
+      inDateFilter(e.date, dates) &&
+      (head === "all" || e.head === head) &&
+      (!q || `${e.description} ${e.tag?.label ?? ""} ${e.paidFromLabel}`.toLowerCase().includes(q)),
   );
   const thisMonth = expenses.filter((e) => e.date.startsWith(month));
   const byHead = (Object.keys(expenseHeadLabels) as ExpenseHead[])
@@ -51,6 +58,7 @@ export function ExpensesList({ expenses, month }: { expenses: Row[]; month: stri
         </ul>
       </div>
 
+      <DataTools title="Expenses" />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <FilterChips
           label="Expense head"

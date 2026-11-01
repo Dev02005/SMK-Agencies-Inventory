@@ -15,7 +15,7 @@ import { isLowStock } from "@/lib/limits";
 import { TodayLine } from "./owner-home";
 
 
-/** Godown in-charge: bills to load, lorries to unload, stock and orders waiting. */
+/** Godown in-charge: bills to load, today's company lorries, stock and orders waiting. */
 export function GodownHome() {
   return (
     <div className="animate-fade-up">
@@ -29,7 +29,7 @@ export function GodownHome() {
         actions={
           <>
             <SampleChip />
-            <ButtonLink href="/stock/inward/new">Unload a lorry</ButtonLink>
+            <ButtonLink href="/purchases/new">New purchase</ButtonLink>
           </>
         }
       />
@@ -48,7 +48,7 @@ async function GodownDay() {
     <div className="space-y-4">
       <StatRow>
         <StatCard label="Bills to load" value={d.toLoad.length} hint={describeQuantities(d.toLoad.flatMap((b) => b.lines), products)} />
-        <StatCard label="Lorries arriving" value={d.arriving.length} />
+        <StatCard label="Company lorries today" value={d.lorriesToday.length} />
         <StatCard label="Low stock" value={lowCount} tone={lowCount ? "warning" : "good"} hint="items" />
       </StatRow>
 
@@ -75,12 +75,12 @@ async function GodownDay() {
           )}
         </SectionCard>
 
-        <SectionCard title="Lorries arriving today">
-          {d.arriving.length === 0 ? (
-            <p className="py-2 text-[15px] text-ink-secondary">None expected.</p>
+        <SectionCard title="Company lorries today">
+          {d.lorriesToday.length === 0 ? (
+            <p className="py-2 text-[15px] text-ink-secondary">None today.</p>
           ) : (
             <ul className="divide-y divide-hairline">
-              {d.arriving.map((p) => (
+              {d.lorriesToday.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 py-3">
                   <Truck size={20} strokeWidth={1.75} className="shrink-0 text-warning" aria-hidden />
                   <div className="min-w-0 flex-1">
@@ -91,8 +91,8 @@ async function GodownDay() {
                       {describeQuantities(p.lines, products)} → {p.godownName}
                     </p>
                   </div>
-                  <ButtonLink href="/stock/inward/new" variant="secondary" className="h-9 px-4 text-[14px]">
-                    Unload
+                  <ButtonLink href={`/purchases/${p.id}`} variant="secondary" className="h-9 px-4 text-[14px]">
+                    View
                   </ButtonLink>
                 </li>
               ))}

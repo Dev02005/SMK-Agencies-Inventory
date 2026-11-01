@@ -139,7 +139,7 @@ async function PartyDetail({ params }: { params: PageProps<"/parties/[id]">["par
       </div>
 
       <div className="mt-4">
-        <LedgerView entries={ledger} />
+        <LedgerView entries={ledger} partyName={party.name} />
       </div>
     </>
   );

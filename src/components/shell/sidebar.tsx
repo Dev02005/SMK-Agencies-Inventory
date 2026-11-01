@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/lib/data/types";
-import { activeHref, sidebarGroups } from "@/lib/sections";
+import { activeHref, sidebarGroups, toneClasses } from "@/lib/sections";
 
 export function Sidebar({ pathname, role }: { pathname: string; role: Role }) {
   const groups = sidebarGroups
@@ -45,12 +45,10 @@ export function Sidebar({ pathname, role }: { pathname: string; role: Role }) {
                       : "text-ink-secondary hover:bg-card/70 hover:text-ink",
                   )}
                 >
-                  <Icon
-                    size={20}
-                    strokeWidth={1.75}
-                    className={cn("shrink-0", isActive && "text-accent")}
-                    aria-hidden
-                  />
+                  {/* Each section keeps its colour, as on the module cards. */}
+                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", toneClasses[section.tone])}>
+                    <Icon size={16} strokeWidth={2} aria-hidden />
+                  </span>
                   <span className="hidden truncate lg:inline">{section.title}</span>
                 </Link>
               );

@@ -3,24 +3,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
-import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
-import { SampleActionButton } from "@/components/ui/sample-action";
 import { getLorryLoads, getProducts } from "@/lib/data";
-import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
-import { lineQty } from "@/lib/quantities";
+import { formatDate } from "@/lib/format";
+import { DeviceLorryStock } from "./device-lorry-stock";
+import { LoadLines } from "./load-lines";
 
 export const metadata: Metadata = { title: "Lorry stock" };
 
+/** Bags still on company lorries that are being sold off the truck. The lorries themselves and their bills are under Sales › Lorry sales. */
 export default function LorryStockPage() {
   return (
     <div className="animate-fade-up">
-      <PageHeader
-        title="Lorry stock"
-        subtitle="Company lorries sold straight off the truck, without unloading into a godown"
-        actions={<SampleChip />}
-      />
+      <PageHeader title="Lorry stock" subtitle="Bags still on company lorries being sold straight off the truck" actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton />}>
         <Loads />
       </Suspense>
@@ -30,10 +26,11 @@ export default function LorryStockPage() {
 
 async function Loads() {
   const [loads, products] = await Promise.all([getLorryLoads(), getProducts()]);
-  if (loads.length === 0) return <SectionCard>No lorry is selling right now.</SectionCard>;
+  const selling = loads.filter((l) => l.status === "selling");
   return (
     <div className="space-y-4">
-      {loads.map((load) => (
+      <DeviceLorryStock products={products} serverCount={selling.length} />
+      {selling.map((load) => (
         <SectionCard
           key={load.id}
           title={
@@ -42,7 +39,7 @@ async function Loads() {
               {load.lorryNo}
             </span>
           }
-          action={<Chip tone={load.status === "selling" ? "warning" : "good"}>{load.status === "selling" ? "Selling" : "Closed"}</Chip>}
+          action={<Chip tone="warning">Selling</Chip>}
         >
           <p className="-mt-2 text-[13px] text-ink-secondary">
             {load.companyName} · arrived {formatDate(load.arrivedOn)} ·{" "}
@@ -50,48 +47,7 @@ async function Loads() {
               purchase
             </Link>
           </p>
-          <div className="mt-4 space-y-3">
-            {load.lines.map((l) => {
-              const p = products.find((x) => x.id === l.productId);
-              return (
-                <div key={l.productId}>
-                  <div className="flex justify-between text-[15px]">
-                    <span className="text-ink">{p?.name}</span>
-                    <span className="tabular-nums text-ink">
-                      <span className="font-semibold">{lineQty(l.left, p)}</span> left of {formatNumber(l.loaded)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-hairline" role="img" aria-label={`${l.sold} sold of ${l.loaded}`}>
-                    <div className="h-full bg-warning" style={{ width: `${(l.sold / l.loaded) * 100}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <h3 className="mt-5 text-[15px] font-semibold text-ink">Sold from this lorry</h3>
-          <ul className="mt-1 divide-y divide-hairline">
-            {load.bills.map((b) => (
-              <li key={b.id}>
-                <Link href={`/sales/${b.id}`} className="flex items-center gap-3 py-2.5">
-                  <span className="w-14 shrink-0 text-[13px] text-ink-secondary">{formatShortDate(b.date)}</span>
-                  <span className="min-w-0 flex-1 truncate text-[15px] text-ink">
-                    Bill {b.billNo} · {b.partyName}
-                  </span>
-                  <span className="text-[13px] text-ink-secondary">{formatNumber(b.qty)} bags</span>
-                  <span className="w-24 text-right text-[15px] tabular-nums text-ink">{formatINR(b.total)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {load.status === "selling" && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ButtonLink href="/sales/new">Sell from this lorry</ButtonLink>
-              <SampleActionButton message="Sample mode: the lorry would be closed: what's left is unloaded into a godown and shortages recorded.">
-                Close lorry
-              </SampleActionButton>
-            </div>
-          )}
+          <LoadLines lines={load.lines} products={products} />
         </SectionCard>
       ))}
     </div>

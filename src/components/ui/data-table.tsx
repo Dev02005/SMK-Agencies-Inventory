@@ -80,13 +80,13 @@ export function DataTable<T>({
       <div className="surface hidden overflow-x-auto md:block" tabIndex={rowHref ? undefined : 0}>
         <table className="w-full text-[15px]">
           <thead>
-            <tr className="border-b border-hairline">
+            <tr className="border-b border-hairline bg-[#f2f7fd]">
               {columns.map((c) => (
                 <th
                   key={c.key}
                   scope="col"
                   className={cn(
-                    "whitespace-nowrap px-4 py-3 text-left text-[12px] font-normal text-ink-secondary first:pl-6 last:pr-6",
+                    "whitespace-nowrap px-4 py-3 text-left text-[12px] font-medium text-[#3d5a80] first:pl-6 last:pr-6",
                     c.align === "right" && "text-right",
                     c.className,
                   )}

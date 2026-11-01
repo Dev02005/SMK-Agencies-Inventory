@@ -4,10 +4,14 @@ import { BadgeCheck, CalendarClock, CheckCheck, ClipboardList, IndianRupee, Lock
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
+import { ExportTable } from "@/components/ui/export-table";
 import { FilterChips } from "@/components/ui/filters";
 import { cn } from "@/lib/cn";
 import type { Profile } from "@/lib/data/types";
-import { formatShortDate } from "@/lib/format";
+import { inDateFilter } from "@/lib/date-filter";
+import { formatDate, formatShortDate } from "@/lib/format";
 import { noticesFor, type Notice, type NoticeKind } from "@/lib/notices";
 import { useReadNotices } from "@/lib/notices-read";
 import { useViewAs } from "@/lib/roles";
@@ -37,8 +41,9 @@ export function NotificationList({ notices, profiles, today }: { notices: Notice
   const user = profiles.find((p) => p.role === role) ?? profiles[0];
   const [read, markRead] = useReadNotices();
   const [show, setShow] = useState<"all" | "unread">("all");
+  const dates = useDateFilter();
 
-  const mine = noticesFor(notices, role, user.id);
+  const mine = noticesFor(notices, role, user.id).filter((n) => inDateFilter(n.date, dates));
   const unread = mine.filter((n) => !read.has(n.id));
   const visible = show === "unread" ? unread : mine;
   const groups = [
@@ -48,6 +53,8 @@ export function NotificationList({ notices, profiles, today }: { notices: Notice
 
   return (
     <div className="space-y-4">
+      <DataTools title="Notifications" />
+      <ExportTable columns={["Date", "Notice", "Details", "Read"]} rows={visible.map((n) => [formatDate(n.date), n.title, n.body, read.has(n.id) ? "Yes" : "No"])} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterChips
           label="Show"
@@ -66,7 +73,7 @@ export function NotificationList({ notices, profiles, today }: { notices: Notice
 
       {groups.length === 0 && (
         <div className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">
-          {show === "unread" ? "You have read everything." : "Nothing needs your attention right now."}
+          {show === "unread" ? "You have read everything." : dates.kind === "all" ? "Nothing needs your attention right now." : "No notifications for these dates."}
         </div>
       )}
 

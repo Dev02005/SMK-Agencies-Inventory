@@ -6,9 +6,10 @@ import { Chip } from "@/components/ui/chip";
 import { LiveTime } from "@/components/ui/live-clock";
 import { ModuleGrid } from "@/components/ui/module-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { getDashboard, getFirm, getNow, getToday } from "@/lib/data";
+import { getDashboard, getFirm, getLorryLoads, getNow, getProducts, getToday } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { toMT } from "@/lib/sales";
+import { ActiveLorries } from "./active-lorries";
 
 /** Owner and office: the whole business today. */
 export function OwnerHome() {
@@ -45,7 +46,18 @@ export async function TodayLine() {
 }
 
 async function Dashboard() {
-  const d = await getDashboard();
+  const [d, loads, products, today] = await Promise.all([getDashboard(), getLorryLoads(), getProducts(), getToday()]);
+  const selling = loads
+    .filter((l) => l.status === "selling")
+    .map((l) => ({
+      id: l.id,
+      lorryNo: l.lorryNo,
+      companyName: l.companyName,
+      driverName: l.driverName,
+      arrivedOn: l.arrivedOn,
+      sellOutDays: l.sellOutDays,
+      left: l.lines.filter((x) => x.left > 0).map((x) => ({ productId: x.productId, qty: x.left })),
+    }));
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <section className="surface p-5 md:col-span-2 md:p-6">
@@ -82,6 +94,8 @@ async function Dashboard() {
           ))}
         </ul>
       </SectionCard>
+
+      <ActiveLorries lorries={selling} products={products} today={today} className="md:col-span-3" />
 
       <StatRow className="md:col-span-3">
         <StatCard label="Collected today" value={formatINR(d.collected)} />

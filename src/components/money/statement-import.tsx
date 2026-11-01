@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Field, inputClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { Checkbox } from "@/components/ui/checkbox";
 import { addBankEntries, maskAccountNo } from "@/lib/bank-book";
 import { cn } from "@/lib/cn";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
@@ -283,7 +284,7 @@ function Preview({
             This statement is for account ending {statementLast}, but {account.name} ends {accountLast}.
           </p>
           <label className="mt-2 flex items-center gap-2 text-ink">
-            <input type="checkbox" className="size-5 accent-[var(--accent)]" checked={otherAccountOk} onChange={(e) => setOtherAccountOk(e.target.checked)} />
+            <Checkbox checked={otherAccountOk} onChange={(e) => setOtherAccountOk(e.target.checked)} />
             Save it to {account.name} anyway
           </label>
         </div>
@@ -297,9 +298,8 @@ function Preview({
 
       <div className="flex items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-[14px] text-ink">
-          <input
-            type="checkbox"
-            className="size-5 accent-[var(--accent)]"
+          <Checkbox
+           
             checked={allOn}
             onChange={() => setSelected(allOn ? new Set() : new Set(rows.map((_, i) => i)))}
           />
@@ -312,7 +312,7 @@ function Preview({
         {rows.map((r, i) => (
           <li key={i}>
             <label className="flex items-start gap-3 px-3 py-3">
-              <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]" checked={selected.has(i)} onChange={() => toggle(i)} aria-label={`Include ${formatShortDate(r.date)} ${r.description}`} />
+              <Checkbox className="mt-0.5" checked={selected.has(i)} onChange={() => toggle(i)} aria-label={`Include ${formatShortDate(r.date)} ${r.description}`} />
               <span className="min-w-0 flex-1">
                 <span className="line-clamp-2 block text-[14px] text-ink">{r.description || "—"}</span>
                 <span className="block text-[12px] text-ink-secondary">
@@ -351,7 +351,7 @@ function Preview({
             {rows.map((r, i) => (
               <tr key={i} className={cn(!selected.has(i) && "text-ink-secondary", r.check === "mismatch" && "bg-warning-soft/60")}>
                 <td className="py-2.5 pl-4 align-top">
-                  <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={selected.has(i)} onChange={() => toggle(i)} aria-label={`Include ${formatShortDate(r.date)} ${r.description}`} />
+                  <Checkbox size="sm" checked={selected.has(i)} onChange={() => toggle(i)} aria-label={`Include ${formatShortDate(r.date)} ${r.description}`} />
                 </td>
                 <td className="whitespace-nowrap px-3 py-2.5 align-top">{formatShortDate(r.date)}</td>
                 <td className="px-3 py-2.5 align-top">

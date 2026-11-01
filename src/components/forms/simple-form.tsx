@@ -4,14 +4,15 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
-import { Select } from "@/components/ui/select";
+import { Select, type SelectOption } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 
 export type SimpleField = {
   name: string;
   label: string;
   type?: "text" | "number" | "select" | "date" | "textarea";
-  options?: { value: string; label: string }[];
+  options?: SelectOption[];
   prefix?: string;
   placeholder?: string;
   required?: boolean;
@@ -55,7 +56,7 @@ export function SimpleForm({ fields, submitLabel, thing }: { fields: SimpleField
                 onChange={(e) => set(e.target.value)}
               />
             ) : f.type === "date" ? (
-              <input id={fieldId} type="date" className={inputClass} value={values[f.name]} onChange={(e) => set(e.target.value)} />
+              <DatePicker id={fieldId} label={f.label} value={values[f.name]} onChange={set} clearable={!f.required} />
             ) : f.prefix ? (
               <AffixInput
                 id={fieldId}

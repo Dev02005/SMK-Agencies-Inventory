@@ -4,6 +4,7 @@ import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPolicies } from "@/lib/data";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
@@ -31,7 +32,12 @@ export default function InsurancePage() {
 function InsuranceContent() {
   return (
     <>
-      <PageHeader title="Insurance" subtitle="Every policy, sorted by the next premium due" actions={<SampleChip />} />
+      <PageHeader title="Insurance" subtitle="Every policy, sorted by the next premium due" actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Insurance"} />
+          </>
+        } />
       <Suspense fallback={<ListSkeleton rows={5} />}>
         <Policies />
       </Suspense>

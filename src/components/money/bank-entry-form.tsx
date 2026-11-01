@@ -7,6 +7,7 @@ import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
+import { DatePicker } from "@/components/ui/date-picker";
 import { addBankEntries, useBankBook } from "@/lib/bank-book";
 import { todayISO } from "@/lib/format";
 
@@ -104,7 +105,7 @@ export function BankEntryForm({
           <AffixInput id={`${id}-amount`} prefix="₹" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))} />
         </Field>
         <Field label="Date" htmlFor={`${id}-date`}>
-          <input id={`${id}-date`} type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DatePicker id={`${id}-date`} label="Date" value={date} onChange={setDate} />
         </Field>
         <Field label="Reference / UTR" htmlFor={`${id}-ref`}>
           <input id={`${id}-ref`} className={inputClass} placeholder="Optional" value={ref} onChange={(e) => setRef(e.target.value)} />

@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { usesSampleData } from "@/lib/supabase/config";
 
 /**
  * The Personal PIN is checked here on the server, never in the browser. A correct PIN sets a signed, httpOnly
@@ -31,7 +31,7 @@ function same(a: string, b: string) {
 }
 
 export function pinMatches(pin: string) {
-  const expected = process.env.PERSONAL_PIN || (isSupabaseConfigured ? "" : SAMPLE_PIN);
+  const expected = process.env.PERSONAL_PIN || (usesSampleData ? SAMPLE_PIN : "");
   return expected.length > 0 && same(pin, expected);
 }
 

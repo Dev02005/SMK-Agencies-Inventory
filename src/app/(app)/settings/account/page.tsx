@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { TimeLeft } from "@/components/ui/live-clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireSession } from "@/lib/auth";
 import { getCurrentUser, getFirm, getNow } from "@/lib/data";
 import { roleLabels } from "@/lib/labels";
-import { loginIdOf } from "@/lib/session";
+import { ownerLoginId } from "@/lib/session";
 import { ChangePasswordForm, SignOutButton } from "./account-forms";
 
 export const metadata: Metadata = { title: "Account" };
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Account" };
 export default function AccountPage() {
   return (
     <div className="animate-fade-up mx-auto max-w-[760px]">
-      <PageHeader title="Account" subtitle="Your sign-in, password and automatic sign-out" actions={<SampleChip />} />
+      <PageHeader back={<BackLink href="/settings">Settings</BackLink>} title="Account" subtitle="Your sign-in, password and automatic sign-out" actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton rows={6} />}>
         <AccountDetails />
       </Suspense>
@@ -45,8 +45,8 @@ async function AccountDetails() {
       <SectionCard title="Sign-in">
         <DetailList
           items={[
-            { label: "Login ID", value: <span className="tabular-nums">{loginIdOf(session.userId)}</span> },
-            { label: "Mobile", value: <span className="tabular-nums">+91 {user.mobile}</span> },
+            { label: "Sign in with", value: <span className="tabular-nums">{[`+91 ${user.mobile}`, user.email].filter(Boolean).join(" or ")}</span> },
+            { label: "Sample login ID", value: user.role === "owner" ? <span className="tabular-nums">{ownerLoginId()}</span> : undefined },
             { label: "Signed in", value: signedInAt.format(session.since) },
             {
               label: "Signs out at",
@@ -67,7 +67,7 @@ async function AccountDetails() {
       </SectionCard>
 
       <SectionCard title="Change password">
-        <ChangePasswordForm />
+        <ChangePasswordForm mobile={user.mobile} />
       </SectionCard>
 
       {user.role === "owner" && (

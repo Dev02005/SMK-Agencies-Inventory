@@ -26,7 +26,9 @@ export function TabBar({ pathname, role }: { pathname: string; role: Role }) {
               isActive ? "font-semibold text-accent" : "text-ink-secondary",
             )}
           >
-            <Icon size={24} strokeWidth={isActive ? 2 : 1.75} aria-hidden />
+            <span className={cn("grid h-7 w-14 place-items-center rounded-full transition-colors", isActive && "bg-accent-soft")}>
+              <Icon size={22} strokeWidth={isActive ? 2 : 1.75} aria-hidden />
+            </span>
             {tab.title}
           </Link>
         );

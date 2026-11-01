@@ -7,10 +7,12 @@ import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
-import type { Product } from "@/lib/data/types";
+import type { Party, Product } from "@/lib/data/types";
+import { partyOptions } from "@/lib/party-options";
 
-export function OrderForm({ parties, products, today }: { parties: { id: string; name: string; place?: string }[]; products: Product[]; today: string }) {
+export function OrderForm({ parties, products, today }: { parties: Pick<Party, "id" | "name" | "place" | "kind">[]; products: Product[]; today: string }) {
   const id = useId();
   const toast = useToast();
   const [partyId, setPartyId] = useState("");
@@ -42,7 +44,7 @@ export function OrderForm({ parties, products, today }: { parties: { id: string;
               setPartyId(v);
               setDestination(parties.find((p) => p.id === v)?.place ?? "");
             }}
-            options={parties.map((p) => ({ value: p.id, label: p.name, hint: p.place }))}
+            options={partyOptions(parties)}
           />
         </Field>
         <Segmented
@@ -57,7 +59,7 @@ export function OrderForm({ parties, products, today }: { parties: { id: string;
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Deliver by" htmlFor={`${id}-by`}>
-            <input id={`${id}-by`} type="date" className={inputClass} value={deliverBy} onChange={(e) => setDeliverBy(e.target.value)} />
+            <DatePicker id={`${id}-by`} label="Deliver by" value={deliverBy} onChange={setDeliverBy} clearable />
           </Field>
           <Field label="Deliver to" htmlFor={`${id}-to`}>
             <input id={`${id}-to`} className={inputClass} value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Village or site" />

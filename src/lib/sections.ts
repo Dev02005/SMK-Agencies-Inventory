@@ -3,7 +3,6 @@ import {
   CalendarCheck,
   ChartColumn,
   CircleSlash,
-  CircleUserRound,
   ClipboardList,
   FileText,
   Fuel,
@@ -16,7 +15,6 @@ import {
   LayoutGrid,
   Lock,
   Package,
-  PackagePlus,
   ReceiptText,
   Route,
   Settings,
@@ -56,7 +54,7 @@ const sections: Section[] = [
   {
     href: "/sales",
     title: "Sales",
-    description: "Cement and steel bills, discounts and transport",
+    description: "Cement and steel bills, lorry sales, discounts and transport",
     icon: ReceiptText,
     tone: "blue",
     roles: ["owner", "office", "field"],
@@ -83,7 +81,7 @@ const sections: Section[] = [
   {
     href: "/purchases",
     title: "Purchases",
-    description: "Company purchases and stock inward by lorry",
+    description: "Company lorries bought; their stock goes into the godown",
     icon: ShoppingCart,
     tone: "blue",
     roles: ["owner", "office", "godown"],
@@ -159,11 +157,11 @@ const sections: Section[] = [
   {
     href: "/stock",
     title: "Stock",
-    description: "Godown stock, inward and movements",
+    description: "Godown stock and movements",
     icon: Package,
     tone: "amber",
     roles: ["owner", "office", "godown"],
-    action: { label: "Stock inward", href: "/stock/inward/new" },
+    action: { label: "New purchase", href: "/purchases/new" },
   },
   {
     href: "/people",
@@ -200,16 +198,8 @@ const sections: Section[] = [
   {
     href: "/settings",
     title: "Settings",
-    description: "Firms, godowns, products, users and roles",
+    description: "Your account and password, install the app, firm, godowns, products and users",
     icon: Settings,
-    tone: "grey",
-    roles: ["owner", "office"],
-  },
-  {
-    href: "/account",
-    title: "Account",
-    description: "Your sign-in, password and automatic sign-out",
-    icon: CircleUserRound,
     tone: "grey",
     roles: everyone,
   },
@@ -225,7 +215,7 @@ export const sidebarGroups: { label?: string; items: Section[] }[] = [
   { label: "Records", items: ["/parties", "/stock", "/people", "/fleet"].map(byHref) },
   { label: "Insights", items: [byHref("/reports")] },
   { label: "Private", items: [byHref("/personal")] },
-  { items: ["/settings", "/account"].map(byHref) },
+  { items: [byHref("/settings")] },
 ];
 
 export type Tab = { href: string; title: string; icon: LucideIcon };
@@ -247,7 +237,7 @@ export const roleTabs: Record<Role, Tab[]> = {
   godown: [
     { href: "/", title: "Today", icon: House },
     { href: "/stock", title: "Stock", icon: Package },
-    { href: "/stock/inward/new", title: "Inward", icon: PackagePlus },
+    { href: "/purchases", title: "Purchases", icon: ShoppingCart },
     { href: "/orders", title: "Orders", icon: ClipboardList },
   ],
   field: [
@@ -273,7 +263,6 @@ export const quickAddItems: { label: string; href: string; icon: LucideIcon; ton
   { label: "Hand over cash", href: "/money/cash/handover/new", icon: HandCoins, tone: "green", roles: ["owner", "office", "field", "driver"] },
   { label: "Quotation", href: "/quotations/new", icon: FileText, tone: "blue", roles: ["owner", "office", "field"] },
   { label: "Purchase", href: "/purchases/new", icon: ShoppingCart, tone: "blue", roles: ["owner", "office", "godown"] },
-  { label: "Stock inward", href: "/stock/inward/new", icon: PackagePlus, tone: "amber", roles: ["owner", "office", "godown"] },
   { label: "Transfer", href: "/stock/transfers/new", icon: Package, tone: "amber", roles: ["owner", "office", "godown"] },
   { label: "New party", href: "/parties/new", icon: Users, tone: "blue", roles: ["owner", "office", "field"] },
   { label: "Expense", href: "/money/expenses/new", icon: Fuel, tone: "green", roles: ["owner", "office", "driver"] },

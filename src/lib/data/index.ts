@@ -4,6 +4,7 @@
  */
 import "server-only";
 import { connection } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { todayISO } from "@/lib/format";
 import { checkCredit, toMT } from "@/lib/sales";
 import * as base from "./sample";
@@ -59,12 +60,6 @@ export async function getNow() {
   return Date.now();
 }
 
-/** The day the books were opened (opening balances and stock), for "all time" reports. */
-export async function getOpeningDate() {
-  await live();
-  return sample.OPENING_DATE;
-}
-
 export type PartyWithBalance = Party & {
   /** Positive = they owe us (Dr); negative = we owe them (Cr). */
   balance: number;
@@ -78,9 +73,15 @@ export async function getFirm() {
   return base.firm;
 }
 
-/** The signed-in user. The sample login (lib/session) is the owner's. */
+/** Every firm the owner bills under, the main one first. */
+export async function getFirms() {
+  return base.firms;
+}
+
+/** The signed-in person, from the session (signing in again if there is none). */
 export async function getCurrentUser(): Promise<Profile> {
-  return base.profiles[0];
+  const { userId } = await requireSession();
+  return base.profiles.find((p) => p.id === userId) ?? base.profiles[0];
 }
 
 export async function getProfiles() {
@@ -349,7 +350,7 @@ export async function getDashboard() {
     return {
       id: s.id,
       title: `${party.name} · Bill ${s.billNo}`,
-      detail: credit?.overLimit ? `Over credit limit by ₹${credit.over.toLocaleString("en-IN")}` : "Waiting for owner approval",
+      detail: credit?.overLimit ? `Over credit limit by ₹${credit.over.toLocaleString("en-IN")}` : "Staff request: set the rates and confirm",
       href: `/sales/${s.id}`,
     };
   });
@@ -773,6 +774,14 @@ export async function getAttendanceCorrections() {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/** Every attendance record with whose it is, newest first (the date-filtered list on Attendance). */
+export async function getAttendanceRecords() {
+  await live();
+  return phase3.attendance
+    .map((a) => ({ ...a, name: staffName(a.profileId) }))
+    .sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+}
+
 export async function getVisits() {
   await live();
   return phase3.visits
@@ -869,7 +878,7 @@ export async function getFieldHome(profileId: string) {
   };
 }
 
-/** Godown in-charge: stock on hand, lorries arriving today, bills to load and orders waiting. */
+/** Godown in-charge: stock on hand, today's company lorries (already in stock), bills to load and orders waiting. */
 export async function getGodownHome() {
   await live();
   const today = sample.SAMPLE_TODAY;
@@ -880,8 +889,8 @@ export async function getGodownHome() {
       ...g,
       items: balances.filter((b) => b.godownId === g.id).map((b) => ({ ...b, product: products.find((p) => p.id === b.productId)! })),
     })),
-    arriving: sample.purchases
-      .filter((p) => p.receivedDate === today)
+    lorriesToday: sample.purchases
+      .filter((p) => p.receivedDate === today && !p.onLorry)
       .map((p) => ({ ...p, companyName: partyName(p.companyId), godownName: godowns.find((g) => g.id === p.godownId)?.name })),
     toLoad: sample.sales
       .filter((s) => s.billDate === today && s.status === "saved" && s.source === "godown")
@@ -939,6 +948,11 @@ export async function getLorryLoads() {
         id: p.id,
         lorryNo: p.lorryNo,
         companyName: partyName(p.companyId),
+        driverName: p.driverName,
+        invoiceNo: p.invoiceNo || undefined,
+        invoicePaperKept: Boolean(p.invoicePaperKept),
+        unloadingCharges: Boolean(p.unloadingCharges),
+        sellOutDays: p.sellOutDays,
         arrivedOn: p.receivedDate,
         purchaseId: p.id,
         lines,

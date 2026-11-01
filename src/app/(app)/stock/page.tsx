@@ -4,10 +4,14 @@ import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/cn";
 import { getGodowns, getProducts, getStockBalances, getStockMovements } from "@/lib/data";
+import { inDateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate, formatNumber, formatShortDate } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 import { lineQty } from "@/lib/quantities";
 import { toMT } from "@/lib/sales";
 import { isLowStock } from "@/lib/limits";
@@ -16,7 +20,10 @@ export const metadata: Metadata = { title: "Stock" };
 
 /** Proposed low-stock levels until the owner sets them per product in Settings. */
 
-export default function StockPage() {
+// Movements start on the last 7 days; there is one for every bill, purchase and transfer.
+const movementDates: DatePreset[] = ["7d", "today", "month", "all"];
+
+export default function StockPage({ searchParams }: PageProps<"/stock">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -25,20 +32,27 @@ export default function StockPage() {
         actions={
           <>
             <SampleChip />
-            <ButtonLink href="/stock/inward/new">Stock inward</ButtonLink>
+            <ButtonLink href="/purchases/new">New purchase</ButtonLink>
           </>
         }
       />
       <Suspense fallback={<ListSkeleton rows={8} />}>
-        <StockData />
+        <StockData searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function StockData() {
-  const [balances, godowns, products, movements] = await Promise.all([getStockBalances(), getGodowns(), getProducts(), getStockMovements()]);
+async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["searchParams"] }) {
+  const [balances, godowns, products, all, dates] = await Promise.all([
+    getStockBalances(),
+    getGodowns(),
+    getProducts(),
+    getStockMovements(),
+    pageDateFilter(searchParams, movementDates),
+  ]);
   const product = (id: string) => products.find((p) => p.id === id);
+  const movements = all.filter((m) => inDateFilter(m.date, dates));
 
   return (
     <div className="space-y-4">
@@ -70,9 +84,25 @@ async function StockData() {
         })}
       </div>
 
-      <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">Recent movements</h2>
+      <ExportTable
+        title="Stock now"
+        columns={["Godown", "Product", "Quantity", "MT"]}
+        rows={godowns.flatMap((g) =>
+          balances
+            .filter((b) => b.godownId === g.id)
+            .sort((a, b) => a.productId.localeCompare(b.productId))
+            .map((b) => {
+              const p = product(b.productId);
+              return [g.name, p?.name, lineQty(b.qty, p), p ? formatNumber(toMT(b.qty, p.unit), 2) : ""];
+            }),
+        )}
+      />
+
+      <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">Movements</h2>
+      <DataTools title="Stock" presets={movementDates} />
       <DataTable
-        rows={movements.slice(0, 25)}
+        rows={movements}
+        empty="No stock moved in these dates."
         rowKey={(m) => m.id}
         mobile={(m) => ({
           title: product(m.productId)?.name,

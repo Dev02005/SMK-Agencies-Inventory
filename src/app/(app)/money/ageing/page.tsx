@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { getAgeingReport, getReminders } from "@/lib/data";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
@@ -16,7 +17,12 @@ export default function AgeingPage() {
       <PageHeader
         title="Ageing & reminders"
         subtitle="Unpaid amounts by age. A reminder goes once a bill passes 7 days, then weekly."
-        actions={<SampleChip />}
+        actions={
+          <>
+            <SampleChip />
+            <ExportMenu title="Ageing" />
+          </>
+        }
       />
       <Suspense fallback={<ListSkeleton />}>
         <AgeingData />

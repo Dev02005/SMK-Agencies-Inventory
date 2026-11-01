@@ -4,15 +4,20 @@ import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
+import { DataTools } from "@/components/ui/data-tools";
+import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { getGodowns, getProducts, getSuspenseLoads, getVehicles } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
+import { productOptions } from "@/lib/product-options";
 import { formatDate, formatShortDate } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 import { lineQty } from "@/lib/quantities";
 
 export const metadata: Metadata = { title: "Suspense loads" };
 
-export default function SuspensePage() {
+export default function SuspensePage({ searchParams }: PageProps<"/stock/suspense">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -21,20 +26,35 @@ export default function SuspensePage() {
         actions={<SampleChip />}
       />
       <Suspense fallback={<ListSkeleton />}>
-        <Loads />
+        <Loads searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function Loads() {
-  const [loads, godowns, products, vehicles] = await Promise.all([getSuspenseLoads(), getGodowns(), getProducts(), getVehicles()]);
+async function Loads({ searchParams }: { searchParams: PageProps<"/stock/suspense">["searchParams"] }) {
+  const [all, godowns, products, vehicles, dates] = await Promise.all([getSuspenseLoads(), getGodowns(), getProducts(), getVehicles(), pageDateFilter(searchParams)]);
+  const loads = all.filter((l) => inDateFilter(l.date, dates));
   const open = loads.filter((l) => !l.assigned);
   const done = loads.filter((l) => l.assigned);
 
   return (
     <div className="grid gap-4 lg:grid-cols-5">
       <div className="space-y-4 lg:col-span-3">
+        <DataTools title="Suspense loads" />
+        <ExportTable
+          columns={["Sent", "From", "Vehicle", "Item", "Quantity", "Buyer", "Assigned on"]}
+          rows={loads.map((l) => [
+            formatDate(l.date),
+            l.godownName,
+            l.vehicle,
+            l.product.name,
+            lineQty(l.qty, l.product),
+            l.assignedParty ?? "No buyer yet",
+            l.assigned ? formatDate(l.assigned.date) : "",
+          ])}
+        />
+        {loads.length === 0 && <p className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">No suspense loads for these dates.</p>}
         {open.length > 0 && <p className="text-[13px] text-warning">{open.length} load{open.length === 1 ? "" : "s"} still without a buyer</p>}
         {open.map((l) => (
           <SectionCard key={l.id} title={lineQty(l.qty, l.product) + " " + l.product.name} action={<Chip tone="warning">No buyer yet</Chip>}>
@@ -77,7 +97,7 @@ async function Loads() {
           submitLabel="Send load"
           fields={[
             { name: "godown", label: "From godown", type: "select", wide: true, options: godowns.map((g) => ({ value: g.id, label: g.name })) },
-            { name: "product", label: "Product", type: "select", options: products.map((p) => ({ value: p.id, label: p.name })) },
+            { name: "product", label: "Product", type: "select", options: productOptions(products) },
             { name: "qty", label: "Quantity", type: "number", required: true },
             { name: "vehicle", label: "Vehicle", type: "select", wide: true, options: vehicles.filter((v) => v.kind === "van" || v.kind === "lorry").map((v) => ({ value: v.id, label: v.label })) },
             { name: "note", label: "Where it's going and why", type: "textarea", required: true, wide: true },

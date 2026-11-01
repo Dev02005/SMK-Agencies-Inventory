@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { getCommitment } from "@/lib/data";
@@ -83,6 +84,7 @@ async function AdvanceDetail({ params }: { params: PageProps<"/money/advances/[i
       </div>
 
       <h2 className="mb-3 mt-6 text-[22px] font-semibold tracking-[-0.3px] text-ink">{fixed ? "Supplied against this advance" : "Bills adjusted"}</h2>
+      <DataTools title={fixed ? "Supplied against advance" : "Bills adjusted"} dated={false} className="mb-4" />
       <DataTable
         rows={c.supplies}
         rowKey={(s) => s.saleId}

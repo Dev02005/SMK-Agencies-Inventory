@@ -4,9 +4,12 @@ import { useState } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import { Segmented } from "@/components/ui/segmented";
 import type { Payment, PaymentMode, Receipt } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
 import { paymentModeLabels } from "@/lib/labels";
 
@@ -29,10 +32,13 @@ export function MoneyLists({
   const [tab, setTab] = useState<"receipts" | "payments">("receipts");
   const [mode, setMode] = useState<PaymentMode | "all">("all");
   const [query, setQuery] = useState("");
+  const dates = useDateFilter();
 
   const q = query.trim().toLowerCase();
-  const filter = <T extends { mode: PaymentMode; partyName: string; reference?: string }>(rows: T[]) =>
-    rows.filter((r) => (mode === "all" || r.mode === mode) && (!q || `${r.partyName} ${r.reference ?? ""}`.toLowerCase().includes(q)));
+  const filter = <T extends { date: string; mode: PaymentMode; partyName: string; reference?: string }>(rows: T[]) =>
+    rows.filter(
+      (r) => inDateFilter(r.date, dates) && (mode === "all" || r.mode === mode) && (!q || `${r.partyName} ${r.reference ?? ""}`.toLowerCase().includes(q)),
+    );
 
   const monthTotal = (rows: { date: string; amount: number }[]) => rows.filter((r) => r.date.startsWith(month)).reduce((s, r) => s + r.amount, 0);
   const cashWithStaff = receipts.filter((r) => r.mode === "cash" && r.collectedBy && fieldStaff.includes(r.collectedBy));
@@ -45,6 +51,7 @@ export function MoneyLists({
         <StatCard label="Collected by staff" value={formatINR(cashWithStaff.filter((r) => r.date.startsWith(month)).reduce((s, r) => s + r.amount, 0))} hint="cash, this month" />
       </StatRow>
 
+      <DataTools title={tab === "receipts" ? "Receipts" : "Payments"} />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
           <Segmented

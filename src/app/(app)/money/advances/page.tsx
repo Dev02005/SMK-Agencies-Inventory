@@ -5,13 +5,17 @@ import { Suspense } from "react";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { DataTools } from "@/components/ui/data-tools";
+import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCommitments } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 
 export const metadata: Metadata = { title: "Advances" };
 
-export default function AdvancesPage() {
+export default function AdvancesPage({ searchParams }: PageProps<"/money/advances">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -25,14 +29,15 @@ export default function AdvancesPage() {
         }
       />
       <Suspense fallback={<ListSkeleton />}>
-        <Commitments />
+        <Commitments searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function Commitments() {
-  const list = await getCommitments();
+async function Commitments({ searchParams }: { searchParams: PageProps<"/money/advances">["searchParams"] }) {
+  const [all, dates] = await Promise.all([getCommitments(), pageDateFilter(searchParams)]);
+  const list = all.filter((c) => inDateFilter(c.date, dates));
   const active = list.filter((c) => c.status === "active");
   const bagsLeft = active.reduce((s, c) => s + c.remainingBags, 0);
 
@@ -44,6 +49,20 @@ async function Commitments() {
         <StatCard label="Open advances" value={active.length} hint={`${list.length - active.length} completed`} />
       </StatRow>
 
+      <DataTools title="Advances" />
+      <ExportTable
+        columns={["Paid on", "Party", "Kind", "Received", "Supplied or adjusted", "Remaining", "Status"]}
+        rows={list.map((c) => [
+          formatDate(c.date),
+          c.partyName,
+          c.kind === "fixed_price" ? `${formatNumber(c.bags ?? 0)} bags ${c.productName} at ${formatINR(c.rate ?? 0)}` : "Advance against future bills",
+          formatINR(c.amount),
+          c.kind === "fixed_price" ? `${formatNumber(c.suppliedBags)} bags` : formatINR(c.adjusted),
+          c.kind === "fixed_price" ? `${formatNumber(c.remainingBags)} bags` : formatINR(c.remainingAmount),
+          c.status === "active" ? "Open" : "Completed",
+        ])}
+      />
+      {list.length === 0 && <p className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">No advances for these dates.</p>}
       <ul className="grid gap-4 md:grid-cols-2">
         {list.map((c) => {
           const share = c.kind === "fixed_price" ? c.suppliedBags / (c.bags || 1) : c.adjusted / c.amount;

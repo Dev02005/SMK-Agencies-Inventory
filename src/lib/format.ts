@@ -31,6 +31,12 @@ export function formatShortDate(isoDate: string): string {
   return `${d} ${months[m - 1]}`;
 }
 
+/** "2026-11-01" moved by whole days: ("2026-11-01", 3) → "2026-11-04". */
+export function addDaysISO(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 /** "2026-10" moved by whole months: ("2026-10", -1) → "2026-09", ("2026-12", 1) → "2027-01". */
 export function shiftMonth(isoMonth: string, by: number): string {
   const [y, m] = isoMonth.split("-").map(Number);

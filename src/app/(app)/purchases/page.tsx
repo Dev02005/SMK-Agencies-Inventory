@@ -3,14 +3,17 @@ import { Suspense } from "react";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
 import { getGodowns, getProducts, getPurchases } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
 
 export const metadata: Metadata = { title: "Purchases" };
 
-export default function PurchasesPage() {
+export default function PurchasesPage({ searchParams }: PageProps<"/purchases">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -24,14 +27,15 @@ export default function PurchasesPage() {
         }
       />
       <Suspense fallback={<ListSkeleton />}>
-        <PurchasesTable />
+        <PurchasesTable searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function PurchasesTable() {
-  const [purchases, products, godowns] = await Promise.all([getPurchases(), getProducts(), getGodowns()]);
+async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purchases">["searchParams"] }) {
+  const [all, products, godowns, dates] = await Promise.all([getPurchases(), getProducts(), getGodowns(), pageDateFilter(searchParams)]);
+  const purchases = all.filter((p) => inDateFilter(p.receivedDate, dates));
   const qty = sumQuantities(purchases.flatMap((p) => p.lines), products);
   const godownName = (id: string) => godowns.find((g) => g.id === id)?.name ?? "–";
 
@@ -42,8 +46,10 @@ async function PurchasesTable() {
         <StatCard label="Cement" value={`${formatNumber(qty.bags)} bags`} hint={`${formatNumber(qty.cementMT)} MT`} />
         <StatCard label="Steel" value={`${formatNumber(qty.steelMT)} MT`} hint={`${formatNumber(qty.kg)} kg`} />
       </StatRow>
+      <DataTools title="Purchases" />
       <DataTable
         rows={purchases}
+        empty="No purchases for these dates."
         rowKey={(p) => p.id}
         rowHref={(p) => `/purchases/${p.id}`}
         mobile={(p) => ({

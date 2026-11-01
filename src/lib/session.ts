@@ -26,20 +26,22 @@ export function loginMatches(id: string, password: string) {
   return same(id, loginId()) && same(password, loginPassword());
 }
 
-/** The login ID shown on the Account page. */
-export function loginIdOf(userId: string) {
-  return userId === "u-owner" ? loginId() : userId;
-}
+/** The sample owner login ID, shown on the owner's Account page. */
+export const ownerLoginId = loginId;
 
-export function newSession(userId: string, now = Date.now()) {
+/** `mustChange`: they signed in with their starting password (their mobile number) and must set their own first. */
+export function newSession(userId: string, mustChange = false, now = Date.now()) {
   const until = nextMidnightIST(now);
-  const payload = `${userId}.${now}.${until}`;
+  const payload = `${userId}.${now}.${until}.${mustChange ? 1 : 0}`;
   return { value: `${payload}.${sign(payload)}`, expires: new Date(until) };
 }
 
-/** The signed-in user with when they signed in and when the session ends, or null if there is none, it was tampered with, or midnight has passed. */
+/**
+ * The signed-in user, when they signed in, when the session ends and whether they still have to set their own
+ * password; null if there is no session, it was tampered with, or midnight has passed.
+ */
 export function readSession(token: string | undefined, now = Date.now()) {
-  const [userId, since, until, mac, extra] = token?.split(".") ?? [];
-  if (!userId || !since || !until || !mac || extra !== undefined || !same(mac, sign(`${userId}.${since}.${until}`))) return null;
-  return Number(until) > now ? { userId, since: Number(since), until: Number(until) } : null;
+  const [userId, since, until, flag, mac, extra] = token?.split(".") ?? [];
+  if (!userId || !since || !until || !flag || !mac || extra !== undefined || !same(mac, sign(`${userId}.${since}.${until}.${flag}`))) return null;
+  return Number(until) > now ? { userId, since: Number(since), until: Number(until), mustChange: flag === "1" } : null;
 }

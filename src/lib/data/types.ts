@@ -17,6 +17,8 @@ export type Product = {
   id: string;
   name: string;
   brand: string;
+  /** The type within the brand, e.g. OPC, PPC, TMT 8 mm. */
+  variant?: string;
   category: "cement" | "steel";
   unit: Unit;
   listRate: number;
@@ -28,6 +30,8 @@ export type Profile = {
   fullName: string;
   initials: string;
   mobile: string;
+  /** Optional; they can sign in with this instead of their mobile number. */
+  email?: string;
   role: Role;
   active: boolean;
 };
@@ -51,6 +55,8 @@ export type SaleLine = { productId: string; qty: number; rate: number; listRate:
 
 export type Sale = {
   id: string;
+  /** Which of the owner's firms the bill is under; the main (first) firm when missing. */
+  firmId?: string;
   billNo: number;
   partyId: string;
   billDate: string;
@@ -110,6 +116,14 @@ export type Purchase = {
   godownId: string;
   /** Sold straight off the lorry without unloading into a godown. */
   onLorry?: boolean;
+  /** Noted when a lorry is sold from (Sales › Lorry sales › Lorry arrived). */
+  driverName?: string;
+  /** The physical invoice paper is kept with us. */
+  invoicePaperKept?: boolean;
+  /** Unloading is charged for this lorry. */
+  unloadingCharges?: boolean;
+  /** Expected to sell out in about this many days. */
+  sellOutDays?: number;
   lines: { productId: string; qty: number; rate: number }[];
   freight: number;
   total: number;
@@ -149,6 +163,7 @@ export type StockMovement = {
   productId: string;
   godownId: string;
   qty: number;
+  /** "inward": stock that came in on a purchase. */
   kind: "opening" | "inward" | "sale" | "transfer" | "suspense";
   ref: string;
 };

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import type { Role } from "@/lib/data/types";
+import { forgetSignedIn, rememberSignedIn, signedInNow } from "@/lib/roles";
 
 /**
  * Signs an open app out at 12 AM India time (`until`, from the session). A timer covers an app left open;
@@ -8,7 +10,10 @@ import { useEffect } from "react";
  */
 export function MidnightSignOut({ until }: { until: number }) {
   useEffect(() => {
-    const leave = () => window.location.replace("/login?reason=midnight");
+    const leave = () => {
+      forgetSignedIn();
+      window.location.replace("/login?reason=midnight");
+    };
     const check = () => {
       if (Date.now() >= until) leave();
     };
@@ -25,5 +30,17 @@ export function MidnightSignOut({ until }: { until: number }) {
       window.removeEventListener("pageshow", check);
     };
   }, [until]);
+  return null;
+}
+
+/**
+ * Keeps this device's idea of who is signed in (and so which screens show) in step with the server's session.
+ * Checked when a page loads, not on every change, so signing out isn't undone on the way to the sign-in page.
+ */
+export function SignedInSync({ id, role }: { id: string; role: Role }) {
+  useEffect(() => {
+    const stored = signedInNow();
+    if (stored?.id !== id || stored?.role !== role) rememberSignedIn({ id, role });
+  }, [id, role]);
   return null;
 }

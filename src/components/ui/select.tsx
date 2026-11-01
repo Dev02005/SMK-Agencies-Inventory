@@ -1,24 +1,42 @@
 "use client";
 
-import { Check, ChevronDown, Search, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
+import { Check, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { fieldButtonClass, fieldSizes, PopoverPanel, usePopover } from "@/components/ui/popover";
 import { cn } from "@/lib/cn";
 
-export type SelectOption = { value: string; label: string; hint?: string };
-
-const sizes = {
-  md: "h-12 rounded-xl px-3.5 text-[17px]",
-  sm: "h-10 rounded-xl px-3 text-[15px]",
-  pill: "h-9 rounded-full px-3.5 text-[14px]",
+export type SelectOption = {
+  value: string;
+  label: string;
+  hint?: string;
+  /** Options with a group sit under a row with that name, which opens when tapped; options without one come first. */
+  group?: string;
 };
 
-type Position = { top?: number; bottom?: number; left: number; width: number; maxHeight: number };
+type Row = { kind: "option"; option: SelectOption; inGroup: boolean } | { kind: "group"; name: string; count: number; expanded: boolean };
+
+/** The rows on screen: ungrouped options, then each group's row followed by its options when it is open (or searched). */
+function buildRows(options: SelectOption[], openGroups: Set<string>, query: string): Row[] {
+  const q = query.trim().toLowerCase();
+  const matches = (o: SelectOption) => !q || `${o.label} ${o.hint ?? ""} ${o.group ?? ""}`.toLowerCase().includes(q);
+  const rows: Row[] = options.filter((o) => !o.group && matches(o)).map((option) => ({ kind: "option", option, inGroup: false }));
+  for (const name of new Set(options.flatMap((o) => (o.group ? [o.group] : [])))) {
+    const members = options.filter((o) => o.group === name && matches(o));
+    if (members.length === 0) continue;
+    const expanded = Boolean(q) || openGroups.has(name);
+    rows.push({ kind: "group", name, count: members.length, expanded });
+    if (expanded) rows.push(...members.map((option) => ({ kind: "option" as const, option, inGroup: true })));
+  }
+  return rows;
+}
+
+const rowLabel = (row: Row) => (row.kind === "group" ? row.name : row.option.label);
 
 /**
  * The app's dropdown, used instead of the browser's own so it looks the same on Android, iPhone, Windows and Mac.
  * A panel under the field on tablets and desktops, a bottom sheet with big rows on phones. Lists longer than
  * eight get a search box. Keyboard: arrows, Home/End, Enter, Escape and type-to-jump, as in a native select.
+ * Grouped options (e.g. parties by kind) show a row per group; Enter or → opens it, ← closes it.
  */
 export function Select({
   id,
@@ -40,7 +58,7 @@ export function Select({
   /** The field's label: the sheet title on phones and the list's name for screen readers. */
   label?: string;
   placeholder?: string;
-  size?: keyof typeof sizes;
+  size?: keyof typeof fieldSizes;
   searchable?: boolean;
   disabled?: boolean;
   className?: string;
@@ -52,85 +70,56 @@ export function Select({
   const optionId = (i: number) => `${autoId}-option-${i}`;
   const name = label ?? ariaLabel ?? "Options";
 
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
+  const popover = usePopover({ width: 240, height: 340 });
+  const { triggerRef, open, sheet, close } = popover;
   const listRef = useRef<HTMLUListElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const typed = useRef({ text: "", at: 0 });
 
-  const [open, setOpen] = useState(false);
-  const [sheet, setSheet] = useState(false);
-  const [pos, setPos] = useState<Position | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  // Where the panel is mounted: inside the field's own <main>, so it stays part of the page's main content.
-  const [root, setRoot] = useState<HTMLElement | null>(null);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
   const withSearch = searchable ?? options.length > 8;
   const selected = options.find((o) => o.value === value);
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? options.filter((o) => `${o.label} ${o.hint ?? ""}`.toLowerCase().includes(q)) : options;
-  }, [options, query]);
-
-  const place = useCallback(() => {
-    const r = triggerRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const width = Math.max(r.width, 240);
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-    const below = window.innerHeight - r.bottom - 12;
-    const above = r.top - 12;
-    // Open upwards only when there is clearly more room above.
-    if (below >= 220 || below >= above) setPos({ top: r.bottom + 6, left, width, maxHeight: Math.min(340, below) });
-    else setPos({ bottom: window.innerHeight - r.top + 6, left, width, maxHeight: Math.min(340, above) });
-  }, []);
+  const shown = useMemo(() => buildRows(options, openGroups, query), [options, openGroups, query]);
 
   function openMenu() {
     if (disabled) return;
-    const phone = !window.matchMedia("(min-width: 768px)").matches;
-    setSheet(phone);
     setQuery("");
-    setActive(Math.max(0, options.findIndex((o) => o.value === value)));
-    setRoot(triggerRef.current?.closest("main") ?? document.body);
-    if (!phone) place();
-    setOpen(true);
+    // Open with the chosen option's group already open, so the current choice is in view.
+    const groups = new Set(selected?.group ? [selected.group] : []);
+    setOpenGroups(groups);
+    setActive(Math.max(0, buildRows(options, groups, "").findIndex((r) => r.kind === "option" && r.option.value === value)));
+    popover.show();
   }
-
-  const close = useCallback((returnFocus = true) => {
-    setOpen(false);
-    if (returnFocus) triggerRef.current?.focus();
-  }, []);
 
   function choose(option: SelectOption) {
     onChange(option.value);
     close();
   }
 
-  // Focus the search box (or the list) once open; keep the panel next to the field; close on an outside tap.
+  function setGroup(name: string, expanded: boolean) {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (expanded) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+  }
+
+  function pick(row: Row) {
+    if (row.kind === "option") choose(row.option);
+    else if (!query.trim()) setGroup(row.name, !row.expanded);
+  }
+
+  // Focus the search box (or the list) once open. On phones the list takes focus, so the keyboard only opens
+  // when the search box is tapped.
   useEffect(() => {
     if (!open) return;
-    // On phones the list takes focus, so the keyboard only opens when the search box is tapped.
     const frame = requestAnimationFrame(() => (withSearch && !sheet ? searchRef.current : listRef.current)?.focus());
-    function onPointer(event: PointerEvent) {
-      const target = event.target as Node;
-      if (!popupRef.current?.contains(target) && !triggerRef.current?.contains(target)) close(false);
-    }
-    window.addEventListener("pointerdown", onPointer);
-    if (!sheet) {
-      window.addEventListener("scroll", place, true);
-      window.addEventListener("resize", place);
-    }
-    const body = document.body.style;
-    const overflow = body.overflow;
-    if (sheet) body.overflow = "hidden";
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
-      body.overflow = overflow;
-    };
-  }, [open, sheet, withSearch, place, close]);
+    return () => cancelAnimationFrame(frame);
+  }, [open, sheet, withSearch]);
 
   useEffect(() => {
     if (open) document.getElementById(optionId(active))?.scrollIntoView({ block: "nearest" });
@@ -158,7 +147,10 @@ export function Select({
       setActive(e.key === "Home" ? 0 : last);
     } else if (e.key === "Enter" || (e.key === " " && !withSearch)) {
       e.preventDefault();
-      if (shown[active]) choose(shown[active]);
+      if (shown[active]) pick(shown[active]);
+    } else if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && shown[active]?.kind === "group" && !query.trim()) {
+      e.preventDefault();
+      setGroup(rowLabel(shown[active]), e.key === "ArrowRight");
     } else if (e.key === "Escape" || e.key === "Tab") {
       e.preventDefault();
       close();
@@ -166,7 +158,7 @@ export function Select({
       // Type-to-jump, like a native select: letters typed within a second build up a prefix.
       const now = Date.now();
       typed.current = { text: (now - typed.current.at < 1000 ? typed.current.text : "") + e.key.toLowerCase(), at: now };
-      const match = shown.findIndex((o) => o.label.toLowerCase().startsWith(typed.current.text));
+      const match = shown.findIndex((r) => rowLabel(r).toLowerCase().startsWith(typed.current.text));
       if (match >= 0) setActive(match);
     }
   }
@@ -208,7 +200,28 @@ export function Select({
         onKeyDown={onListKey}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 focus:outline-none"
       >
-        {shown.map((o, i) => {
+        {shown.map((row, i) => {
+          const rowSize = sheet ? "min-h-12 py-2.5 text-[17px]" : "min-h-10 py-2 text-[15px]";
+          if (row.kind === "group") {
+            const Chevron = row.expanded ? ChevronDown : ChevronRight;
+            return (
+              <li
+                key={`group-${row.name}`}
+                id={optionId(i)}
+                role="option"
+                aria-selected={false}
+                aria-label={`${row.name}, ${row.count}, ${row.expanded ? "showing" : "tap to show"}`}
+                onPointerMove={() => setActive(i)}
+                onClick={() => pick(row)}
+                className={cn("mt-1 flex cursor-pointer items-center gap-2 rounded-xl px-3 font-semibold text-ink", rowSize, i === active && "bg-accent-soft")}
+              >
+                <Chevron size={18} strokeWidth={2} className="shrink-0 text-ink-secondary" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                <span className="shrink-0 rounded-full bg-hairline px-2 py-0.5 text-[12px] font-medium tabular-nums text-ink-secondary">{row.count}</span>
+              </li>
+            );
+          }
+          const o = row.option;
           const isSelected = o.value === value;
           return (
             <li
@@ -220,7 +233,8 @@ export function Select({
               onClick={() => choose(o)}
               className={cn(
                 "flex cursor-pointer items-center gap-3 rounded-xl px-3",
-                sheet ? "min-h-12 py-2.5 text-[17px]" : "min-h-10 py-2 text-[15px]",
+                rowSize,
+                row.inGroup && "ml-4 rounded-l-none border-l-2 border-hairline",
                 i === active && "bg-accent-soft",
                 isSelected ? "font-medium text-accent" : "text-ink",
               )}
@@ -253,8 +267,8 @@ export function Select({
         onClick={() => (open ? close() : openMenu())}
         onKeyDown={onTriggerKey}
         className={cn(
-          "flex w-full items-center gap-2 border border-divider bg-card text-left text-ink transition-colors hover:border-ink-tertiary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:pointer-events-none disabled:bg-card-subtle disabled:text-ink-tertiary",
-          sizes[size],
+          fieldButtonClass,
+          fieldSizes[size],
           open && "border-accent ring-2 ring-accent/25",
           className,
         )}
@@ -266,43 +280,10 @@ export function Select({
         <ChevronDown size={18} strokeWidth={1.75} className={cn("shrink-0 text-ink-secondary transition-transform", open && "rotate-180")} aria-hidden />
       </button>
 
-      {open &&
-        root &&
-        createPortal(
-          sheet ? (
-            <div className="fixed inset-0 z-50 flex items-end">
-              <div className="absolute inset-0 bg-black/25" aria-hidden />
-              <div
-                ref={popupRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label={name}
-                className="animate-sheet-up relative flex max-h-[78dvh] w-full flex-col rounded-t-sheet bg-card pb-[env(safe-area-inset-bottom)] shadow-sheet"
-              >
-                <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-1 pt-4">
-                  <p className="truncate text-[17px] font-semibold tracking-[-0.3px] text-ink">{name}</p>
-                  <button type="button" onClick={() => close()} aria-label="Close" className="grid size-8 shrink-0 place-items-center rounded-full bg-hairline text-ink-secondary">
-                    <X size={16} strokeWidth={2} aria-hidden />
-                  </button>
-                </div>
-                {search}
-                {list}
-              </div>
-            </div>
-          ) : (
-            pos && (
-              <div
-                ref={popupRef}
-                className="animate-fade-up fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-hairline bg-card shadow-raised"
-                style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
-              >
-                {search}
-                {list}
-              </div>
-            )
-          ),
-          root,
-        )}
+      <PopoverPanel popover={popover} title={name}>
+        {search}
+        {list}
+      </PopoverPanel>
     </>
   );
 }

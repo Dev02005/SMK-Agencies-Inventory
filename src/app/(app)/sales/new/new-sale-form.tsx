@@ -3,6 +3,8 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { ProductPicker } from "@/components/forms/product-picker";
+import { DatePicker } from "@/components/ui/date-picker";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
@@ -19,18 +21,34 @@ import {
   type DiscountMode,
   type TransportMode,
 } from "@/lib/sales";
-import type { Product, Role } from "@/lib/data/types";
+import type { Party, Product } from "@/lib/data/types";
+import { useLorryBook } from "@/lib/lorry-book";
+import { partyOptions } from "@/lib/party-options";
+import { useViewAs } from "@/lib/roles";
 
 export type SaleParty = {
   id: string;
   name: string;
   place?: string;
+  kind: Party["kind"];
   creditLimit: number | null;
   outstanding: number;
 };
 
 type Line = { key: number; productId: string; qty: string; rate: string };
-type Source = "godown" | "lorry" | "van";
+/** The company lorry a bill is sold from, as noted when it arrived. Invoice and tick boxes may be empty. */
+export type LorryOnSale = {
+  id: string;
+  lorryNo: string;
+  companyName: string;
+  driverName?: string;
+  invoiceNo?: string;
+  invoicePaperKept?: boolean;
+  unloadingCharges?: boolean;
+};
+
+/** A vehicle to pick for delivery: "Lorry AP 30 TB 1186", with its model, driver or owner as the hint. */
+export type VehicleChoice = { id: string; label: string; hint?: string };
 
 const num = (value: string) => {
   const n = parseFloat(value);
@@ -38,41 +56,76 @@ const num = (value: string) => {
 };
 
 const transportHelp: Record<TransportMode, string> = {
-  FOR: "Our lorry delivers; freight is charged.",
-  EX: "Customer's own vehicle; no transport charge.",
-  RENT: "Hired vehicle; enter the rent charged.",
+  FOR: "Our own vehicle delivers; transport is charged.",
+  EX: "The customer's own vehicle collects; no charges.",
+  RENT: "A rented vehicle delivers; its rent is not added to the bill.",
 };
 
 export function NewSaleForm({
+  firms,
   products,
   parties,
   godowns,
-  role,
+  ownVehicles,
+  rentedVehicles,
+  lorries,
+  preselect,
   today,
 }: {
+  /** The owner's firms; the bill goes out under the one picked at the top. */
+  firms: { id: string; name: string; gstin: string }[];
   products: Product[];
   parties: SaleParty[];
+  /** The bill's bags come out of the godown, or the company lorry, picked under "Load from". */
   godowns: { id: string; name: string }[];
-  role: Role;
+  /** Our own lorries and vans, for FOR deliveries. */
+  ownVehicles: VehicleChoice[];
+  /** Rented vehicles, for RENT deliveries. */
+  rentedVehicles: VehicleChoice[];
+  /** Company lorries selling now (the ones noted on this device are added here). */
+  lorries: LorryOnSale[];
+  /** A godown or lorry to start on (Sales › Lorry sales › Sell from this lorry). */
+  preselect?: string;
   /** "YYYY-MM-DD", worked out on the server so it matches between server and browser. */
   today: string;
 }) {
   const id = useId();
+  const [role] = useViewAs();
+  // Only the owner prices a bill. Everyone else sends the items, quantities and vehicle; the owner sets the
+  // rates, discount and charges and confirms it (on the bill's page).
+  const pricing = role === "owner";
+  const [firmId, setFirmId] = useState(firms[0]?.id ?? "");
+  const firm = firms.find((f) => f.id === firmId);
   const [partyId, setPartyId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [receivedDate, setReceivedDate] = useState("");
-  const [source, setSource] = useState<Source>("godown");
-  const [godownId, setGodownId] = useState(godowns[0]?.id ?? "");
-  const [vehicle, setVehicle] = useState("");
   const [lines, setLines] = useState<Line[]>([
     { key: 1, productId: products[0].id, qty: "", rate: String(products[0].listRate) },
   ]);
   const [nextKey, setNextKey] = useState(2);
   const [discountMode, setDiscountMode] = useState<DiscountMode>("amount");
   const [discountValue, setDiscountValue] = useState("");
+  // A godown id or a lorry id. Lorries noted on this device appear once the page is running in the browser.
+  const [loadFrom, setLoadFrom] = useState(preselect ?? godowns[0]?.id ?? "");
+  const deviceLorries: LorryOnSale[] = useLorryBook()
+    .filter((l) => !l.closed)
+    .map((l) => ({
+      id: l.id,
+      lorryNo: l.lorryNo,
+      companyName: l.companyName,
+      driverName: l.driverName,
+      invoiceNo: l.invoiceNo,
+      invoicePaperKept: l.invoicePaperKept,
+      unloadingCharges: l.unloadingCharges,
+    }));
+  const allLorries = [...lorries, ...deviceLorries];
+  const lorry = allLorries.find((l) => l.id === loadFrom);
+  const loadFromKnown = Boolean(lorry) || godowns.some((g) => g.id === loadFrom);
   const [transportMode, setTransportMode] = useState<TransportMode>("FOR");
+  const [ownVehicleId, setOwnVehicleId] = useState("");
+  const [rentedVehicleId, setRentedVehicleId] = useState("");
+  const [customerVehicle, setCustomerVehicle] = useState("");
   const [transportCharge, setTransportCharge] = useState("");
-  const [unloadingCharge, setUnloadingCharge] = useState("");
   const [otherCharge, setOtherCharge] = useState("");
   const [destination, setDestination] = useState("");
   const [memo, setMemo] = useState("");
@@ -83,32 +136,19 @@ export function NewSaleForm({
   const productById = (productId: string) => products.find((p) => p.id === productId) ?? products[0];
   const party = parties.find((p) => p.id === partyId);
 
+  // EX: the customer's own vehicle, so nothing is charged on top of the items. Only FOR (our vehicle) charges
+  // transport; any mode but EX may add an optional "Other" charge. Rent and unloading are not put on bills.
+  const charged = transportMode !== "EX";
   const totals = computeTotals({
     lines: lines.map((l) => ({ qty: num(l.qty), rate: num(l.rate) })),
     discountMode,
     discountValue: num(discountValue),
     transportMode,
-    transportCharge: num(transportCharge),
-    unloadingCharge: num(unloadingCharge),
-    otherCharge: num(otherCharge),
+    transportCharge: transportMode === "FOR" ? num(transportCharge) : 0,
+    unloadingCharge: 0,
+    otherCharge: charged ? num(otherCharge) : 0,
   });
-  const credit = party ? checkCredit(party.creditLimit, party.outstanding, totals.total) : null;
-
-  const isOwner = role === "owner";
-  const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
-  const rateChanged = lines.some((l) => num(l.rate) !== productById(l.productId).listRate);
-  const needsApproval = Boolean(credit?.overLimit) || discountOverLimit;
-  const needsReason = (isOwner && needsApproval) || rateChanged;
-  const hasLines = lines.some((l) => num(l.qty) > 0 && num(l.rate) > 0);
-
-  const missing = !party
-    ? "Choose a party to continue."
-    : !hasLines
-      ? "Enter a quantity and rate for at least one item."
-      : needsReason && !reason.trim()
-        ? "Enter the reason before saving."
-        : null;
-  const actionLabel = needsApproval ? (isOwner ? "Save with override" : "Send for approval") : "Save sale";
+  const credit = party && pricing ? checkCredit(party.creditLimit, party.outstanding, totals.total) : null;
 
   const quantities = lines.reduce(
     (acc, l) => {
@@ -120,6 +160,32 @@ export function NewSaleForm({
     },
     { cement: { qty: 0, mt: 0 }, steel: { qty: 0, mt: 0 } },
   );
+
+  const isOwner = role === "owner";
+  const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
+  const rateChanged = lines.some((l) => num(l.rate) !== productById(l.productId).listRate);
+  const needsApproval = pricing && (Boolean(credit?.overLimit) || discountOverLimit);
+  const needsReason = pricing && ((isOwner && needsApproval) || rateChanged);
+  const hasLines = lines.some((l) => num(l.qty) > 0 && (!pricing || num(l.rate) > 0));
+
+  const missing = !party
+    ? "Choose a party to continue."
+    : !loadFromKnown
+      ? "Choose the godown or lorry the bags are loaded from."
+      : !hasLines
+      ? pricing
+        ? "Enter a quantity and rate for at least one item."
+        : "Enter the quantity for at least one item."
+      : needsReason && !reason.trim()
+        ? "Enter the reason before saving."
+        : null;
+  const actionLabel = !pricing ? "Send to owner" : needsApproval ? (isOwner ? "Save with override" : "Send for approval") : "Save sale";
+  const quantityLine = [
+    quantities.cement.qty > 0 && `${formatNumber(quantities.cement.qty)} bags (${formatNumber(quantities.cement.mt, 3)} MT)`,
+    quantities.steel.qty > 0 && `${formatNumber(quantities.steel.qty)} kg (${formatNumber(quantities.steel.mt, 3)} MT)`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function updateLine(key: number, patch: Partial<Line>) {
     setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -133,6 +199,10 @@ export function NewSaleForm({
 
   function save() {
     if (missing) return;
+    if (!pricing) {
+      toast("Sample mode: the request to the owner was checked but not sent. Sending starts once Supabase is connected.");
+      return;
+    }
     toast(
       needsApproval && !isOwner
         ? "Sample mode: the approval request was checked but not sent. Sending starts once Supabase is connected."
@@ -149,6 +219,40 @@ export function NewSaleForm({
           save();
         }}
       >
+        {firms.length > 1 && (
+          <div role="radiogroup" aria-label="Bill from firm" className="grid grid-cols-2 gap-3">
+            {firms.map((f, i) => {
+              const picked = f.id === firmId;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={picked}
+                  onClick={() => setFirmId(f.id)}
+                  className={cn(
+                    "flex min-h-[72px] items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors md:p-4",
+                    picked ? "border-accent bg-accent-soft shadow-card" : "border-hairline bg-card hover:bg-card-subtle",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-8 shrink-0 place-items-center rounded-full text-[14px] font-semibold",
+                      picked ? "bg-accent text-white" : "bg-hairline text-ink-secondary",
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className={cn("block text-[15px] font-semibold leading-[20px]", picked ? "text-accent" : "text-ink")}>{f.name}</span>
+                    <span className="block truncate text-[12px] text-ink-secondary">{f.gstin ? `GSTIN ${f.gstin}` : "GSTIN not added yet"}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <section className="surface space-y-4 p-5">
           <Field label="Party" htmlFor={`${id}-party`}>
             <Select
@@ -156,64 +260,60 @@ export function NewSaleForm({
               label="Party"
               placeholder="Choose a party"
               value={partyId}
-              onChange={setPartyId}
-              options={parties.map((p) => ({ value: p.id, label: p.name, hint: p.place }))}
+              onChange={(next) => {
+                // The destination follows the party's town unless it was typed by hand.
+                if (!destination || destination === (party?.place ?? "")) setDestination(parties.find((p) => p.id === next)?.place ?? "");
+                setPartyId(next);
+              }}
+              options={partyOptions(parties)}
             />
           </Field>
           {credit && <CreditPanel credit={credit} billTotal={totals.total} isOwner={isOwner} />}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Bill date" htmlFor={`${id}-date`}>
-              <input
-                id={`${id}-date`}
-                type="date"
-                className={inputClass}
-                value={invoiceDate}
-                onChange={(e) => setInvoiceDate(e.target.value)}
-              />
+              <DatePicker id={`${id}-date`} label="Bill date" value={invoiceDate} onChange={setInvoiceDate} />
             </Field>
             <Field label="Truck received on" htmlFor={`${id}-received`} hint="Only if different">
-              <input
-                id={`${id}-received`}
-                type="date"
-                className={inputClass}
-                value={receivedDate}
-                onChange={(e) => setReceivedDate(e.target.value)}
-              />
+              <DatePicker id={`${id}-received`} label="Truck received on" value={receivedDate} onChange={setReceivedDate} clearable />
             </Field>
           </div>
         </section>
 
-        <section className="surface space-y-4 p-5">
-          <SectionTitle>Load from</SectionTitle>
-          <Segmented
-            label="Load from"
-            value={source}
-            onChange={setSource}
-            options={[
-              { value: "godown", label: "Godown" },
-              { value: "lorry", label: "Lorry" },
-              { value: "van", label: "Van" },
-            ]}
-          />
-          {source === "godown" ? (
-            <Field label="Godown" htmlFor={`${id}-godown`}>
-              <Select id={`${id}-godown`} label="Godown" value={godownId} onChange={setGodownId} options={godowns.map((g) => ({ value: g.id, label: g.name }))} />
-            </Field>
-          ) : (
-            <Field label={source === "lorry" ? "Lorry number" : "Van number"} htmlFor={`${id}-vehicle`}>
-              <input
-                id={`${id}-vehicle`}
-                className={inputClass}
-                value={vehicle}
-                onChange={(e) => setVehicle(e.target.value.toUpperCase())}
-                placeholder="AP 30 AB 1234"
-              />
-            </Field>
-          )}
-        </section>
-
         <section className="surface p-5">
           <SectionTitle>Items</SectionTitle>
+          <Field label="Load from" htmlFor={`${id}-from`} className="mt-3">
+            <Select
+              id={`${id}-from`}
+              label="Load from"
+              placeholder="Choose a godown or lorry"
+              value={loadFrom}
+              onChange={setLoadFrom}
+              options={[
+                ...godowns.map((g) => ({ value: g.id, label: g.name })),
+                ...allLorries.map((l) => ({
+                  value: l.id,
+                  label: l.lorryNo,
+                  hint: [l.companyName, l.driverName && `driver ${l.driverName}`].filter(Boolean).join(" · "),
+                  group: "Lorries selling now",
+                })),
+              ]}
+            />
+          </Field>
+          {lorry && (
+            <div className="mt-3 rounded-xl bg-accent-soft px-3.5 py-2.5 text-[14px] text-ink">
+              <p>
+                Selling from lorry <span className="font-semibold">{lorry.lorryNo}</span> · {lorry.companyName}
+                {lorry.driverName && ` · driver ${lorry.driverName}`}. These bags come off the lorry, not out of a godown.
+              </p>
+              <p className="mt-1 text-[13px] text-ink-secondary">
+                {[
+                  lorry.invoiceNo ? `Invoice ${lorry.invoiceNo}` : "No invoice number yet",
+                  lorry.invoicePaperKept ? "invoice paper with us" : "invoice paper not with us",
+                  lorry.unloadingCharges ? "unloading charges" : "no unloading charges",
+                ].join(" · ")}
+              </p>
+            </div>
+          )}
           <ul className="divide-y divide-hairline">
             {lines.map((line, index) => {
               const product = productById(line.productId);
@@ -221,25 +321,24 @@ export function NewSaleForm({
               const rate = num(line.rate);
               return (
                 <li key={line.key} className="space-y-3 py-4">
-                  <div className="flex items-end gap-2">
-                    <Field label={`Item ${index + 1}`} htmlFor={`${id}-product-${line.key}`} className="flex-1">
-                      <Select
-                        id={`${id}-product-${line.key}`}
-                        label="Product"
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ProductPicker
+                        label={`Item ${index + 1}`}
+                        products={products}
                         value={line.productId}
                         onChange={(v) => {
                           const next = productById(v);
                           updateLine(line.key, { productId: next.id, rate: String(next.listRate) });
                         }}
-                        options={products.map((p) => ({ value: p.id, label: p.name }))}
                       />
-                    </Field>
+                    </div>
                     {lines.length > 1 && (
                       <button
                         type="button"
                         aria-label={`Remove item ${index + 1}`}
                         onClick={() => setLines((current) => current.filter((l) => l.key !== line.key))}
-                        className="mb-1 grid size-10 shrink-0 place-items-center rounded-full text-ink-secondary hover:bg-hairline"
+                        className="grid size-10 shrink-0 place-items-center rounded-full text-ink-secondary hover:bg-hairline"
                       >
                         <X size={18} strokeWidth={2} aria-hidden />
                       </button>
@@ -260,24 +359,28 @@ export function NewSaleForm({
                         onChange={(e) => updateLine(line.key, { qty: e.target.value })}
                       />
                     </Field>
-                    <Field
-                      label={`Rate per ${product.unit}`}
-                      htmlFor={`${id}-rate-${line.key}`}
-                      hint={rate !== product.listRate ? `List rate ${formatINR(product.listRate)}` : undefined}
-                    >
-                      <AffixInput
-                        id={`${id}-rate-${line.key}`}
-                        inputMode="decimal"
-                        prefix="₹"
-                        value={line.rate}
-                        onChange={(e) => updateLine(line.key, { rate: e.target.value })}
-                      />
-                    </Field>
+                    {pricing && (
+                      <Field
+                        label={`Rate per ${product.unit}`}
+                        htmlFor={`${id}-rate-${line.key}`}
+                        hint={rate !== product.listRate ? `List rate ${formatINR(product.listRate)}` : undefined}
+                      >
+                        <AffixInput
+                          id={`${id}-rate-${line.key}`}
+                          inputMode="decimal"
+                          prefix="₹"
+                          value={line.rate}
+                          onChange={(e) => updateLine(line.key, { rate: e.target.value })}
+                        />
+                      </Field>
+                    )}
                   </div>
-                  <div className="flex justify-between text-[15px]">
-                    <span className="text-ink-secondary">Amount</span>
-                    <span className="font-semibold tabular-nums text-ink">{formatINR(qty * rate)}</span>
-                  </div>
+                  {pricing && (
+                    <div className="flex justify-between text-[15px]">
+                      <span className="text-ink-secondary">Amount</span>
+                      <span className="font-semibold tabular-nums text-ink">{formatINR(qty * rate)}</span>
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -289,35 +392,38 @@ export function NewSaleForm({
         </section>
 
         <section className="surface space-y-4 p-5">
-          <SectionTitle>Discount</SectionTitle>
-          <div className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3">
-            <Segmented
-              label="Discount type"
-              value={discountMode}
-              onChange={setDiscountMode}
-              options={[
-                { value: "amount", label: "₹" },
-                { value: "percent", label: "%" },
-              ]}
-            />
-            <AffixInput
-              aria-label="Discount"
-              inputMode="decimal"
-              placeholder="0"
-              prefix={discountMode === "amount" ? "₹" : undefined}
-              suffix={discountMode === "percent" ? "%" : undefined}
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-            />
-          </div>
-          {totals.discount > 0 && (
-            <p className={cn("text-[13px]", discountOverLimit ? "text-warning" : "text-ink-secondary")}>
-              {formatINR(totals.discount)} off · {formatNumber(totals.discountPercent)}% of {formatINR(totals.subtotal)}
-              {discountOverLimit && ` · above the ${maxDiscountPercent[role]}% limit for your role, needs owner approval`}
-            </p>
+          {pricing && (
+            <>
+              <SectionTitle>Discount</SectionTitle>
+              <div className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-3">
+                <Segmented
+                  label="Discount type"
+                  value={discountMode}
+                  onChange={setDiscountMode}
+                  options={[
+                    { value: "amount", label: "₹" },
+                    { value: "percent", label: "%" },
+                  ]}
+                />
+                <AffixInput
+                  aria-label="Discount"
+                  inputMode="decimal"
+                  placeholder="0"
+                  prefix={discountMode === "amount" ? "₹" : undefined}
+                  suffix={discountMode === "percent" ? "%" : undefined}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                />
+              </div>
+              {totals.discount > 0 && (
+                <p className={cn("text-[13px]", discountOverLimit ? "text-warning" : "text-ink-secondary")}>
+                  {formatINR(totals.discount)} off · {formatNumber(totals.discountPercent)}% of {formatINR(totals.subtotal)}
+                  {discountOverLimit && ` · above the ${maxDiscountPercent[role]}% limit for your role, needs owner approval`}
+                </p>
+              )}
+            </>
           )}
-
-          <SectionTitle className="pt-2">Transport</SectionTitle>
+          <SectionTitle className={pricing ? "pt-2" : undefined}>Transport</SectionTitle>
           <Segmented
             label="Transport mode"
             value={transportMode}
@@ -329,51 +435,73 @@ export function NewSaleForm({
             ]}
           />
           <p className="text-[13px] text-ink-secondary">{transportHelp[transportMode]}</p>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Transport" htmlFor={`${id}-transport`}>
-              <AffixInput
-                id={`${id}-transport`}
-                inputMode="decimal"
-                prefix="₹"
-                placeholder="0"
-                disabled={transportMode === "EX"}
-                value={transportMode === "EX" ? "" : transportCharge}
-                onChange={(e) => setTransportCharge(e.target.value)}
-              />
-            </Field>
-            <Field label="Unloading" htmlFor={`${id}-unloading`}>
-              <AffixInput
-                id={`${id}-unloading`}
-                inputMode="decimal"
-                prefix="₹"
-                placeholder="0"
-                value={unloadingCharge}
-                onChange={(e) => setUnloadingCharge(e.target.value)}
-              />
-            </Field>
-            <Field label="Other" htmlFor={`${id}-other`}>
-              <AffixInput
-                id={`${id}-other`}
-                inputMode="decimal"
-                prefix="₹"
-                placeholder="0"
-                value={otherCharge}
-                onChange={(e) => setOtherCharge(e.target.value)}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {transportMode === "EX" ? (
+              <Field label="Customer's vehicle number" htmlFor={`${id}-vehicle`}>
+                <input
+                  id={`${id}-vehicle`}
+                  className={inputClass}
+                  value={customerVehicle}
+                  onChange={(e) => setCustomerVehicle(e.target.value.toUpperCase())}
+                  placeholder="AP 30 AB 1234"
+                  autoCapitalize="characters"
+                />
+              </Field>
+            ) : (
+              <Field
+                label={transportMode === "FOR" ? "Our vehicle" : "Rented vehicle"}
+                htmlFor={`${id}-vehicle`}
+                hint={(transportMode === "FOR" ? ownVehicles : rentedVehicles).length === 0 ? "Add vehicles under Vehicles" : undefined}
+              >
+                <Select
+                  id={`${id}-vehicle`}
+                  label={transportMode === "FOR" ? "Our vehicle" : "Rented vehicle"}
+                  placeholder="Choose a vehicle"
+                  value={transportMode === "FOR" ? ownVehicleId : rentedVehicleId}
+                  onChange={transportMode === "FOR" ? setOwnVehicleId : setRentedVehicleId}
+                  options={(transportMode === "FOR" ? ownVehicles : rentedVehicles).map((v) => ({ value: v.id, label: v.label, hint: v.hint }))}
+                />
+              </Field>
+            )}
+            <Field label="Destination" htmlFor={`${id}-destination`}>
+              <input
+                id={`${id}-destination`}
+                className={inputClass}
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Village or site"
               />
             </Field>
           </div>
+          {charged && pricing && (
+            <div className="grid grid-cols-2 gap-3">
+              {transportMode === "FOR" && (
+                <Field label="Transport" htmlFor={`${id}-transport`}>
+                  <AffixInput
+                    id={`${id}-transport`}
+                    inputMode="decimal"
+                    prefix="₹"
+                    placeholder="0"
+                    value={transportCharge}
+                    onChange={(e) => setTransportCharge(e.target.value)}
+                  />
+                </Field>
+              )}
+              <Field label="Other" htmlFor={`${id}-other`} hint="Optional">
+                <AffixInput
+                  id={`${id}-other`}
+                  inputMode="decimal"
+                  prefix="₹"
+                  placeholder="0"
+                  value={otherCharge}
+                  onChange={(e) => setOtherCharge(e.target.value)}
+                />
+              </Field>
+            </div>
+          )}
         </section>
 
         <section className="surface space-y-4 p-5">
-          <Field label="Shipping destination" htmlFor={`${id}-destination`}>
-            <input
-              id={`${id}-destination`}
-              className={inputClass}
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="Village or site"
-            />
-          </Field>
           <Field label="Paper memo number" htmlFor={`${id}-memo`} hint="Number from the paper bill book, if any">
             <input id={`${id}-memo`} className={inputClass} value={memo} onChange={(e) => setMemo(e.target.value)} />
           </Field>
@@ -415,30 +543,30 @@ export function NewSaleForm({
 
       <aside className="hidden lg:sticky lg:top-20 lg:block">
         <section className="surface p-6">
-          <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">Bill summary</h2>
-          <dl className="mt-4 space-y-2.5 text-[15px]">
-            <SummaryRow label="Items" value={formatINR(totals.subtotal)} />
-            {totals.discount > 0 && <SummaryRow label="Discount" value={`− ${formatINR(totals.discount)}`} />}
-            {totals.charges > 0 && <SummaryRow label="Charges" value={formatINR(totals.charges)} />}
-          </dl>
-          <div className="mt-4 border-t border-hairline pt-4">
-            <p className="text-[13px] text-ink-secondary">Total</p>
-            <p className="text-[34px] font-semibold leading-[41px] tracking-[-0.4px] tabular-nums text-ink">
-              {formatINR(totals.total)}
-            </p>
-            {(quantities.cement.qty > 0 || quantities.steel.qty > 0) && (
-              <p className="mt-1 text-[13px] text-ink-secondary">
-                {[
-                  quantities.cement.qty > 0 &&
-                    `${formatNumber(quantities.cement.qty)} bags (${formatNumber(quantities.cement.mt, 3)} MT)`,
-                  quantities.steel.qty > 0 &&
-                    `${formatNumber(quantities.steel.qty)} kg (${formatNumber(quantities.steel.mt, 3)} MT)`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            )}
-          </div>
+          <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{pricing ? "Bill summary" : "Request summary"}</h2>
+          {firms.length > 1 && firm && <p className="mt-1 text-[13px] text-ink-secondary">From {firm.name}</p>}
+          {!pricing && (
+            <div className="mt-4">
+              <p className="text-[15px] text-ink">{quantityLine || "No items yet"}</p>
+              <p className="mt-2 text-[13px] text-ink-secondary">The owner sets the rates, discount and charges and confirms the sale.</p>
+            </div>
+          )}
+          {pricing && (
+            <>
+              <dl className="mt-4 space-y-2.5 text-[15px]">
+                <SummaryRow label="Items" value={formatINR(totals.subtotal)} />
+                {totals.discount > 0 && <SummaryRow label="Discount" value={`− ${formatINR(totals.discount)}`} />}
+                {totals.charges > 0 && <SummaryRow label="Charges" value={formatINR(totals.charges)} />}
+              </dl>
+              <div className="mt-4 border-t border-hairline pt-4">
+                <p className="text-[13px] text-ink-secondary">Total</p>
+                <p className="text-[34px] font-semibold leading-[41px] tracking-[-0.4px] tabular-nums text-ink">
+                  {formatINR(totals.total)}
+                </p>
+                {quantityLine && <p className="mt-1 text-[13px] text-ink-secondary">{quantityLine}</p>}
+              </div>
+            </>
+          )}
           {missing && <p className="mt-4 text-[13px] text-ink-secondary">{missing}</p>}
           <Button className="mt-5 w-full" disabled={Boolean(missing)} onClick={save}>
             {actionLabel}
@@ -449,9 +577,9 @@ export function NewSaleForm({
       <div className="frosted fixed inset-x-0 bottom-[calc(57px+env(safe-area-inset-bottom))] z-20 border-t border-black/[0.08] md:bottom-0 md:left-[72px] lg:hidden">
         <div className="mx-auto flex max-w-[640px] items-center gap-3 px-4 py-3 md:px-8">
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] text-ink-secondary">Total</p>
+            <p className="text-[12px] text-ink-secondary">{pricing ? "Total" : "Items"}</p>
             <p className="truncate text-[20px] font-semibold tabular-nums tracking-[-0.3px] text-ink">
-              {formatINR(totals.total)}
+              {pricing ? formatINR(totals.total) : quantityLine || "None yet"}
             </p>
           </div>
           <Button disabled={Boolean(missing)} onClick={save}>

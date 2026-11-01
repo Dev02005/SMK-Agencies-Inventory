@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { usesSampleData } from "@/lib/supabase/config";
 import { Chip } from "./chip";
 
 /** White card with a title row and an optional action link on the right. */
@@ -20,7 +20,11 @@ export function SectionCard({
     <section className={cn("surface p-5 md:p-6", className)}>
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
-          {title && <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{title}</h2>}
+          {title && (
+            <h2 className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.3px] text-ink before:block before:h-[18px] before:w-1 before:shrink-0 before:rounded-full before:bg-[linear-gradient(180deg,var(--accent),var(--teal))]">
+              {title}
+            </h2>
+          )}
           {action}
         </div>
       )}
@@ -43,8 +47,8 @@ export function StatCard({
   className?: string;
 }) {
   return (
-    <section className={cn("surface min-w-0 p-3.5 md:p-5", className)}>
-      <h2 className="truncate text-[12px] text-ink-secondary md:text-[13px]">{label}</h2>
+    <section data-tone={tone} className={cn("surface stat-card min-w-0 p-3.5 md:p-5", className)}>
+      <h2 className="truncate text-[12px] font-medium text-[color:var(--stat)] md:text-[13px]">{label}</h2>
       <p
         className={cn(
           "mt-1.5 truncate text-[15px] font-semibold tabular-nums tracking-[-0.2px] md:text-[22px]",
@@ -90,7 +94,7 @@ export function BackLink({ href, children }: { href: string; children: ReactNode
 
 /** Shown on every page while the app runs on sample data. */
 export function SampleChip() {
-  return isSupabaseConfigured ? null : <Chip tone="warning">Sample data</Chip>;
+  return usesSampleData ? <Chip tone="warning">Sample data</Chip> : null;
 }
 
 export function DetailList({ items, className }: { items: { label: string; value: ReactNode }[]; className?: string }) {

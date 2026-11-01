@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
-import { getDriverHome, getProducts } from "@/lib/data";
+import { getCurrentUser, getDriverHome, getProducts } from "@/lib/data";
 import { formatDate, formatINR } from "@/lib/format";
 import { describeQuantities } from "@/lib/quantities";
 import { TodayLine } from "./owner-home";
@@ -39,7 +39,9 @@ export function DriverHome({ profileId }: { profileId: string }) {
 }
 
 async function DriverDay({ profileId }: { profileId: string }) {
-  const [d, products] = await Promise.all([getDriverHome(profileId), getProducts()]);
+  // Their own deliveries when a driver is signed in; the owner previewing sees the first driver.
+  const me = await getCurrentUser();
+  const [d, products] = await Promise.all([getDriverHome(me.role === "driver" ? me.id : profileId), getProducts()]);
   const next = d.deliveries.find((x) => x.status !== "delivered");
 
   return (

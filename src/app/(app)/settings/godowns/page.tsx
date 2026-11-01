@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { getGodowns, getStockBalances } from "@/lib/data";
 
@@ -11,7 +12,12 @@ export const metadata: Metadata = { title: "Godowns" };
 export default function GodownSettingsPage() {
   return (
     <div className="animate-fade-up mx-auto max-w-[760px] space-y-4">
-      <PageHeader back={<BackLink href="/settings">Settings</BackLink>} title="Godowns" actions={<SampleChip />} />
+      <PageHeader back={<BackLink href="/settings">Settings</BackLink>} title="Godowns" actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Godowns"} />
+          </>
+        } />
       <Suspense fallback={<ListSkeleton rows={2} />}>
         <GodownList />
       </Suspense>

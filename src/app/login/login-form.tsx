@@ -1,14 +1,19 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/field";
+import { rememberSignedIn } from "@/lib/roles";
 import { signIn } from "./actions";
 
-/** Login ID + password. The session lasts until 12 AM India time, then everyone signs in again. */
+/**
+ * Login ID (mobile number or email) + password, on any phone or computer. The session lasts until 12 AM India
+ * time, then everyone signs in again.
+ */
 export function LoginForm() {
   const id = useId();
+  const router = useRouter();
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [wrong, setWrong] = useState(false);
@@ -26,10 +31,14 @@ export function LoginForm() {
         const next = new URLSearchParams(window.location.search).get("next") ?? undefined;
         startTransition(async () => {
           const result = await signIn(loginId, password, next);
-          if (result && !result.ok) {
+          if (!result.ok) {
             setWrong(true);
             setPassword("");
+            return;
           }
+          // Their own role's screens from the first page.
+          rememberSignedIn(result.user);
+          router.replace(result.next);
         });
       }}
     >
@@ -39,12 +48,15 @@ export function LoginForm() {
       <Field label="Login ID" htmlFor={`${id}-login`}>
         <input
           id={`${id}-login`}
-          inputMode="numeric"
+          type="text"
           autoComplete="username"
-          maxLength={10}
-          className={`${inputClass} tabular-nums`}
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={100}
+          placeholder="Mobile number or email"
+          className={inputClass}
           value={loginId}
-          onChange={(e) => setLoginId(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setLoginId(e.target.value)}
           aria-invalid={wrong || undefined}
         />
       </Field>
@@ -62,7 +74,6 @@ export function LoginForm() {
       <Button type="submit" disabled={!valid || pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <p className="text-center text-[13px] text-ink-secondary">You stay signed in until 12 midnight.</p>
     </form>
   );
 }

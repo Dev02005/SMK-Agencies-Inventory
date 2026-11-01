@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import type { PartyWithBalance } from "@/lib/data";
 import { formatBalance, formatINR } from "@/lib/format";
@@ -49,6 +50,7 @@ export function PartiesList({ parties, staff }: { parties: PartyWithBalance[]; s
         <StatCard label="Over limit" value={parties.filter(overLimit).length} tone="danger" hint="parties" />
       </StatRow>
 
+      <DataTools title="Parties" dated={false} />
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <FilterChips
           label="Party type"

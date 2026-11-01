@@ -5,22 +5,25 @@ import { Suspense } from "react";
 import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { cn } from "@/lib/cn";
 import { getCashBook } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
+import { pageDateFilter } from "@/lib/page-dates";
 import { CountChip } from "../count-chip";
 
 export const metadata: Metadata = { title: "Cash book" };
 
-export default function CashBookPage({ params }: PageProps<"/money/cash/[holder]">) {
+export default function CashBookPage({ params, searchParams }: PageProps<"/money/cash/[holder]">) {
   return (
     <div className="animate-fade-up">
       <BackLink href="/money/cash">Staff cash</BackLink>
       <Suspense fallback={<ListSkeleton rows={8} />}>
-        <CashBook params={params} />
+        <CashBook params={params} searchParams={searchParams} />
       </Suspense>
     </div>
   );
@@ -28,9 +31,9 @@ export default function CashBookPage({ params }: PageProps<"/money/cash/[holder]
 
 const signed = (n: number) => (n >= 0 ? `+ ${formatINR(n)}` : `− ${formatINR(-n)}`);
 
-async function CashBook({ params }: { params: PageProps<"/money/cash/[holder]">["params"] }) {
+async function CashBook({ params, searchParams }: Pick<PageProps<"/money/cash/[holder]">, "params" | "searchParams">) {
   const { holder } = await params;
-  const book = await getCashBook(holder);
+  const [book, dates] = await Promise.all([getCashBook(holder), pageDateFilter(searchParams)]);
   if (!book) notFound();
   const t = book.today;
   const difference = t.counted === undefined ? undefined : t.counted - t.closing;
@@ -70,11 +73,13 @@ async function CashBook({ params }: { params: PageProps<"/money/cash/[holder]">[
         )}
       </SectionCard>
 
+      <DataTools title={`Cash book ${book.name}`} className="mt-4" />
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-[22px] font-semibold tracking-[-0.3px] text-ink">Day by day</h2>
           <DataTable
-            rows={book.days}
+            rows={book.days.filter((d) => inDateFilter(d.date, dates))}
+            empty="No days in these dates."
             rowKey={(d) => d.date}
             mobile={(d) => ({
               title: formatDate(d.date),
@@ -93,7 +98,8 @@ async function CashBook({ params }: { params: PageProps<"/money/cash/[holder]">[
         <div>
           <h2 className="mb-3 text-[22px] font-semibold tracking-[-0.3px] text-ink">Entries</h2>
           <DataTable
-            rows={book.entries.slice(0, 40)}
+            rows={book.entries.filter((e) => inDateFilter(e.date, dates)).slice(0, 40)}
+            empty="No entries in these dates."
             rowKey={(e) => `${e.date}-${e.description}-${e.amount}`}
             rowHref={(e) => e.href}
             mobile={(e) => ({

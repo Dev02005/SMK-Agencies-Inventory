@@ -4,6 +4,7 @@ import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getEmployees, getLoans, getSalarySheet, getToday } from "@/lib/data";
@@ -18,7 +19,12 @@ export default function SalaryPage() {
       <PageHeader
         title="Salary & loans"
         subtitle="Salary and loans are kept apart: a loan instalment taken from salary lowers both the loan and the pay."
-        actions={<SampleChip />}
+        actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Salary and loans"} />
+          </>
+        }
       />
       <RoleGuard roles={["owner", "office"]}>
         <Suspense fallback={<ListSkeleton />}>

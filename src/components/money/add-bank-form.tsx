@@ -7,6 +7,7 @@ import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
+import { DatePicker } from "@/components/ui/date-picker";
 import { addBankAccount, type LocalBankAccount } from "@/lib/bank-book";
 import { todayISO } from "@/lib/format";
 import { BANK_NAMES, bankFromIfsc } from "@/lib/statement-parser";
@@ -127,7 +128,7 @@ export function AddBankForm({ holder }: { holder: string }) {
           <AffixInput id={`${id}-opening`} prefix="₹" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value.replace(/[^\d.-]/g, ""))} />
         </Field>
         <Field label="Balance as on" htmlFor={`${id}-date`}>
-          <input id={`${id}-date`} type="date" className={inputClass} value={openingDate} onChange={(e) => setOpeningDate(e.target.value)} />
+          <DatePicker id={`${id}-date`} label="Opening date" value={openingDate} onChange={setOpeningDate} />
         </Field>
       </div>
 

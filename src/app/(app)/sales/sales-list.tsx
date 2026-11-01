@@ -4,29 +4,23 @@ import { useState } from "react";
 import { StatCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import type { SaleWithParty } from "@/lib/data";
 import type { Product, SaleStatus } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { saleStatus } from "@/lib/labels";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
 
-type Period = "today" | "7d" | "30d" | "all";
-
-function daysAgo(today: string, days: number) {
-  const d = new Date(`${today}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - days);
-  return d.toISOString().slice(0, 10);
-}
-
-export function SalesList({ sales, products, today }: { sales: SaleWithParty[]; products: Product[]; today: string }) {
-  const [period, setPeriod] = useState<Period>("30d");
+export function SalesList({ sales, products }: { sales: SaleWithParty[]; products: Product[] }) {
+  const dates = useDateFilter();
   const [status, setStatus] = useState<SaleStatus | "all">("all");
   const [query, setQuery] = useState("");
 
-  const from = period === "today" ? today : period === "7d" ? daysAgo(today, 6) : period === "30d" ? daysAgo(today, 29) : "";
   const q = query.trim().toLowerCase();
-  const inPeriod = sales.filter((s) => s.billDate >= from);
+  const inPeriod = sales.filter((s) => inDateFilter(s.billDate, dates));
   const rows = inPeriod.filter(
     (s) =>
       (status === "all" || s.status === status) &&
@@ -50,19 +44,9 @@ export function SalesList({ sales, products, today }: { sales: SaleWithParty[]; 
         />
       </div>
 
+      <DataTools title="Godown sales" />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:gap-4">
-          <FilterChips
-            label="Period"
-            value={period}
-            onChange={setPeriod}
-            options={[
-              { value: "today", label: "Today" },
-              { value: "7d", label: "7 days" },
-              { value: "30d", label: "30 days" },
-              { value: "all", label: "All" },
-            ]}
-          />
           <FilterChips
             label="Status"
             value={status}
@@ -81,7 +65,7 @@ export function SalesList({ sales, products, today }: { sales: SaleWithParty[]; 
         rows={rows}
         rowKey={(s) => s.id}
         rowHref={(s) => `/sales/${s.id}`}
-        empty="No bills in this period."
+        empty="No bills for these dates."
         mobile={(s) => ({
           title: s.partyName,
           subtitle: `Bill ${s.billNo} · ${formatShortDate(s.billDate)} · ${describeQuantities(s.lines, products)}`,

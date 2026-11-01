@@ -19,7 +19,7 @@ function show(c: ReportColumn, v: ReportRow[string]) {
 export function ReportTable({ result }: { result: ReportResult }) {
   const { columns, rows, totals } = result;
   if (rows.length === 0) {
-    return <div className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">Nothing in this period.</div>;
+    return <div className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">Nothing for these dates.</div>;
   }
   const [first, ...rest] = columns;
   const texts = rest.filter((c) => !numeric(c));

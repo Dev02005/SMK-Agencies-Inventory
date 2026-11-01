@@ -7,6 +7,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { PaymentMode } from "@/lib/data/types";
 import { formatBalance, formatINR } from "@/lib/format";
@@ -114,7 +115,7 @@ export function PaymentForm({
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Date" htmlFor={`${id}-date`}>
-            <input id={`${id}-date`} type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DatePicker id={`${id}-date`} label="Date" value={date} onChange={setDate} />
           </Field>
           {isReceipt && (
             <Field label="Collected by" htmlFor={`${id}-by`}>

@@ -5,7 +5,7 @@
 
 export type Unit = "bag" | "kg";
 export type DiscountMode = "amount" | "percent";
-/** FOR = our lorry (freight charged), EX = customer's own vehicle (no transport charge), RENT = hired vehicle. */
+/** FOR = our own vehicle (transport charged), EX = the customer's own vehicle (no charges), RENT = a rented vehicle (rent charged). */
 export type TransportMode = "FOR" | "EX" | "RENT";
 
 /** 20 bags of cement = 1 MT; 1000 kg of steel = 1 MT. */

@@ -4,31 +4,42 @@ import { Suspense } from "react";
 import { AttendanceChip } from "@/components/people/attendance-chip";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
 import { Today } from "@/components/ui/today";
 import { SampleActionButton } from "@/components/ui/sample-action";
-import { getAttendanceCorrections, getAttendanceToday, getToday } from "@/lib/data";
-import { formatMonth, formatShortDate } from "@/lib/format";
+import { getAttendanceCorrections, getAttendanceRecords, getAttendanceToday, getToday } from "@/lib/data";
+import { inDateFilter, type DatePreset } from "@/lib/date-filter";
+import { formatDate, formatMonth, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
+import { pageDateFilter } from "@/lib/page-dates";
 import { CheckInCard } from "./check-in-card";
 
 export const metadata: Metadata = { title: "Attendance" };
 
-export default function AttendancePage() {
+// The records list starts on today: every day of every person is a lot of rows.
+const recordDates: DatePreset[] = ["today", "7d", "month", "all"];
+
+export default function AttendancePage({ searchParams }: PageProps<"/people/attendance">) {
   return (
     <>
       <PageHeader title="Attendance" subtitle={<><Today />. Weekly off on Sundays.</>} actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton />}>
-        <AttendanceData />
+        <AttendanceData searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
 
-async function AttendanceData() {
-  const rows = await getAttendanceToday();
+async function AttendanceData({ searchParams }: { searchParams: PageProps<"/people/attendance">["searchParams"] }) {
+  const [rows, corrected, all, dates] = await Promise.all([
+    getAttendanceToday(),
+    getAttendanceCorrections(),
+    getAttendanceRecords(),
+    pageDateFilter(searchParams, recordDates),
+  ]);
   const present = rows.filter((r) => r.record?.status === "present" || r.record?.status === "half_day").length;
-  const corrected = await getAttendanceCorrections();
+  const records = all.filter((r) => inDateFilter(r.date, dates));
 
   return (
     <div className="space-y-4">
@@ -90,6 +101,28 @@ async function AttendanceData() {
           { key: "leave", header: "Leave", align: "right", cell: (r) => r.month.leave },
           { key: "absent", header: "Absent", align: "right", cell: (r) => <span className={r.month.absent ? "text-danger" : undefined}>{r.month.absent}</span> },
           { key: "late", header: "Late", align: "right", cell: (r) => <span className={r.month.late ? "text-warning" : undefined}>{r.month.late}</span> },
+        ]}
+      />
+
+      <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">Day by day</h2>
+      <DataTools title="Attendance" presets={recordDates} />
+      <DataTable
+        rows={records}
+        rowKey={(r) => `${r.profileId}-${r.date}`}
+        rowHref={(r) => `/people/${r.profileId}`}
+        empty="No attendance for these dates."
+        mobile={(r) => ({
+          title: r.name,
+          subtitle: [formatShortDate(r.date), r.checkOut && `out ${r.checkOut}`, r.location].filter(Boolean).join(" · "),
+          meta: <AttendanceChip record={r} />,
+        })}
+        columns={[
+          { key: "date", header: "Date", cell: (r) => formatDate(r.date), className: "whitespace-nowrap text-ink-secondary" },
+          { key: "name", header: "Name", cell: (r) => r.name },
+          { key: "status", header: "Status", cell: (r) => <AttendanceChip record={r} /> },
+          { key: "in", header: "Check-in", cell: (r) => r.checkIn ?? "–", className: "text-ink-secondary" },
+          { key: "out", header: "Check-out", cell: (r) => r.checkOut ?? "–", className: "text-ink-secondary" },
+          { key: "where", header: "Where", cell: (r) => r.location ?? "–", className: "hidden text-ink-secondary lg:table-cell" },
         ]}
       />
       {corrected.length > 0 && (

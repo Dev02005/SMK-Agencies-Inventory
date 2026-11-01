@@ -6,6 +6,7 @@ import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui
 import { PageHeader } from "@/components/ui/page-header";
 import { getGodowns, getProducts, getVehicles } from "@/lib/data";
 import { todayISO } from "@/lib/format";
+import { productOptions } from "@/lib/product-options";
 
 export const metadata: Metadata = { title: "New transfer" };
 
@@ -32,7 +33,7 @@ async function TransferForm() {
         fields={[
           { name: "from", label: "From", type: "select", options: places },
           { name: "to", label: "To", type: "select", options: [...places].reverse() },
-          { name: "product", label: "Product", type: "select", options: products.map((p) => ({ value: p.id, label: p.name })) },
+          { name: "product", label: "Product", type: "select", options: productOptions(products) },
           { name: "qty", label: "Quantity (bags or kg)", type: "number", required: true },
           { name: "vehicle", label: "Vehicle", type: "select", options: vehicles.filter((v) => v.kind === "van" || v.kind === "lorry").map((v) => ({ value: v.id, label: v.label })) },
           { name: "date", label: "Date", type: "date", defaultValue: todayISO() },

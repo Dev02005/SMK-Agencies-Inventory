@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ExportButtons } from "@/components/reports/export-buttons";
 import { ReportTable } from "@/components/reports/report-table";
 import { BackLink, ListSkeleton, SampleChip } from "@/components/ui/blocks";
+import { DateFilterBar } from "@/components/ui/date-filter";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { cn } from "@/lib/cn";
 import { getCurrentUser, getFirm, getToday } from "@/lib/data";
 import { formatDate } from "@/lib/format";
-import { findReport, periodLabels, periodRange, reports, type Period } from "@/lib/reports";
+import { resolveDateFilter } from "@/lib/date-filter";
+import { findReport, reports } from "@/lib/reports";
 
 export function generateStaticParams() {
   return reports.map((r) => ({ report: r.key }));
@@ -71,17 +73,18 @@ function OptionLinks({ label, items }: { label: string; items: { href: string; l
 async function ReportBody({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const def = findReport((await params).report);
   if (!def) notFound();
-  const sp = await searchParams;
-  const asked = typeof sp.period === "string" ? sp.period : undefined;
-  const period: Period = def.periods?.find((p) => p === asked) ?? def.periods?.[0] ?? "today";
+  const [sp, today] = await Promise.all([searchParams, getToday()]);
   const by = def.groupings?.find((g) => g.key === sp.by)?.key ?? def.groupings?.[0]?.key;
+  // Reports without date choices are "as of today": every date is included.
+  const dates = resolveDateFilter(def.periods ? sp : {}, today, def.periods ?? ["all"]);
 
-  const [result, firm, user, today, range] = await Promise.all([def.run(period, by), getFirm(), getCurrentUser(), getToday(), periodRange(period)]);
-  const periodLabel = def.periods ? range.label : `As of ${formatDate(today)}`;
+  const [result, firm, user] = await Promise.all([def.run(dates, by), getFirm(), getCurrentUser()]);
+  const periodLabel = def.periods ? dates.label : `As of ${formatDate(today)}`;
   const groupingLabel = def.groupings?.find((g) => g.key === by)?.label;
-  const href = (p: Period | undefined, b: string | undefined) => {
+  // Changing the grouping keeps the dates already chosen.
+  const href = (b: string | undefined) => {
     const q = new URLSearchParams();
-    if (p && p !== def.periods?.[0]) q.set("period", p);
+    for (const [key, value] of Object.entries(sp)) if (typeof value === "string" && key !== "by") q.set(key, value);
     if (b && b !== def.groupings?.[0]?.key) q.set("by", b);
     const s = q.toString();
     return `/reports/${def.key}${s ? `?${s}` : ""}`;
@@ -92,23 +95,20 @@ async function ReportBody({ params, searchParams }: { params: Params; searchPara
     <div className={cn("space-y-4", wide && "print-landscape")}>
       <div className="flex flex-col gap-3 print:hidden lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
-          {def.periods && (
-            <OptionLinks label="Period" items={def.periods.map((p) => ({ href: href(p, by), label: periodLabels[p], current: p === period }))} />
-          )}
-          {def.groupings && (
-            <OptionLinks label="Group by" items={def.groupings.map((g) => ({ href: href(period, g.key), label: g.label, current: g.key === by }))} />
-          )}
+          {def.periods && <DateFilterBar presets={def.periods} />}
+          {def.groupings && <OptionLinks label="Group by" items={def.groupings.map((g) => ({ href: href(g.key), label: g.label, current: g.key === by }))} />}
         </div>
         <div className="flex shrink-0 gap-2">
-          <ExportButtons
-            firmName={firm.name}
+          <ExportMenu
             title={def.title}
-            periodLabel={[groupingLabel, periodLabel].filter(Boolean).join(" · ")}
-            fileName={`SKA ${def.title} ${def.periods ? periodLabels[period] : today}`.replace(/[^\w -]+/g, "").replace(/\s+/g, " ")}
-            columns={result.columns}
-            rows={result.rows}
-            totals={result.totals}
-            wide={wide}
+            subtitle={[groupingLabel, periodLabel].filter(Boolean).join(" · ")}
+            tables={[
+              {
+                columns: result.columns.map((c) => ({ label: c.label, kind: c.kind })),
+                rows: result.rows.map((r) => result.columns.map((c) => r[c.key])),
+                totals: result.totals ? [result.columns.map((c) => result.totals?.[c.key])] : [],
+              },
+            ]}
           />
         </div>
       </div>

@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
 import { getAgeingReport, getBadDebts } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 
 export const metadata: Metadata = { title: "Bad debts" };
 
-export default function BadDebtsPage() {
+export default function BadDebtsPage({ searchParams }: PageProps<"/money/bad-debts">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
@@ -18,24 +21,26 @@ export default function BadDebtsPage() {
         actions={<SampleChip />}
       />
       <Suspense fallback={<ListSkeleton />}>
-        <BadDebtsData />
+        <BadDebtsData searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function BadDebtsData() {
-  const [debts, ageing] = await Promise.all([getBadDebts(), getAgeingReport()]);
+async function BadDebtsData({ searchParams }: { searchParams: PageProps<"/money/bad-debts">["searchParams"] }) {
+  const [all, ageing, dates] = await Promise.all([getBadDebts(), getAgeingReport(), pageDateFilter(searchParams)]);
+  const debts = all.filter((d) => inDateFilter(d.date, dates));
   const oldDebtors = ageing.filter((r) => r.ageing["61-90"] + r.ageing["90+"] + r.ageing["31-60"] > 0);
 
   return (
     <div className="grid gap-4 lg:grid-cols-5">
       <div className="space-y-3 lg:col-span-3">
+        <DataTools title="Bad debts" />
         <DataTable
           rows={debts}
           rowKey={(d) => d.id}
           rowHref={(d) => `/parties/${d.partyId}`}
-          empty="Nothing written off."
+          empty="Nothing written off in these dates."
           mobile={(d) => ({ title: d.partyName, subtitle: `${formatShortDate(d.date)} · ${d.reason}`, value: formatINR(d.amount) })}
           columns={[
             { key: "party", header: "Party", cell: (d) => d.partyName },

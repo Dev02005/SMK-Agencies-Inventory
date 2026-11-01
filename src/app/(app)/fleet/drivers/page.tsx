@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getDrivers } from "@/lib/data";
@@ -16,7 +17,12 @@ export default function DriversPage() {
       <PageHeader
         title="Drivers"
         subtitle="Our drivers' ledger (money given, spent and returned) and the lorry owners we hire from"
-        actions={<SampleChip />}
+        actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Drivers"} />
+          </>
+        }
       />
       <RoleGuard roles={["owner", "office"]}>
         <Suspense fallback={<ListSkeleton />}>

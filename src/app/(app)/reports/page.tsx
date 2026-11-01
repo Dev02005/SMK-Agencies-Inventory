@@ -17,7 +17,8 @@ const elsewhere = [
   { href: "/money/banks", title: "Bank book", description: "Each account with a running balance" },
   { href: "/people/salary", title: "Salary sheet", description: "This month's salary, loans and advances" },
   { href: "/fleet/drivers", title: "Driver ledger", description: "Cash with each driver and hired lorry dues" },
-  { href: "/stock/lorries", title: "Lorry stock", description: "Lorries sold straight off the truck" },
+  { href: "/sales/lorries", title: "Lorry sales", description: "Bills from lorries sold straight off the truck" },
+  { href: "/stock/lorries", title: "Lorry stock", description: "Bags still on those lorries" },
 ];
 
 function ReportLink({ href, title, description }: { href: string; title: string; description: string }) {

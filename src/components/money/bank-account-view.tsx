@@ -4,10 +4,13 @@ import { FileUp, Plus } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { maskAccountNo, useBankBook } from "@/lib/bank-book";
 import type { BankAccount, BankEntry } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatINR } from "@/lib/format";
 import { BankEntryForm } from "./bank-entry-form";
 import { BankEntriesTable } from "./bank-views";
@@ -23,6 +26,7 @@ export function BankAccountView({ accountId, account: saved, entries: savedEntri
   const book = useBankBook();
   const ready = useSyncExternalStore(noop, () => true, () => false);
   const [panel, setPanel] = useState<"entry" | "import" | null>(null);
+  const dates = useDateFilter();
 
   const local = book.accounts.find((a) => a.id === accountId);
   const account: BankAccount | undefined =
@@ -80,7 +84,8 @@ export function BankAccountView({ accountId, account: saved, entries: savedEntri
         <StatementImport account={account} existing={rows.map((r) => ({ date: r.date, amount: r.amount }))} onClose={() => setPanel(null)} />
       )}
 
-      <BankEntriesTable entries={rows} />
+      <DataTools title={account.name} className="mb-4" />
+      <BankEntriesTable entries={rows.filter((r) => inDateFilter(r.date, dates))} />
       {deviceEntries.length > 0 && (
         <p className="mt-3 px-1 text-[13px] text-ink-secondary">
           {deviceEntries.length} {deviceEntries.length === 1 ? "entry is" : "entries are"} saved on this device and move to the database once it is connected.

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { PrintButton } from "@/components/print/print-button";
 import { Letterhead, PrintFooter, PrintSheet } from "@/components/print/print-sheet";
 import { BackLink, ListSkeleton } from "@/components/ui/blocks";
-import { getFirm, getParty, getProducts, getProfiles, getSale } from "@/lib/data";
+import { getFirms, getParty, getProducts, getProfiles, getSale } from "@/lib/data";
 import { formatDate, formatINR, rupeesInWords } from "@/lib/format";
 import { transportLabels } from "@/lib/labels";
 import { lineQty } from "@/lib/quantities";
@@ -23,7 +23,8 @@ async function PrintBill({ params }: { params: PageProps<"/sales/[id]/print">["p
   const { id } = await params;
   const sale = await getSale(id);
   if (!sale) notFound();
-  const [firm, party, products, profiles] = await Promise.all([getFirm(), getParty(sale.partyId), getProducts(), getProfiles()]);
+  const [firms, party, products, profiles] = await Promise.all([getFirms(), getParty(sale.partyId), getProducts(), getProfiles()]);
+  const firm = firms.find((f) => f.id === sale.firmId) ?? firms[0];
   const owner = profiles.find((p) => p.role === "owner")?.fullName ?? "";
 
   const charges = [

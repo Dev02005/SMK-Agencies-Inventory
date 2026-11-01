@@ -3,6 +3,7 @@ import { SimpleForm } from "@/components/forms/simple-form";
 import { BackLink, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProducts } from "@/lib/data";
 import { formatINR } from "@/lib/format";
@@ -17,7 +18,12 @@ export default async function ProductSettingsPage() {
         back={<BackLink href="/settings">Settings</BackLink>}
         title="Products & rates"
         subtitle="List rates fill in new bills; changing a rate on a bill needs a reason"
-        actions={<SampleChip />}
+        actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Products and rates"} />
+          </>
+        }
       />
       <DataTable
         rows={products}

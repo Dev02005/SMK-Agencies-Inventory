@@ -4,8 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { Segmented } from "@/components/ui/segmented";
 import type { LedgerEntry } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatBalance, formatDate, formatINR, formatMonth, formatShortDate } from "@/lib/format";
 
 type MonthRow = { month: string; debit: number; credit: number; closing: number };
@@ -24,9 +27,12 @@ function byMonth(entries: LedgerEntry[]): MonthRow[] {
 }
 
 /** Party ledger in two views: every entry (detailed) or month totals (summary). Newest first. */
-export function LedgerView({ entries }: { entries: LedgerEntry[] }) {
+export function LedgerView({ entries, partyName }: { entries: LedgerEntry[]; partyName: string }) {
   const [view, setView] = useState<"detailed" | "summary">("detailed");
-  const newestFirst = [...entries].reverse();
+  const dates = useDateFilter();
+  // Balances stay as worked out over the whole ledger; the filter only picks which lines show.
+  const shown = entries.filter((e) => inDateFilter(e.date, dates));
+  const newestFirst = [...shown].reverse();
 
   return (
     <SectionCard
@@ -44,12 +50,13 @@ export function LedgerView({ entries }: { entries: LedgerEntry[] }) {
         />
       }
     >
+      <DataTools title={`Ledger ${partyName}`} className="mb-4" />
       <div className="-mx-5 -mb-5 md:-mx-6 md:-mb-6 [&_.surface]:rounded-none [&_.surface]:border-0 [&_.surface]:shadow-none">
         {view === "detailed" ? (
           <DataTable
             rows={newestFirst}
             rowKey={(e) => `${e.date}-${e.ref}`}
-            empty="No entries yet."
+            empty="No entries in these dates."
             mobile={(e) => ({
               title: e.href ? <Link href={e.href} className="text-link">{e.ref}</Link> : e.ref,
               subtitle: `${formatShortDate(e.date)} · ${e.narration}`,
@@ -72,7 +79,7 @@ export function LedgerView({ entries }: { entries: LedgerEntry[] }) {
           />
         ) : (
           <DataTable
-            rows={byMonth(entries)}
+            rows={byMonth(shown)}
             rowKey={(m) => m.month}
             mobile={(m) => ({
               title: formatMonth(m.month),

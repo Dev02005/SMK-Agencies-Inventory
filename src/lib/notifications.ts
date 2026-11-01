@@ -57,7 +57,7 @@ export async function getNotifications(): Promise<Notice[]> {
   // Bills waiting for the owner, and a note to whoever made them.
   for (const a of dashboard.approvals) {
     const sale = sales.find((s) => s.id === a.id)!;
-    notices.push({ id: `approval-${a.id}`, kind: "approval", title: `Approve ${a.title}`, body: a.detail, href: a.href, date: sale.billDate, tone: "warning", roles: ["owner"] });
+    notices.push({ id: `approval-${a.id}`, kind: "approval", title: `Confirm ${a.title}`, body: a.detail, href: a.href, date: sale.billDate, tone: "warning", roles: ["owner"] });
     if (profiles.find((p) => p.id === sale.createdBy)?.role !== "owner") {
       notices.push({
         id: `approval-wait-${a.id}`,
@@ -171,9 +171,9 @@ export async function getNotifications(): Promise<Notice[]> {
     }
   }
 
-  // Godown: lorries arriving today and transfers on the way.
+  // Godown: company lorries that came in today (their stock is already in) and transfers on the way.
   for (const p of purchases.filter((x) => x.receivedDate === today && !x.onLorry)) {
-    notices.push({ id: `arriving-${p.id}`, kind: "stock", title: `Lorry arriving from ${p.companyName}`, body: `Invoice ${p.invoiceNo} · ${p.lorryNo ?? "lorry"} · unload and check the count`, href: `/purchases/${p.id}`, date: today, tone: "accent", roles: ["godown"] });
+    notices.push({ id: `arriving-${p.id}`, kind: "stock", title: `Lorry from ${p.companyName} today`, body: `Invoice ${p.invoiceNo} · ${p.lorryNo ?? "lorry"} · check the count matches the bill`, href: `/purchases/${p.id}`, date: today, tone: "accent", roles: ["godown"] });
   }
   for (const t of transfers.filter((x) => x.status === "in_transit")) {
     notices.push({ id: `transfer-${t.id}`, kind: "stock", title: `Transfer ${t.transferNo} on the way to ${t.toName}`, body: `From ${t.fromName} on ${t.vehicle}. Mark it received when it arrives.`, href: "/stock/transfers", date: t.date, tone: "neutral", roles: ["office", "godown"] });

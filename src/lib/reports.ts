@@ -9,7 +9,6 @@ import {
   getAttendanceToday,
   getExpenses,
   getGodowns,
-  getOpeningDate,
   getOrders,
   getParties,
   getPayments,
@@ -22,11 +21,13 @@ import {
   getTrips,
   getVehicles,
 } from "@/lib/data";
+import { inDateFilter, type DateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate, formatMonth } from "@/lib/format";
 import { expenseHeadLabels, paymentModeLabels } from "@/lib/labels";
 import { toMT } from "@/lib/sales";
 
-export type Period = "today" | "7d" | "month" | "all";
+/** Quick date choices a report offers (lib/date-filter); Pick a day and From – to are always there too. */
+export type Period = DatePreset;
 export type ColumnKind = "text" | "inr" | "number" | "date";
 export type ReportColumn = { key: string; label: string; kind?: ColumnKind };
 export type ReportRow = Record<string, string | number | undefined>;
@@ -37,32 +38,11 @@ export type ReportDef = {
   title: string;
   description: string;
   group: "Sales" | "Money" | "Stock" | "People" | "Vehicles" | "Activity";
-  /** Period choices offered; the first is the default. Omit for "as of today" reports. */
+  /** Quick date choices offered; the first is the default. Omit for "as of today" reports. */
   periods?: Period[];
   groupings?: { key: string; label: string }[];
-  run: (period: Period, grouping: string | undefined) => Promise<ReportResult>;
+  run: (dates: DateFilter, grouping: string | undefined) => Promise<ReportResult>;
 };
-
-export const periodLabels: Record<Period, string> = { today: "Today", "7d": "Last 7 days", month: "This month", all: "Since opening" };
-
-/** A period's first and last day, counted back from today in India time. */
-export async function periodRange(period: Period) {
-  const [to, opening] = await Promise.all([getToday(), getOpeningDate()]);
-  const back = (days: number) => {
-    const d = new Date(`${to}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() - days);
-    return d.toISOString().slice(0, 10);
-  };
-  const from = period === "today" ? to : period === "7d" ? back(6) : period === "month" ? `${to.slice(0, 7)}-01` : opening;
-  const label = period === "today" ? formatDate(to) : period === "month" ? formatMonth(to.slice(0, 7)) : `${formatDate(from)} – ${formatDate(to)}`;
-  return { from, to, label };
-}
-
-/** A test for "is this date in the period", for filtering rows. */
-async function rangeTest(period: Period) {
-  const { from, to } = await periodRange(period);
-  return (date: string) => date >= from && date <= to;
-}
 
 const sumBy = <T,>(rows: T[], f: (r: T) => number) => rows.reduce((s, r) => s + f(r), 0);
 
@@ -82,8 +62,8 @@ export const reports: ReportDef[] = [
     description: "Every sale, receipt, payment, purchase and expense, in order",
     group: "Money",
     periods: ["today", "7d", "month"],
-    async run(period) {
-      const inRange = await rangeTest(period);
+    async run(dates) {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [sales, receipts, payments, expenses, purchases] = await Promise.all([getSales(), getReceipts(), getPayments(), getExpenses(), getPurchases()]);
       const rows: ReportRow[] = [
         ...sales.filter((s) => s.status === "saved" && inRange(s.billDate)).map((s) => ({ date: s.billDate, type: "Sale", ref: `Bill ${s.billNo}`, detail: s.partyName, in: 0, out: 0, billed: s.total })),
@@ -120,8 +100,8 @@ export const reports: ReportDef[] = [
       { key: "staff", label: "By staff" },
       { key: "day", label: "By day" },
     ],
-    async run(period, grouping = "party") {
-      const inRange = await rangeTest(period);
+    async run(dates, grouping = "party") {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [sales, products, profiles, parties] = await Promise.all([getSales(), getProducts(), getProfiles(), getParties()]);
       const saved = sales.filter((s) => s.status === "saved" && inRange(s.billDate));
       const product = (id: string) => products.find((p) => p.id === id)!;
@@ -184,8 +164,8 @@ export const reports: ReportDef[] = [
     description: "Bills with a discount or a rate below the list rate, and the reason given",
     group: "Sales",
     periods: ["month", "7d", "all"],
-    async run(period) {
-      const inRange = await rangeTest(period);
+    async run(dates) {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [sales, profiles] = await Promise.all([getSales(), getProfiles()]);
       const rows = sales
         .filter((s) => s.status !== "cancelled" && inRange(s.billDate))
@@ -262,8 +242,8 @@ export const reports: ReportDef[] = [
       { key: "mode", label: "By mode" },
       { key: "party", label: "By party" },
     ],
-    async run(period, grouping = "staff") {
-      const inRange = await rangeTest(period);
+    async run(dates, grouping = "staff") {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [receipts, profiles] = await Promise.all([getReceipts(), getProfiles()]);
       const inPeriod = receipts.filter((r) => inRange(r.date));
       const keyOf = (r: (typeof inPeriod)[number]) => (grouping === "mode" ? paymentModeLabels[r.mode] : grouping === "party" ? r.partyName : (profiles.find((p) => p.id === r.collectedBy)?.fullName ?? "Office / bank"));
@@ -293,8 +273,8 @@ export const reports: ReportDef[] = [
       { key: "head", label: "By head" },
       { key: "tag", label: "By vehicle / staff / godown" },
     ],
-    async run(period, grouping = "head") {
-      const inRange = await rangeTest(period);
+    async run(dates, grouping = "head") {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const expenses = (await getExpenses()).filter((e) => inRange(e.date));
       const keyOf = (e: (typeof expenses)[number]) => (grouping === "tag" ? (e.tag?.label ?? "General") : expenseHeadLabels[e.head]);
       const rows = groupRows(expenses, keyOf)
@@ -319,15 +299,14 @@ export const reports: ReportDef[] = [
     description: "Opening, in, out and closing stock for each godown and product",
     group: "Stock",
     periods: ["month", "7d", "today"],
-    async run(period) {
+    async run(dates) {
       const [movements, godowns, products] = await Promise.all([getAllStockMovements(), getGodowns(), getProducts()]);
-      const { from, to } = await periodRange(period);
       const rows = godowns.flatMap((g) =>
         products
           .map((p) => {
             const mine = movements.filter((m) => m.godownId === g.id && m.productId === p.id);
-            const before = sumBy(mine.filter((m) => m.date < from), (m) => m.qty);
-            const during = mine.filter((m) => m.date >= from && m.date <= to);
+            const before = sumBy(mine.filter((m) => dates.from !== "" && m.date < dates.from), (m) => m.qty);
+            const during = mine.filter((m) => inDateFilter(m.date, dates));
             const inward = sumBy(during.filter((m) => m.kind === "inward"), (m) => m.qty);
             const sold = -sumBy(during.filter((m) => m.kind === "sale"), (m) => m.qty) || 0;
             const moved = sumBy(during.filter((m) => m.kind === "transfer" || m.kind === "suspense"), (m) => m.qty);
@@ -342,7 +321,7 @@ export const reports: ReportDef[] = [
           { key: "product", label: "Product" },
           { key: "unit", label: "Unit" },
           { key: "opening", label: "Opening", kind: "number" },
-          { key: "inward", label: "In", kind: "number" },
+          { key: "inward", label: "Purchased", kind: "number" },
           { key: "sold", label: "Sold", kind: "number" },
           { key: "moved", label: "Transfers / loads", kind: "number" },
           { key: "closing", label: "Closing", kind: "number" },
@@ -390,8 +369,8 @@ export const reports: ReportDef[] = [
     description: "Fuel, repairs and freight earned for each vehicle",
     group: "Vehicles",
     periods: ["month", "7d", "all"],
-    async run(period) {
-      const inRange = await rangeTest(period);
+    async run(dates) {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [vehicles, trips] = await Promise.all([getVehicles(), getTrips()]);
       const rows = vehicles
         .filter((v) => v.category !== "rented")
@@ -426,8 +405,8 @@ export const reports: ReportDef[] = [
     description: "Who entered what and when, across bills, receipts, expenses and orders",
     group: "Activity",
     periods: ["today", "7d", "month"],
-    async run(period) {
-      const inRange = await rangeTest(period);
+    async run(dates) {
+      const inRange = (date: string) => inDateFilter(date, dates);
       const [sales, receipts, expenses, orders, profiles] = await Promise.all([getSales(), getReceipts(), getExpenses(), getOrders(), getProfiles()]);
       const name = (id?: string) => profiles.find((p) => p.id === id)?.fullName ?? "Office";
       const rows: ReportRow[] = [

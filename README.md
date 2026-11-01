@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. The app opens on the sign-in page; the sample login is ID `123456789`, password `123456789` (change them with `SKA_LOGIN_ID` and `SKA_LOGIN_PASSWORD`). Everyone is signed out at 12 midnight India time.
+Open http://localhost:3000 on any phone or computer. The app opens on the sign-in page. The sample owner login is ID `123456789`, password `123456789` (change them with `SKA_LOGIN_ID` and `SKA_LOGIN_PASSWORD`). Everyone on the staff list (Settings › Users & roles) can also sign in with their mobile number or email. Their starting password is their mobile number, and on that first sign-in they must set their own (at least 8 characters, not the mobile number) before anything else opens; after that the mobile number no longer works as a password. Each person sees their own role's screens, and only the owner has "View as". In sample mode the passwords people set are kept in the server's memory (hashed), so they last until the app restarts; with Supabase, Supabase Auth stores them. Everyone is signed out at 12 midnight India time.
 
 Without Supabase keys the app runs on the sample data in `src/lib/data` and shows a "Sample data" chip. The sample records follow the real calendar: they are rebuilt each day around today's date in India, so "today" on every screen is the real today.
 
@@ -22,16 +22,17 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Area | Screens |
 | --- | --- |
 | Shell | Sidebar (desktop), icon rail (tablet), tab bar + quick-add sheet (phone), search (Ctrl K), profile menu with **View as** role switcher, Account and Sign out |
-| Sign-in | `/login` first: every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
-| Account | `/account`: who is signed in, login ID, when they signed in, a countdown to the midnight sign-out, change password, sign out |
+| Sign-in | `/login` first, with a mobile number or email (`src/lib/login.ts`): every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
+| Account | `/settings/account` (Settings › Account): who is signed in, login ID, when they signed in, a countdown to the midnight sign-out, change password, sign out |
 | Home | `/` dashboard with today's real date and a live clock: today's sales, cash with staff, collected / outstanding / overdue, approvals, dues |
-| Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill |
+| Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill, `/sales/lorries` (+ `/new`) company lorries sold straight off the truck |
 | Quotations | `/quotations`, `/quotations/new`, `/quotations/[id]` in the SKA paper format, printable |
 | Purchases | `/purchases`, `/purchases/new`, `/purchases/[id]` |
 | Parties | `/parties` with balances, `/parties/[id]` ledger (detailed / summary) and ageing, `/parties/new` |
 | Money | `/money` receipts and payments, `/money/receipts/new`, `/money/payments/new` |
-| Stock | `/stock` godown balances and movements, `/stock/inward/new` |
-| Settings | `/settings`, firm, godowns, products & rates, users & roles |
+| Stock | `/stock` godown balances and movements. Stock comes in only through a purchase: saving a purchase puts its items into the purchase's godown (there is no separate inward step) |
+| Settings | `/settings` for everyone: Account and Install app; the owner and office also get firm details (two firms, with Add firm; New sale asks which firm the bill is from), godowns, products & rates, users & roles |
+| Dates and downloads | Every list has the same date filter (All dates, Today, Last 7 days, This month, Pick a day, From – to), kept in the page address (`src/lib/date-filter.ts`), and **Download**: Excel (.xlsx), PDF (A4 pages) and a JPG picture of what is on screen after the filters, or Share them (WhatsApp, mail…) where the phone or browser can, and Print. Files are made in the browser (`src/lib/export/`); card pages carry a hidden table for this (`src/components/ui/export-table.tsx`) |
 | Staff cash | `/money/cash` everyone's cash today, `/money/cash/[holder]` day-by-day cash book with counts, `/money/cash/handover/new` |
 | Expenses | `/money/expenses` by head with this month's split, `/money/expenses/new` with fixed heads, paid-from and vehicle/staff/godown tag |
 | Advances | `/money/advances` fixed-price cement commitments and plain advances, `/money/advances/[id]` bags supplied and left, `/money/advances/new` |
@@ -42,14 +43,15 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Home by role | `/` shows a different screen per role: owner/office dashboard, field staff (cash, targets, visits, who to collect from), godown (bills to load, lorries arriving, stock, orders), driver (today's deliveries, cash, renewals) |
 | People | `/people` staff with today's attendance, `/people/[id]`, `/people/new`, `/people/mapping` (sub-dealers per staff), `/people/attendance` (check in, today, month), `/people/tours`, `/people/targets`, `/people/salary` (salary sheet, loans and advances) |
 | Orders | `/orders` pending / new / confirmed / dispatched, `/orders/[id]` ordered vs sent with bills, `/orders/new` |
-| Stock movement | `/stock/transfers` (+ `/new`) between godowns with in-transit status, `/stock/lorries` lorry sold straight off the truck, `/stock/suspense` loads sent before the buyer is known |
+| Stock movement | `/stock/transfers` (+ `/new`) between godowns with in-transit status, `/stock/lorries` bags still on lorries being sold off the truck, `/stock/suspense` loads sent before the buyer is known |
 | Vehicles | `/fleet` papers due and service due per vehicle, `/fleet/[id]` papers, health, service log, running cost; `/fleet/trips`; `/fleet/map` (Leaflet + OpenStreetMap); `/fleet/freight` chart with calculator; `/fleet/drivers` driver cash ledger and hired lorries |
-| Reports | `/reports` hub and `/reports/[report]`: daybook, sales summary (by party, product, staff or day), discounts and rate changes, outstanding and ageing, collections, expenses, stock summary, attendance, vehicle costs, activity log. Each has period and grouping options, **Excel** (a real .xlsx made in the browser, numbers stay numbers) and **PDF / Print** (A4 with the firm header; wide reports print landscape) |
+| Reports | `/reports` hub and `/reports/[report]`: daybook, sales summary (by party, product, staff or day), discounts and rate changes, outstanding and ageing, collections, expenses, stock summary, attendance, vehicle costs, activity log. Each has the date filter and grouping options, and Download: **Excel** (a real .xlsx, numbers stay numbers), **PDF**, **JPG**, Share and **Print** (A4 with the firm header; wide reports print landscape) |
 | Notifications | Bell with unread count in the top bar and `/notifications`: approvals, payment reminders due, who to collect from, vehicle papers and service, low stock, new and pending orders, lorries arriving, transfers, suspense loads, cash above the limit, deliveries, personal dues. Each role sees its own; field staff and drivers only theirs |
 | Reminder messages | `/settings/reminders`: when reminders go (first after, repeat, stop after, time, skip Sundays, SMS if WhatsApp fails) and the message templates with fill-in fields, SMS length count and a preview with real parties. Includes a Telugu draft for the owner to check |
 | Install | Installs like an app on Android, iPhone, iPad, Windows, Mac and ChromeOS: PNG icons (192, 512, maskable, Apple), manifest with shortcuts (new bill, receipt, notifications). The install card offers one-tap install in Chrome, Edge and Samsung Internet, shows Share → Add to Home Screen on iPhone/iPad, File → Add to Dock in Safari on a Mac, and the browser menu in Firefox on Android; "Install app" is also in the profile menu |
 | Offline | A service worker (`public/sw.js`, production builds only) keeps the app's own files so the installed app opens fast and shows `/offline` with no signal; pages and figures are never stored on the device. Next.js's offline mode shows a banner and retries page loads and saves when the connection returns |
-| Dropdowns | Every dropdown is the app's own (`src/components/ui/select.tsx`), so it looks the same on every device: a panel under the field on tablets and computers, a bottom sheet with large rows on phones, search for lists longer than eight, full keyboard and screen-reader support |
+| Dropdowns and pickers | Every dropdown, date, time and tick box is the app's own, so it looks the same on every device: `select.tsx`, `date-picker.tsx` (a calendar with month and year arrows, Today and Clear), `time-select.tsx` and `checkbox.tsx` in `src/components/ui`. Dropdowns and calendars open as a panel under the field on tablets and computers and as a bottom sheet with large rows on phones (`popover.tsx`), with full keyboard and screen-reader support |
+| Map | `/fleet/map` on OpenStreetMap, dressed in the app's look: softer map colours, round zoom buttons, card-style popups and pill-shaped vehicle markers coloured by status (`.ska-map` in `globals.css`) |
 | SEO and sharing | The sign-in page is indexable with a description, canonical address, business details for Google (schema.org) and a branded preview image for WhatsApp and social links; `robots.txt` and `sitemap.xml` list only it. Every page behind sign-in is marked noindex, because it holds business records |
 
 The Personal PIN is checked on the server (`src/lib/personal-lock.ts`): a correct PIN sets a signed, httpOnly cookie for 30 minutes, and each Personal page checks it before reading any record, so nothing private reaches a locked browser. "View as" still picks the role in the browser; once each staff member has their own login, the server renders only the signed-in person's screens and notifications.
@@ -78,7 +80,10 @@ The frontend is complete. Next: connect Supabase.
 - `src/lib/sections.ts`: every module, its icon and colour; drives the sidebar, tab bar, search and module grid.
 - `src/lib/reports.ts`: every report, worked out from the same data functions as the screens so the two never disagree.
 - `src/lib/notifications.ts`: the rules that turn the day's data into notifications, and which roles see each one.
-- `src/components/shell`, `src/components/ui`: app shell and the shared components.
+- `src/lib/date-filter.ts` (with `page-dates.ts` for server pages): the date filter every list shares, kept in the page address.
+- `src/lib/export`: Download. `table.ts` reads the tables on screen, `excel.ts`, `picture.ts` (JPG and A4 pages) and `pdf.ts` make the files, `save.ts` downloads or shares them.
+- `src/components/shell`: the app shell (sidebar, top bar, tab bar, install card, midnight sign-out).
+- `src/components/ui`: the shared building blocks: cards and figures (`blocks.tsx`), `data-table.tsx`, the pickers above, `data-tools.tsx` (date filter and Download over a list), `export-menu.tsx`, `export-table.tsx` (a hidden table for card pages).
 - `supabase/migrations`: schema, row-level security and the `create_sale` / `approve_sale` functions. Sales, ledger and stock are only written through these functions so totals and limits are always checked on the server.
 
 ## Rules worth knowing

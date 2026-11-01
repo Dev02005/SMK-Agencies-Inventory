@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { FilterChips } from "@/components/ui/filters";
 import { useToast } from "@/components/ui/toast";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import type { Ageing } from "@/lib/data/types";
 import { formatINR, formatShortDate } from "@/lib/format";
@@ -81,7 +82,7 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
       <ul className="surface divide-y divide-hairline overflow-hidden md:hidden">
         {shown.map((r) => (
           <li key={r.id} className="flex items-start gap-3 px-4 py-3">
-            <input type="checkbox" aria-label={`Remind ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="mt-0.5 size-6 shrink-0 accent-[var(--accent)]" />
+            <Checkbox aria-label={`Remind ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="mt-0.5" />
             <div className="min-w-0 flex-1">
               <Link href={`/parties/${r.id}`} className="block truncate text-[15px] text-ink">
                 {r.name}
@@ -127,7 +128,7 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
             {shown.map((r) => (
               <tr key={r.id} className="h-12 hover:bg-card-subtle">
                 <td className="pl-6">
-                  <input type="checkbox" aria-label={`Remind ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="size-4 accent-[var(--accent)]" />
+                  <Checkbox aria-label={`Remind ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} size="sm" />
                 </td>
                 <td className="px-3">
                   <Link href={`/parties/${r.id}`} className="font-medium text-ink hover:text-link hover:underline">

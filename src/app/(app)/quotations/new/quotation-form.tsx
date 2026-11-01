@@ -2,11 +2,13 @@
 
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
+import { ProductPicker } from "@/components/forms/product-picker";
 import { Button } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { Product } from "@/lib/data/types";
 import { formatINR } from "@/lib/format";
@@ -79,7 +81,7 @@ export function QuotationForm({
             <input id={`${id}-no`} className={inputClass} value={quoteNo} readOnly />
           </Field>
           <Field label="Date" htmlFor={`${id}-date`}>
-            <input id={`${id}-date`} type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DatePicker id={`${id}-date`} label="Date" value={date} onChange={setDate} />
           </Field>
         </div>
         <Field label="Existing party" htmlFor={`${id}-client`} hint="Or leave this and type a new client below">
@@ -116,16 +118,15 @@ export function QuotationForm({
           {lines.map((line, index) => {
             const p = product(line.productId);
             return (
-              <li key={line.key} className="grid grid-cols-2 items-end gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_130px_130px_auto]">
-                <Field label={`Item ${index + 1}`} htmlFor={`${id}-p-${line.key}`} className="col-span-2 sm:col-span-1">
-                  <Select
-                    id={`${id}-p-${line.key}`}
-                    label="Product"
+              <li key={line.key} className="grid grid-cols-2 items-end gap-3 py-4 sm:grid-cols-[150px_150px_minmax(0,1fr)]">
+                <div className="col-span-2 sm:col-span-3">
+                  <ProductPicker
+                    label={`Item ${index + 1}`}
+                    products={products}
                     value={line.productId}
                     onChange={(v) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: v, rate: String(product(v).listRate) } : l)))}
-                    options={products.map((x) => ({ value: x.id, label: x.name }))}
                   />
-                </Field>
+                </div>
                 <Field label="Quantity" htmlFor={`${id}-q-${line.key}`}>
                   <AffixInput
                     id={`${id}-q-${line.key}`}

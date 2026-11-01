@@ -6,6 +6,7 @@ import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui
 import { PageHeader } from "@/components/ui/page-header";
 import { getEmployees, getParties } from "@/lib/data";
 import { todayISO } from "@/lib/format";
+import { partyOptions } from "@/lib/party-options";
 
 export const metadata: Metadata = { title: "Plan a visit" };
 
@@ -38,7 +39,7 @@ async function VisitForm() {
             wide: true,
             options: [
               { value: "", label: "New party (type the name below)" },
-              ...parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ value: p.id, label: `${p.name} · ${p.place ?? ""}` })),
+              ...partyOptions(parties.filter((p) => p.kind !== "cash")),
             ],
           },
           { name: "prospect", label: "New party name", placeholder: "Only for a new party" },

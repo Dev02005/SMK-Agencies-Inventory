@@ -7,6 +7,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { ExpenseHead } from "@/lib/data/types";
 import { formatINR } from "@/lib/format";
@@ -85,7 +86,7 @@ export function ExpenseForm({
             <Select id={`${id}-from`} label="Paid from" value={from} onChange={setFrom} options={paidFrom} />
           </Field>
           <Field label="Date" htmlFor={`${id}-date`}>
-            <input id={`${id}-date`} type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DatePicker id={`${id}-date`} label="Date" value={date} onChange={setDate} />
           </Field>
         </div>
         <Field label="What was it for" htmlFor={`${id}-desc`}>

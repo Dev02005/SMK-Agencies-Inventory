@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { getDocuments, getToday } from "@/lib/data";
@@ -30,6 +31,7 @@ function DocumentsContent() {
         actions={
           <>
             <SampleChip />
+            <ExportMenu title="Documents" />
             <SampleActionButton variant="primary" message="Sample mode: the photo or PDF would be stored in private Supabase Storage, visible only to you.">
               Add document
             </SampleActionButton>

@@ -3,26 +3,31 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
+import { DataTools } from "@/components/ui/data-tools";
+import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProducts, getTrips } from "@/lib/data";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
+import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities } from "@/lib/quantities";
 
 export const metadata: Metadata = { title: "Trips" };
 
-export default function TripsPage() {
+export default function TripsPage({ searchParams }: PageProps<"/fleet/trips">) {
   return (
     <>
       <PageHeader title="Trips" subtitle="Our lorry's delivery runs: stops, km, freight charged and diesel spent" actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton />}>
-        <TripList />
+        <TripList searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
 
-async function TripList() {
-  const [trips, products] = await Promise.all([getTrips(), getProducts()]);
+async function TripList({ searchParams }: { searchParams: PageProps<"/fleet/trips">["searchParams"] }) {
+  const [all, products, dates] = await Promise.all([getTrips(), getProducts(), pageDateFilter(searchParams)]);
+  const trips = all.filter((t) => inDateFilter(t.date, dates));
   const done = trips.filter((t) => t.status === "completed");
   const km = done.reduce((s, t) => s + (t.km ?? 0), 0);
   const freight = trips.reduce((s, t) => s + t.freightCharged, 0);
@@ -31,10 +36,25 @@ async function TripList() {
   return (
     <div className="space-y-4">
       <StatRow>
-        <StatCard label="Trips (2 weeks)" value={trips.length} hint={`${formatNumber(km)} km`} />
+        <StatCard label="Trips" value={trips.length} hint={`${formatNumber(km)} km`} />
         <StatCard label="Freight charged" value={formatINR(freight)} tone="good" />
         <StatCard label="Diesel on trip days" value={formatINR(fuel)} hint={freight ? `${Math.round((fuel / freight) * 100)}% of freight` : undefined} />
       </StatRow>
+      <DataTools title="Trips" />
+      {trips.length === 0 && <p className="surface px-5 py-12 text-center text-[15px] text-ink-secondary">No trips for these dates.</p>}
+      <ExportTable
+        columns={["Date", "Vehicle", "Driver", "Stops", "Km", "Freight", "Diesel", "Status"]}
+        rows={trips.map((t) => [
+          formatDate(t.date),
+          t.vehicleLabel,
+          t.driverName,
+          t.stops.map((s) => `${s.partyName} (${s.destination})`).join(", "),
+          t.km !== undefined ? formatNumber(t.km) : "",
+          formatINR(t.freightCharged),
+          formatINR(t.fuel),
+          t.status === "on_the_way" ? "On the way" : "Completed",
+        ])}
+      />
       {trips.map((t) => (
         <section key={t.id} className="surface p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">

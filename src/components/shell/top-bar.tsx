@@ -10,12 +10,14 @@ import { SearchBox } from "./search-box";
 export function TopBar({
   user,
   role,
+  canViewAs,
   notices,
   onRoleChange,
   onQuickAdd,
 }: {
   user: Profile;
   role: Role;
+  canViewAs: boolean;
   notices: Promise<Notice[]>;
   onRoleChange: (role: Role) => void;
   onQuickAdd: () => void;
@@ -41,7 +43,7 @@ export function TopBar({
           >
             <Plus size={20} strokeWidth={2} aria-hidden />
           </button>
-          <ProfileMenu user={user} role={role} onRoleChange={onRoleChange} />
+          <ProfileMenu user={user} role={role} canViewAs={canViewAs} onRoleChange={onRoleChange} />
         </div>
       </div>
     </header>

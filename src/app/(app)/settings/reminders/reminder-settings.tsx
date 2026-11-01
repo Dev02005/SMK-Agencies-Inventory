@@ -10,6 +10,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { TimeSelect } from "@/components/ui/time-select";
 import { cn } from "@/lib/cn";
 import type { Firm, ReminderRules, ReminderTemplate } from "@/lib/data/types";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -130,7 +131,7 @@ export function ReminderSettings({
               <AffixInput id={`${id}-stop`} inputMode="numeric" suffix="times" value={rules.stopAfter} onChange={(e) => setRule("stopAfter", num(e.target.value) || 1)} />
             </Field>
             <Field label="Send at" htmlFor={`${id}-time`}>
-              <input id={`${id}-time`} type="time" className={inputClass} value={rules.sendAt} onChange={(e) => setRule("sendAt", e.target.value)} />
+              <TimeSelect id={`${id}-time`} label="Send at" value={rules.sendAt} onChange={(v) => setRule("sendAt", v)} />
             </Field>
             <Field label="Skip parties owing less than" htmlFor={`${id}-min`}>
               <AffixInput id={`${id}-min`} inputMode="numeric" prefix="₹" value={rules.minimumAmount} onChange={(e) => setRule("minimumAmount", num(e.target.value))} />

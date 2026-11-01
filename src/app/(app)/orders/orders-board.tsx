@@ -4,8 +4,11 @@ import { useState } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { DataTools } from "@/components/ui/data-tools";
+import { useDateFilter } from "@/components/ui/date-filter";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import type { Order, OrderStatus, Product } from "@/lib/data/types";
+import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatShortDate } from "@/lib/format";
 import { orderStatus } from "@/lib/labels";
 import { describeQuantities } from "@/lib/quantities";
@@ -18,9 +21,11 @@ const isPending = (o: Row) => o.status === "new" || o.status === "confirmed" || 
 export function OrdersBoard({ orders, products, today }: { orders: Row[]; products: Product[]; today: string }) {
   const [view, setView] = useState<View>("pending");
   const [query, setQuery] = useState("");
+  const dates = useDateFilter();
   const q = query.trim().toLowerCase();
   const rows = orders.filter(
     (o) =>
+      inDateFilter(o.date, dates) &&
       (view === "all" ? true : view === "pending" ? isPending(o) : o.status === view) &&
       (!q || `${o.partyName} ${o.orderNo} ${o.destination ?? ""}`.toLowerCase().includes(q)),
   );
@@ -35,6 +40,7 @@ export function OrdersBoard({ orders, products, today }: { orders: Row[]; produc
         <StatCard label="Past delivery date" value={late.length} tone={late.length ? "danger" : "good"} />
       </StatRow>
 
+      <DataTools title="Orders" />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <FilterChips
           label="Show"

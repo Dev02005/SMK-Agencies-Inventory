@@ -25,7 +25,7 @@ async function FormForToday() {
   const [parties, products] = await Promise.all([getParties(), getProducts()]);
   return (
     <OrderForm
-      parties={parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ id: p.id, name: p.name, place: p.place }))}
+      parties={parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ id: p.id, name: p.name, place: p.place, kind: p.kind }))}
       products={products.filter((p) => p.active)}
       today={todayISO()}
     />

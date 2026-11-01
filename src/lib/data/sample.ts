@@ -29,22 +29,34 @@ export const firm: Firm = {
   phone: "9949245484",
 };
 
+/** The owner bills under two firms; the first is the main one (sign-in page, reports, statements). */
+export const firms: Firm[] = [
+  firm,
+  {
+    id: "firm-2",
+    name: "Second firm",
+    gstin: "",
+    address: "Polaki 532 429, Srikakulam Dist. (A.P.)",
+    phone: "9949245484",
+  },
+];
+
 export const godowns: Godown[] = [
   { id: "g-polaki", name: "Polaki godown", place: "Polaki" },
   { id: "g-srikakulam", name: "Srikakulam godown", place: "Srikakulam" },
 ];
 
 export const products: Product[] = [
-  { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", category: "cement", unit: "bag", listRate: 360, active: true },
-  { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", category: "cement", unit: "bag", listRate: 340, active: true },
-  { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", category: "steel", unit: "kg", listRate: 70, active: true },
-  { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", category: "steel", unit: "kg", listRate: 72, active: true },
-  { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", category: "steel", unit: "kg", listRate: 71, active: true },
+  { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", variant: "OPC", category: "cement", unit: "bag", listRate: 360, active: true },
+  { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", variant: "PPC", category: "cement", unit: "bag", listRate: 340, active: true },
+  { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", variant: "MS iron", category: "steel", unit: "kg", listRate: 70, active: true },
+  { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", variant: "TMT 8 mm", category: "steel", unit: "kg", listRate: 72, active: true },
+  { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", variant: "TMT 12 mm", category: "steel", unit: "kg", listRate: 71, active: true },
 ];
 
 export const profiles: Profile[] = [
   { id: "u-owner", fullName: "P. Srinivasa Rao", initials: "PS", mobile: "9949245484", role: "owner", active: true },
-  { id: "u-office", fullName: "Office desk", initials: "OD", mobile: "9000000001", role: "office", active: true },
+  { id: "u-office", fullName: "Office desk", initials: "OD", mobile: "9000000001", email: "office@ska.example", role: "office", active: true },
   { id: "u-godown", fullName: "Godown in-charge", initials: "GI", mobile: "9000000002", role: "godown", active: true },
   { id: "u-ramana", fullName: "Ramana", initials: "RA", mobile: "9000000003", role: "field", active: true },
   { id: "u-venkatesh", fullName: "Venkatesh", initials: "VE", mobile: "9000000004", role: "field", active: true },
@@ -184,8 +196,8 @@ export function buildSample(SAMPLE_TODAY: string) {
     [at("2026-10-19"), "deccan", [["p-deccan-opc", 800, 320]]],
     [at("2026-10-23"), "vishaka", [["p-tmt-8", 3000, 66], ["p-ms-vishaka", 4000, 64]]],
     [at("2026-10-24"), "deccan", [["p-deccan-opc", 600, 320], ["p-deccan-ppc", 200, 300]]],
-    // Arrives today: shows on the godown screen as a lorry to unload; its bags join stock once unloaded.
-    [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320]]],
+    // Came in today: its bags are already in the godown's stock.
+    [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320], ["p-deccan-ppc", 200, 300]]],
   ];
   purchasePlan.forEach(([invoiceDate, companyId, lines], i) => {
     const freight = companyId === "deccan" ? 0 : 6000;
@@ -197,7 +209,8 @@ export function buildSample(SAMPLE_TODAY: string) {
       invoiceDate,
       receivedDate: addDays(invoiceDate, companyId === "deccan" ? 1 : 0),
       lorryNo: companyId === "deccan" ? "AP 39 T 7781" : "AP 31 TB 2204",
-      godownId: i % 3 === 2 ? "g-srikakulam" : "g-polaki",
+      // Today's lorry comes to Polaki, where today's bills are loaded; earlier ones are spread over both godowns.
+      godownId: i === purchasePlan.length - 1 || i % 3 !== 2 ? "g-polaki" : "g-srikakulam",
       lines: lines.map(([productId, qty, rate]) => ({ productId, qty, rate })),
       freight,
       total: lines.reduce((s, [, qty, rate]) => s + qty * rate, 0) + freight,
@@ -215,6 +228,9 @@ export function buildSample(SAMPLE_TODAY: string) {
     lorryNo: LORRY_ON_SALE,
     godownId: "",
     onLorry: true,
+    driverName: "Ramesh",
+    invoicePaperKept: true,
+    sellOutDays: 3,
     lines: [{ productId: "p-deccan-opc", qty: 600, rate: 320 }],
     freight: 0,
     total: 192000,
@@ -233,6 +249,19 @@ export function buildSample(SAMPLE_TODAY: string) {
   ];
   const stockOnHand = new Map<string, number>();
   const stockKey = (godownId: string, productId: string) => `${godownId}|${productId}`;
+  // Held back from the day-to-day bills: what later leaves on godown transfers and van/lorry loads (sample-phase4)
+  // and on today's fixed bills, so no godown's stock ever shows below zero.
+  const keepBack: Record<string, number> = {
+    "g-polaki|p-deccan-opc": 410,
+    "g-polaki|p-deccan-ppc": 100,
+    "g-polaki|p-tmt-8": 1000,
+    "g-polaki|p-ms-vishaka": 2000,
+    "g-srikakulam|p-deccan-opc": 120,
+  };
+  const sellable = (godownId: string, productId: string) => {
+    const key = stockKey(godownId, productId);
+    return Math.max(0, (stockOnHand.get(key) ?? 0) - (keepBack[key] ?? 0));
+  };
   function moveStock(m: Omit<StockMovement, "id">) {
     stockMovements.push({ ...m, id: `sm-${stockMovements.length + 1}` });
     const key = stockKey(m.godownId, m.productId);
@@ -309,7 +338,8 @@ export function buildSample(SAMPLE_TODAY: string) {
     return sale;
   }
 
-  for (let day = FIRST_DAY; day < SAMPLE_TODAY; day = addDays(day, 1)) {
+  // A purchase is the only way stock comes in: the lorry unloads at the purchase's godown on the day it arrives.
+  const receive = (day: string) =>
     purchases
       .filter((p) => p.receivedDate === day && !p.onLorry)
       .forEach((p) =>
@@ -317,6 +347,9 @@ export function buildSample(SAMPLE_TODAY: string) {
           moveStock({ date: day, godownId: p.godownId, productId: l.productId, qty: l.qty, kind: "inward", ref: `Purchase ${p.purchaseNo}` }),
         ),
       );
+
+  for (let day = FIRST_DAY; day < SAMPLE_TODAY; day = addDays(day, 1)) {
+    receive(day);
 
     const isSunday = new Date(`${day}T00:00:00Z`).getUTCDay() === 0;
     const bills = isSunday ? (rand() < 0.3 ? 1 : 0) : between(1, 3);
@@ -328,13 +361,13 @@ export function buildSample(SAMPLE_TODAY: string) {
       const wantSteel = !wantCement || rand() < 0.35;
       if (wantCement) {
         const product = productById(rand() < 0.7 ? "p-deccan-opc" : "p-deccan-ppc");
-        const qty = Math.min(between(20, party.kind === "sub_dealer" ? 300 : 150, 10), stockOnHand.get(stockKey(godownId, product.id)) ?? 0);
+        const qty = Math.min(between(20, party.kind === "sub_dealer" ? 300 : 150, 10), sellable(godownId, product.id));
         const rate = rand() < 0.15 ? product.listRate - 5 : product.listRate;
         if (qty >= 10) lines.push({ productId: product.id, qty: Math.floor(qty / 10) * 10, rate });
       }
       if (wantSteel) {
         const product = productById(pick(["p-ms-vishaka", "p-tmt-8", "p-tmt-12"]));
-        const qty = Math.min(between(300, 2500, 100), stockOnHand.get(stockKey(godownId, product.id)) ?? 0);
+        const qty = Math.min(between(300, 2500, 100), sellable(godownId, product.id));
         if (qty >= 100) lines.push({ productId: product.id, qty: Math.floor(qty / 100) * 100, rate: product.listRate });
       }
       if (lines.length === 0) continue;
@@ -375,8 +408,9 @@ export function buildSample(SAMPLE_TODAY: string) {
   lorrySale("venk", at("2026-10-25"), 200, "u-venkatesh");
   lorrySale("lakshmi", SAMPLE_TODAY, 100, "u-venkatesh");
 
-  // Today: the quotation bill (over the limit, saved by the owner with a reason), a normal bill,
-  // and a staff bill waiting for approval. Today's lorry is not unloaded yet, so it isn't in stock.
+  // Today: the lorry that came in, then the quotation bill (over the limit, saved by the owner with a reason),
+  // a normal bill and a staff bill waiting for approval.
+  receive(SAMPLE_TODAY);
   addSale({
     partyId: "raja",
     billDate: SAMPLE_TODAY,

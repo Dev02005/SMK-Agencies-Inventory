@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getParties, getProducts } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { paymentModeLabels } from "@/lib/labels";
+import { partyOptions } from "@/lib/party-options";
 
 export const metadata: Metadata = { title: "New advance" };
 
@@ -40,7 +41,7 @@ async function AdvanceForm() {
             label: "Party",
             type: "select",
             wide: true,
-            options: parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ value: p.id, label: p.name })),
+            options: partyOptions(parties.filter((p) => p.kind !== "cash")),
           },
           {
             name: "kind",

@@ -6,6 +6,7 @@ import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import type { Godown, Product } from "@/lib/data/types";
 import { formatINR } from "@/lib/format";
 
@@ -62,10 +63,10 @@ export function PurchaseForm({
             <input id={`${id}-inv`} className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
           </Field>
           <Field label="Invoice date" htmlFor={`${id}-invdate`}>
-            <input id={`${id}-invdate`} type="date" className={inputClass} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
           </Field>
           <Field label="Truck received on" htmlFor={`${id}-recv`}>
-            <input id={`${id}-recv`} type="date" className={inputClass} value={receivedDate} onChange={(e) => setReceivedDate(e.target.value)} />
+            <DatePicker id={`${id}-recv`} label="Truck arrived on" value={receivedDate} onChange={setReceivedDate} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -78,7 +79,7 @@ export function PurchaseForm({
               onChange={(e) => setLorryNo(e.target.value.toUpperCase())}
             />
           </Field>
-          <Field label="Unload at" htmlFor={`${id}-godown`}>
+          <Field label="Unload at" htmlFor={`${id}-godown`} hint="Its items go into this godown's stock">
             <Select id={`${id}-godown`} label="Unload at" value={godownId} onChange={setGodownId} options={godowns.map((g) => ({ value: g.id, label: g.name }))} />
           </Field>
         </div>

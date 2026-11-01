@@ -6,6 +6,7 @@ import { categoryLabel, DueChip, GpsChip } from "@/components/fleet/fleet-bits";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { getVehicle } from "@/lib/data";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
@@ -33,7 +34,12 @@ async function VehicleDetail({ params }: { params: PageProps<"/fleet/[id]">["par
 
   return (
     <>
-      <PageHeader title={v.number} subtitle={`${v.model} · ${categoryLabel[v.category]}${v.driverName ? ` · ${v.driverName}` : ""}${v.ownerName ? ` · ${v.ownerName}` : ""}`} actions={<SampleChip />} />
+      <PageHeader title={v.number} subtitle={`${v.model} · ${categoryLabel[v.category]}${v.driverName ? ` · ${v.driverName}` : ""}${v.ownerName ? ` · ${v.ownerName}` : ""}`} actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={`Vehicle ${v.number}`} />
+          </>
+        } />
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Papers">
           {v.renewals.length === 0 ? (

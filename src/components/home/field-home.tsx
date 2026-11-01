@@ -8,7 +8,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/cn";
-import { getFieldHome } from "@/lib/data";
+import { getCurrentUser, getFieldHome } from "@/lib/data";
 import { formatINR, formatShortDate } from "@/lib/format";
 import { orderStatus } from "@/lib/labels";
 import { TodayLine } from "./owner-home";
@@ -41,7 +41,9 @@ export function FieldHome({ profileId }: { profileId: string }) {
 }
 
 async function FieldDay({ profileId }: { profileId: string }) {
-  const d = await getFieldHome(profileId);
+  // Their own day when a field staff member is signed in; the owner previewing sees the first field staff member.
+  const me = await getCurrentUser();
+  const d = await getFieldHome(me.role === "field" ? me.id : profileId);
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <SectionCard title={`Hello, ${d.name}`} action={<AttendanceChip record={d.attendance} />}>

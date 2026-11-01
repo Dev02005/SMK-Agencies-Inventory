@@ -27,7 +27,9 @@
   --danger: #d70015;
   --danger-soft: #fdecee;
   --teal: #0e7c86;
+  --teal-soft: #e3f3f4;
   --purple: #8944ab;
+  --purple-soft: #f3ebf8;
 }
 
 @theme inline {
@@ -49,7 +51,9 @@
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
   --color-purple: var(--purple);
+  --color-purple-soft: var(--purple-soft);
 
   --font-sans: -apple-system, BlinkMacSystemFont, var(--font-inter), "Noto Sans Telugu", system-ui, sans-serif;
 
@@ -76,7 +80,12 @@
 }
 
 body {
-  background: var(--page);
+  /* A soft wash of the app's blue and teal behind the top of every page, fading into the page grey. */
+  background:
+    radial-gradient(1100px 440px at 0% -8%, rgba(0, 104, 209, 0.11), transparent 62%),
+    radial-gradient(900px 400px at 100% -6%, rgba(14, 124, 134, 0.1), transparent 60%),
+    var(--page);
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -128,6 +137,41 @@ button {
   }
 }
 
+/* Figure cards take turns at the app's colours (or follow their tone), with a coloured top edge and a light
+   tint, so a row of figures is easy to tell apart. Outside the layers, so they win over the surface utility. */
+.stat-card {
+  --stat: var(--accent);
+  --stat-soft: var(--accent-soft);
+  background-image: linear-gradient(150deg, var(--stat-soft) 0%, var(--card) 72%);
+  box-shadow:
+    inset 0 3px 0 var(--stat),
+    var(--shadow-card);
+}
+.stat-card:nth-child(4n + 2) {
+  --stat: var(--teal);
+  --stat-soft: var(--teal-soft);
+}
+.stat-card:nth-child(4n + 3) {
+  --stat: var(--purple);
+  --stat-soft: var(--purple-soft);
+}
+.stat-card:nth-child(4n + 4) {
+  --stat: var(--good);
+  --stat-soft: var(--good-soft);
+}
+.stat-card[data-tone="good"] {
+  --stat: var(--good);
+  --stat-soft: var(--good-soft);
+}
+.stat-card[data-tone="warning"] {
+  --stat: var(--warning);
+  --stat-soft: var(--warning-soft);
+}
+.stat-card[data-tone="danger"] {
+  --stat: var(--danger);
+  --stat-soft: var(--danger-soft);
+}
+
 /* Sideways-scrolling rows (tabs, chips, stat cards) swipe without showing a scrollbar. */
 @utility no-scrollbar {
   scrollbar-width: none;
@@ -162,26 +206,108 @@ button {
 .leaflet-container {
   font-family: var(--font-sans);
 }
-.ska-map-label,
-.ska-map-vehicle {
-  border: 0;
-  border-radius: 8px;
-  box-shadow: var(--shadow-card);
-  color: var(--text);
-  font-size: 12px;
-  padding: 2px 6px;
+/* The fleet map in the app's own look: softer tiles, round controls, card-style popups and pill markers
+   (components in app/(app)/fleet/map/fleet-map.tsx). */
+.ska-map .leaflet-tile-pane {
+  filter: saturate(0.65) brightness(1.05) contrast(0.95);
 }
-.ska-map-label {
+.ska-map .leaflet-control-zoom {
+  border: 0;
+  border-radius: 14px;
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+.ska-map .leaflet-control-zoom a {
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+  font-size: 20px;
+  color: var(--accent);
+  background: var(--card);
+  border-bottom: 1px solid var(--hairline);
+}
+.ska-map .leaflet-control-zoom a:hover {
+  background: var(--accent-soft);
+}
+.ska-map .leaflet-control-attribution {
+  border-top-left-radius: 10px;
   background: rgba(255, 255, 255, 0.85);
   color: var(--text-secondary);
+  font-size: 11px;
 }
-.ska-map-vehicle {
-  background: var(--card);
-  font-weight: 600;
+.ska-map .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: var(--shadow-raised);
 }
-.ska-map-label::before,
-.ska-map-vehicle::before {
+.ska-map .leaflet-popup-content {
+  margin: 12px 16px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ska-map .leaflet-popup-tip {
+  box-shadow: none;
+}
+.ska-map-label {
+  border: 0;
+  border-radius: 8px;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.ska-map-label::before {
   display: none;
+}
+.ska-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 7px;
+  border: 2px solid var(--pin);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-raised);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 8px));
+  cursor: pointer;
+}
+/* The little tail pointing at the vehicle's spot. */
+.ska-pin::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--pin);
+  border-bottom: 2px solid var(--pin);
+  background: var(--card);
+  transform: translateX(-50%) rotate(45deg);
+}
+.ska-pin-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--pin);
+}
+.ska-pin[data-status="moving"] .ska-pin-dot {
+  animation: pin-pulse 1.6s ease-out infinite;
+}
+@keyframes pin-pulse {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pin) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 8px transparent;
+  }
 }
 
 /* Printed bills and quotations: A4, white page, no app chrome. */

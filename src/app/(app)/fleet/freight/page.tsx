@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { DataTable } from "@/components/ui/data-table";
+import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getFreightRates } from "@/lib/data";
@@ -17,7 +18,12 @@ export default function FreightPage() {
       <PageHeader
         title="Freight chart"
         subtitle="Fixed delivery rates from Polaki. New FOR bills fill in the transport charge from this chart."
-        actions={<SampleChip />}
+        actions={
+          <>
+            <SampleChip />
+            <ExportMenu title={"Freight chart"} />
+          </>
+        }
       />
       <Suspense fallback={<ListSkeleton />}>
         <Rates />
