@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronDown, Download, FileImage, FileSpreadsheet, FileText, Printer, Share2, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Copy, Download, FileImage, FileSpreadsheet, FileText, Mail, MessageCircle, Printer, Share2, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/cn";
 import { resolveDateFilter, type DatePreset } from "@/lib/date-filter";
-import { asFile, canShareFiles, downloadFile, shareFile, type FileKind } from "@/lib/export/save";
+import { asFile, copyPicture, downloadFile, shareFile, type FileKind } from "@/lib/export/save";
 import { fileNameFor, tablesOnPage, type ExportDoc, type TableData } from "@/lib/export/table";
 import { formatDate, todayISO } from "@/lib/format";
 
@@ -31,25 +32,34 @@ const make = {
   jpg: async (doc: ExportDoc) => (await import("@/lib/export/picture")).pictureFile(doc),
 };
 
-const item = "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] text-ink hover:bg-card-subtle";
+const item = "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] text-ink hover:bg-card-subtle disabled:opacity-40";
 
-/** Download or share what the page shows (after its filters) as Excel, PDF or a JPG picture, or print it. */
+type Made = { file: File; kind: FileKind; message: string };
+/**
+ * After Share is picked: "retry" when the browser wants a fresh tap before opening the share sheet (making the file
+ * took a moment), "manual" when it can't hand files to other apps at all, so the person saves it and attaches it.
+ */
+type ShareStep = { made: Made; step: "retry" | "manual" };
+
+/**
+ * Download and Share for what the page shows (after its filters): Excel, PDF or a JPG picture. Share opens the
+ * phone's or computer's share sheet (WhatsApp, mail…); where a browser can't share files, it saves the file and
+ * offers WhatsApp, email and (for pictures) copy-to-paste. Download also offers Print.
+ */
 export function ExportMenu({ title, subtitle, dated, tables }: Props) {
   const toast = useToast();
   const ref = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState<"download" | "share" | null>(null);
   const [busy, setBusy] = useState(false);
-  const [canShare, setCanShare] = useState(false);
-  // A file made but not yet shared, because the browser wanted a fresh tap.
-  const [ready, setReady] = useState<{ file: File; title: string } | null>(null);
+  const [shareStep, setShareStep] = useState<ShareStep | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!menu) return;
     function onPointer(event: PointerEvent) {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+      if (!ref.current?.contains(event.target as Node)) setMenu(null);
     }
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") setMenu(null);
     }
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
@@ -57,17 +67,16 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
       window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [menu]);
 
-  function toggle() {
-    if (!open) {
-      setCanShare(canShareFiles());
-      setReady(null);
+  function toggle(which: "download" | "share") {
+    if (menu !== which) {
+      setShareStep(null);
       // Load the file makers now, so sharing still counts as the same tap.
       void import("@/lib/export/excel");
       void import("@/lib/export/picture");
     }
-    setOpen((o) => !o);
+    setMenu((current) => (current === which ? null : which));
   }
 
   function currentDoc(): ExportDoc | null {
@@ -80,116 +89,185 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
     return { firmName: document.getElementById("main")?.dataset.firm || "SKA", title, subtitle: subtitle ?? shownDates, tables: found };
   }
 
-  async function run(kind: FileKind, share: boolean) {
+  async function makeFile(kind: FileKind): Promise<Made | null> {
     const doc = currentDoc();
     if (!doc) {
-      setOpen(false);
-      toast("Nothing to download: there are no rows here for these dates.");
-      return;
+      setMenu(null);
+      toast("Nothing to send: there are no rows here for these dates.");
+      return null;
     }
+    const file = asFile(await make[kind](doc), fileNameFor(doc), kind);
+    return { file, kind, message: `${doc.firmName} · ${doc.title} · ${doc.subtitle}` };
+  }
+
+  async function download(kind: FileKind) {
     setBusy(true);
     try {
-      const file = asFile(await make[kind](doc), fileNameFor(doc), kind);
-      if (!share) {
-        downloadFile(file);
-        setOpen(false);
-        toast(`${file.name} downloaded`);
-        return;
-      }
-      const shareTitle = `${doc.title} · ${doc.subtitle}`;
-      const result = await shareFile(file, shareTitle);
-      if (result === "blocked") {
-        setReady({ file, title: shareTitle });
-        return;
-      }
-      setOpen(false);
-      if (result === "unsupported") {
-        downloadFile(file);
-        toast(`This browser can't share files, so ${file.name} was downloaded.`);
-      }
+      const made = await makeFile(kind);
+      if (!made) return;
+      downloadFile(made.file);
+      setMenu(null);
+      toast(`${made.file.name} downloaded`);
     } catch {
-      setOpen(false);
+      setMenu(null);
       toast("Could not make the file. Try again.");
     } finally {
       setBusy(false);
     }
   }
 
+  async function share(made: Made) {
+    const result = await shareFile(made.file, made.message);
+    if (result === "shared" || result === "cancelled") {
+      setShareStep(null);
+      setMenu(null);
+    } else {
+      setShareStep({ made, step: result === "blocked" ? "retry" : "manual" });
+    }
+  }
+
+  async function startShare(kind: FileKind) {
+    setBusy(true);
+    try {
+      const made = await makeFile(kind);
+      if (made) await share(made);
+    } catch {
+      setMenu(null);
+      toast("Could not make the file. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Saves the file, then opens WhatsApp or the mail app with a note, ready for the file to be attached. */
+  function sendVia(app: "whatsapp" | "email", made: Made) {
+    downloadFile(made.file);
+    const note = `${made.message}. File attached: ${made.file.name}`;
+    if (app === "whatsapp") window.open(`https://wa.me/?text=${encodeURIComponent(note)}`, "_blank", "noopener");
+    else window.location.href = `mailto:?subject=${encodeURIComponent(made.message)}&body=${encodeURIComponent(note)}`;
+    toast(`${made.file.name} saved. Attach it in ${app === "whatsapp" ? "WhatsApp" : "the email"}.`);
+    setShareStep(null);
+    setMenu(null);
+  }
+
+  async function copy(made: Made) {
+    try {
+      await copyPicture(made.file);
+      toast("Picture copied. Paste it into WhatsApp or an email.");
+      setShareStep(null);
+      setMenu(null);
+    } catch {
+      toast("This browser can't copy pictures. Use Save file instead.");
+    }
+  }
+
+  const kindButtons = (onPick: (kind: FileKind) => void, icon?: LucideIcon) =>
+    kinds.map(({ kind, label, icon: KindIcon }) => {
+      const Icon = icon ?? KindIcon;
+      return (
+        <button key={kind} type="button" role="menuitem" className={item} disabled={busy} onClick={() => onPick(kind)}>
+          <Icon size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
+          {label}
+        </button>
+      );
+    });
+
   return (
-    <div ref={ref} className="relative print:hidden">
-      <Button variant="secondary" onClick={toggle} aria-expanded={open} aria-haspopup="menu" disabled={busy}>
-        <Download size={18} strokeWidth={1.75} aria-hidden />
-        {busy ? "Making…" : "Download"}
-        <ChevronDown size={16} strokeWidth={2} aria-hidden />
-      </Button>
-      {open && (
-        // Under the button: from its left edge on phones (where it sits on the left), from its right edge on wide screens.
-        <div role="menu" className="surface animate-fade-up absolute left-0 top-12 z-40 w-64 p-2 shadow-raised lg:left-auto lg:right-0">
-          {ready ? (
-            <div className="space-y-2 p-2">
-              <p className="text-[14px] text-ink-secondary">{ready.file.name} is ready.</p>
-              <Button
-                className="w-full"
-                onClick={async () => {
-                  const result = await shareFile(ready.file, ready.title);
-                  if (result !== "blocked") {
-                    setReady(null);
-                    setOpen(false);
-                  }
-                }}
-              >
-                <Share2 size={18} strokeWidth={1.75} aria-hidden /> Share
-              </Button>
-              <Button
-                variant="secondary"
-                className="w-full"
+    <div ref={ref} className="flex flex-wrap gap-2 print:hidden">
+      <div className="relative">
+        <Button variant="secondary" onClick={() => toggle("download")} aria-expanded={menu === "download"} aria-haspopup="menu" disabled={busy}>
+          <Download size={18} strokeWidth={1.75} aria-hidden />
+          {busy && menu === "download" ? "Making…" : "Download"}
+          <ChevronDown size={16} strokeWidth={2} aria-hidden />
+        </Button>
+        {menu === "download" && (
+          // From the button's left edge on phones (where it sits on the left), from its right edge on wide screens.
+          <MenuPanel className="left-0 lg:left-auto lg:right-0">
+            <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-tertiary">Download as</p>
+            {kindButtons((kind) => void download(kind))}
+            <div className="mt-1 border-t border-hairline pt-1">
+              <button
+                type="button"
+                role="menuitem"
+                className={item}
                 onClick={() => {
-                  downloadFile(ready.file);
-                  setReady(null);
-                  setOpen(false);
+                  setMenu(null);
+                  window.print();
                 }}
               >
-                Download instead
-              </Button>
+                <Printer size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
+                Print
+              </button>
             </div>
-          ) : (
-            <>
-              <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-tertiary">Download</p>
-              {kinds.map(({ kind, label, icon: Icon }) => (
-                <button key={kind} type="button" role="menuitem" className={item} disabled={busy} onClick={() => void run(kind, false)}>
-                  <Icon size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
-                  {label}
+          </MenuPanel>
+        )}
+      </div>
+
+      <div className="relative">
+        <Button variant="secondary" onClick={() => toggle("share")} aria-expanded={menu === "share"} aria-haspopup="menu" disabled={busy}>
+          <Share2 size={18} strokeWidth={1.75} aria-hidden />
+          {busy && menu === "share" ? "Making…" : "Share"}
+          <ChevronDown size={16} strokeWidth={2} aria-hidden />
+        </Button>
+        {menu === "share" && (
+          <MenuPanel className="right-0">
+            {!shareStep ? (
+              <>
+                <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-tertiary">Share as (WhatsApp, mail…)</p>
+                {kindButtons((kind) => void startShare(kind))}
+              </>
+            ) : shareStep.step === "retry" ? (
+              <div className="space-y-2 p-2">
+                <p className="text-[14px] text-ink-secondary">{shareStep.made.file.name} is ready.</p>
+                <Button className="w-full" onClick={() => void share(shareStep.made)}>
+                  <Share2 size={18} strokeWidth={1.75} aria-hidden /> Share now
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1 p-1">
+                <p className="px-2 pb-1 pt-1 text-[13px] leading-[18px] text-ink-secondary">
+                  {shareStep.made.file.name} is ready. This browser can&apos;t hand files to other apps, so send it like this:
+                </p>
+                <button type="button" role="menuitem" className={item} onClick={() => sendVia("whatsapp", shareStep.made)}>
+                  <MessageCircle size={17} strokeWidth={1.75} className="text-good" aria-hidden />
+                  WhatsApp (save, then attach)
                 </button>
-              ))}
-              {canShare && (
-                <>
-                  <p className="mt-1 border-t border-hairline px-3 pb-1 pt-2.5 text-[12px] text-ink-tertiary">Share (WhatsApp, mail…)</p>
-                  {kinds.map(({ kind, label }) => (
-                    <button key={kind} type="button" role="menuitem" className={item} disabled={busy} onClick={() => void run(kind, true)}>
-                      <Share2 size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
-                      {label}
-                    </button>
-                  ))}
-                </>
-              )}
-              <div className="mt-1 border-t border-hairline pt-1">
+                <button type="button" role="menuitem" className={item} onClick={() => sendVia("email", shareStep.made)}>
+                  <Mail size={17} strokeWidth={1.75} className="text-accent" aria-hidden />
+                  Email (save, then attach)
+                </button>
+                {shareStep.made.kind === "jpg" && (
+                  <button type="button" role="menuitem" className={item} onClick={() => void copy(shareStep.made)}>
+                    <Copy size={17} strokeWidth={1.75} className="text-purple" aria-hidden />
+                    Copy picture to paste
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"
                   className={item}
                   onClick={() => {
-                    setOpen(false);
-                    window.print();
+                    downloadFile(shareStep.made.file);
+                    setShareStep(null);
+                    setMenu(null);
                   }}
                 >
-                  <Printer size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
-                  Print
+                  <Download size={17} strokeWidth={1.75} className="text-ink-secondary" aria-hidden />
+                  Save file
                 </button>
               </div>
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </MenuPanel>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuPanel({ className, children }: { className: string; children: ReactNode }) {
+  return (
+    <div role="menu" className={cn("surface animate-fade-up absolute top-12 z-40 w-72 p-2 shadow-raised", className)}>
+      {children}
     </div>
   );
 }

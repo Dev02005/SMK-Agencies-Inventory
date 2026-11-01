@@ -21,13 +21,15 @@ export function downloadFile(file: File) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-/** Phones and Windows/Mac browsers that can hand a file to WhatsApp, mail and the like. */
-export function canShareFiles(kind: FileKind = "jpg") {
-  try {
-    return typeof navigator.canShare === "function" && navigator.canShare({ files: [new File([""], `test.${kind}`, { type: types[kind] })] });
-  } catch {
-    return false;
-  }
+/** Puts a picture on the clipboard (as PNG, the one image type clipboards take) to paste into WhatsApp or mail. */
+export async function copyPicture(picture: Blob) {
+  const bitmap = await createImageBitmap(picture);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  const png = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("No picture"))), "image/png"));
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
 }
 
 /**
