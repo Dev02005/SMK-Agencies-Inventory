@@ -66,7 +66,10 @@ The frontend is complete. Next: connect Supabase.
 
 ## The firm's own records
 
-The firm's real records are kept in `local-data/` on the computer that runs the app, never in the code: `local-data/` is in `.gitignore`, so it never goes to GitHub (the repository is public). Each file replaces the matching sample records when it is there; without it the app runs on sample data (`src/lib/data/local-data.ts` and `firms.ts` read them).
+The firm's real records are never in the code: `local-data/` is in `.gitignore`, so it never goes to GitHub (the repository is public). Each list (`staff.json`, `godowns.json`…) replaces the matching sample records when it is there; without it the app runs on sample data (`src/lib/data/local-data.ts` and `firms.ts` read them through `store.ts`). They are kept in one of two places:
+
+- **On this computer** (no `SKA_DATA_SECRET`): JSON files in `local-data/`.
+- **Online** (`SKA_DATA_SECRET` set): one row per list in the Supabase table `ska_records`, so the site on Vercel has them too. The table is locked: the publishable key alone can't read or write it, only its two functions can, and only with `SKA_DATA_SECRET`. Each request fetches what changed since that server last looked, and a save that meets someone else's save of the same list is made again on the newer one, so nothing is lost when two people save at once.
 
 | File | Holds | Changed from |
 |---|---|---|
@@ -91,13 +94,20 @@ Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns 
 
 Original or sample: records read from `local-data/` carry `original: true`. List pages show **Original data**, **Sample data** or **Original + sample** (`DataOrigin`, `OriginChip`), and in a mixed list each sample record has a small **Sample** tag (`SampleTag`). Sales, money and stock are all still sample data.
 
-`replaces` in `staff.json` and `vehicles.json` lets a real person or vehicle take over a sample one's records. Firm details are written to the file when saved, so on a host with a read-only disk they need Supabase. With Supabase these files become database tables.
+`replaces` in `staff.json` and `vehicles.json` lets a real person or vehicle take over a sample one's records. A host with a read-only disk (Vercel) needs the records online.
 
 ```json
 { "staff": [{ "name": "Example", "designation": "Wholesale manager", "role": "field", "mobile": "9000000000", "godowns": ["g-polaki"] }] }
 ```
 
-## Connect Supabase
+## Put the records online (Supabase)
+
+1. In Supabase › SQL Editor, run `supabase/migrations/20261103000000_records.sql`, then set the data key's SHA-256 as its first lines say.
+2. In `.env.local` set `SKA_DATA_SECRET` (that key), `SESSION_SECRET` and `PERSONAL_LOCK_SECRET` (long random strings) and `PERSONAL_PIN`, beside the Supabase URL and publishable key.
+3. `npm run records:upload` copies `local-data/*.json` up (records already online are left alone). From then on the app on this computer uses the online records too; `npm run records:download` saves a backup copy back into `local-data/`.
+4. On Vercel › Settings › Environment Variables, add the same variables (and `NEXT_PUBLIC_SITE_URL`, the site's address), then redeploy. Put the Vercel functions in the region nearest the Supabase project.
+
+## Connect Supabase (the full database)
 
 1. Create a Supabase project in the Mumbai region (staging first).
 2. Run `supabase/migrations/20261026000000_phase1_core.sql` in the SQL editor (or `supabase db push` with the CLI), then `supabase/seed.sql`.
@@ -133,4 +143,5 @@ Original or sample: records read from `local-data/` carry `original: true`. List
 - Every page is sent with security headers (`next.config.ts`): no framing by other sites, no MIME sniffing, a strict referrer policy, HSTS, and only location and camera allowed.
 - Database: row-level security on every table; sales, ledger and stock are only written through checked functions. Field staff can only add cash-only parties assigned to themselves and record receipts they collected from their own parties. `npm audit` reports no known vulnerabilities in the app's packages.
 - Sign-in: the session cookie is signed (HMAC) with `SESSION_SECRET`, httpOnly, same-site and secure in production; a wrong login waits 0.6 s before answering, which slows guessing.
-- Before go-live: set `SESSION_SECRET`, `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET`; switch the map to a paid tile provider.
+- Before go-live: set `SESSION_SECRET`, `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET` (with the records online the app refuses to run without the two secrets); switch the map to a paid tile provider.
+- Records online: the `ska_records` table has row-level security and no grants; only `ska_records_since` and `ska_save_records` open it, and only with `SKA_DATA_SECRET`, which stays on the server (the database keeps only its SHA-256).

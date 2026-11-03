@@ -1,42 +1,16 @@
 import "server-only";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { mobileOf } from "@/lib/mobile";
+import { readRecord, writeRecord } from "./store";
 import type { BankAccount, Chit, EmployeeDetails, Godown, Lorry, Party, Product, Profile, Rental, Role, VehicleKind } from "./types";
 
 /**
- * The firm's own records (firms, staff, godowns, vehicles), kept as JSON files in local-data/ on the computer that
- * runs the app, never in the code or in git (local-data/ is in .gitignore; the GitHub repository is public).
- * Each file replaces the matching sample records when it is there; without it the app runs on sample data.
- * With Supabase these become database tables and the folder goes away.
+ * The firm's own records (staff, godowns, suppliers, products, banks and vehicles, and the parties, lorries, chits,
+ * rents, check-ins and notes added in the app): one JSON record per list in the record store (store.ts: local-data/
+ * on a computer, Supabase online), never in the code or in git. Each list replaces the matching sample records when
+ * it is there; without it the app runs on sample data. They are changed only inside saving() (store.ts).
  */
-const folder = join(process.cwd(), "local-data");
-
-/** A local-data file's contents, or undefined when it is missing or not valid JSON. */
-export function readLocal(file: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(folder, file), "utf8"));
-  } catch {
-    return undefined;
-  }
-}
-
-let version = 0;
-
-/** Goes up on every save, so anything worked out from the records (notifications) knows when to work it out again. */
-export const dataVersion = () => version;
-
-/** Saves a local-data file in one step (written beside it, then swapped in), so a crash never leaves half a file. */
-export function writeLocal(file: string, data: unknown) {
-  mkdirSync(folder, { recursive: true });
-  const path = join(folder, file);
-  writeFileSync(`${path}.tmp`, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  renameSync(`${path}.tmp`, path);
-  version++;
-}
-
 const listIn = (file: string, key: string): unknown[] => {
-  const data = readLocal(file) as Record<string, unknown> | undefined;
+  const data = readRecord(file) as Record<string, unknown> | undefined;
   return Array.isArray(data?.[key]) ? (data[key] as unknown[]) : [];
 };
 
@@ -73,12 +47,14 @@ function isPerson(p: unknown): p is LocalPerson {
   return Boolean(x && isText(x.name) && typeof x.mobile === "string" && typeof x.designation === "string" && staffRoles.includes(x.role as StaffRole));
 }
 
-// Read once when the server starts; restart the app after editing the file by hand.
-const staff = listIn("staff.json", "staff").filter(isPerson);
-const ownerEntry = (readLocal("staff.json") as { owner?: { name?: unknown; designation?: unknown; mobile?: unknown; email?: unknown } } | undefined)?.owner;
+type OwnerEntry = { name?: unknown; designation?: unknown; mobile?: unknown; email?: unknown };
+
+// Each list here is read by loadLocal(), at the end of this file.
+let staff: LocalPerson[] = [];
+let ownerEntry: OwnerEntry | undefined;
 
 /** What the owner is called in the business ("Admin"), when the staff file says. */
-export const ownerDesignation = isText(ownerEntry?.designation) ? ownerEntry.designation.trim() : undefined;
+export let ownerDesignation: string | undefined;
 
 const personId = (p: LocalPerson) => p.replaces ?? `u-staff-${slug(p.name)}`;
 
@@ -89,16 +65,17 @@ function initialsOf(name: string) {
 
 /** The owner (their own name and mobile when the file has them), then the real staff or the sample staff. */
 export function withLocalProfiles(sample: Profile[]): Profile[] {
+  const entry = ownerEntry;
   const owner = sample
     .filter((p) => p.role === "owner")
     .map((p) =>
-      isText(ownerEntry?.name)
+      isText(entry?.name)
         ? {
             ...p,
-            fullName: ownerEntry.name.trim(),
-            initials: initialsOf(ownerEntry.name),
-            mobile: typeof ownerEntry.mobile === "string" ? mobileOf(ownerEntry.mobile) : p.mobile,
-            email: typeof ownerEntry.email === "string" ? ownerEntry.email.trim() : undefined,
+            fullName: entry.name.trim(),
+            initials: initialsOf(entry.name),
+            mobile: typeof entry.mobile === "string" ? mobileOf(entry.mobile) : p.mobile,
+            email: typeof entry.email === "string" ? entry.email.trim() : undefined,
             original: true,
           }
         : p,
@@ -127,7 +104,7 @@ function isGodown(g: unknown): g is Godown {
   return Boolean(x && isText(x.id) && isText(x.name) && typeof x.place === "string");
 }
 
-const godowns = listIn("godowns.json", "godowns").filter(isGodown);
+let godowns: Godown[] = [];
 
 /** The real godowns (sample ones when there is no file), each with who looks after it. */
 export function withLocalGodowns(sample: Godown[]): Godown[] {
@@ -146,7 +123,7 @@ function isSupplier(s: unknown): s is LocalSupplier {
   return Boolean(x && isText(x.id) && isText(x.name));
 }
 
-const suppliers = listIn("suppliers.json", "suppliers").filter(isSupplier);
+let suppliers: LocalSupplier[] = [];
 
 /**
  * The companies we buy from, with the brands they sell; one with a sample party's id takes over its records. Once the
@@ -175,7 +152,7 @@ function isProduct(p: unknown): p is LocalProduct {
   return Boolean(x && isText(x.id) && isText(x.brand) && isText(x.variant) && (x.category === "cement" || x.category === "steel") && (x.unit === "bag" || x.unit === "kg"));
 }
 
-const productEntries: LocalProduct[] = listIn("products.json", "products").filter(isProduct);
+let productEntries: LocalProduct[] = [];
 
 const toProduct = (p: LocalProduct, sample?: Product): Product => ({
   id: p.id,
@@ -206,14 +183,14 @@ export function saveLocalProduct(products: Product[], product: Product) {
   const live = products.findIndex((p) => p.id === product.id);
   if (live >= 0) products[live] = saved;
   else products.push(saved);
-  writeLocal("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill. Kept on this computer only.", products: productEntries });
+  writeRecord("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill.", products: productEntries });
 }
 
 /** Deletes a product from products.json and from `products`; false for a sample product. */
 export function removeLocalProduct(products: Product[], id: string): boolean {
   if (!removeFrom(productEntries, (p) => p.id === id)) return false;
   removeFrom(products, (p) => p.id === id);
-  writeLocal("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill. Kept on this computer only.", products: productEntries });
+  writeRecord("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill.", products: productEntries });
   return true;
 }
 
@@ -224,7 +201,7 @@ function isAccount(a: unknown): a is BankAccount {
   return Boolean(x && isText(x.id) && isText(x.bank) && isText(x.accountNo));
 }
 
-const accounts = listIn("banks.json", "accounts").filter(isAccount);
+let accounts: BankAccount[] = [];
 
 /** The firms' real business accounts in place of the sample ones; the owner's personal (sample) accounts stay. */
 export function withLocalBanks(sample: BankAccount[]): BankAccount[] {
@@ -253,9 +230,7 @@ function isCustomer(c: unknown): c is Party {
   return Boolean(x && isText(x.id) && isText(x.name) && addedKinds.includes(x.kind as Party["kind"]));
 }
 
-const customers: Party[] = listIn("customers.json", "customers")
-  .filter(isCustomer)
-  .map((c) => ({ ...c, creditLimit: typeof c.creditLimit === "number" ? c.creditLimit : null, openingBalance: Number(c.openingBalance) || 0, original: true }));
+let customers: Party[] = [];
 
 /** The sample parties plus the parties added in the app. */
 export function withLocalCustomers(sample: Party[]): Party[] {
@@ -263,7 +238,7 @@ export function withLocalCustomers(sample: Party[]): Party[] {
 }
 
 const writeCustomers = () =>
-  writeLocal("customers.json", { about: "Parties added in the app (Parties > New party, New sale > New customer). Kept on this computer only.", customers: customers.map(stored) });
+  writeRecord("customers.json", { about: "Parties added in the app (Parties > New party, New sale > New customer).", customers: customers.map(stored) });
 
 /** Saves a new party and adds it to `parties` (the list every screen reads), so it can be used at once. */
 export function addLocalCustomer(parties: Party[], customer: Party) {
@@ -285,8 +260,8 @@ function removeFrom<T>(list: T[], match: (item: T) => boolean): boolean {
 export function removeLocalParty(parties: Party[], id: string): boolean {
   if (removeFrom(customers, (c) => c.id === id)) writeCustomers();
   else if (removeFrom(suppliers, (s) => s.id === id)) {
-    const file = (readLocal("suppliers.json") as Record<string, unknown> | undefined) ?? {};
-    writeLocal("suppliers.json", { ...file, suppliers });
+    const file = (readRecord("suppliers.json") as Record<string, unknown> | undefined) ?? {};
+    writeRecord("suppliers.json", { ...file, suppliers });
   } else return false;
   removeFrom(parties, (p) => p.id === id);
   return true;
@@ -309,9 +284,7 @@ function isLorry(l: unknown): l is Lorry {
   );
 }
 
-const lorries: Lorry[] = listIn("lorries.json", "lorries")
-  .filter(isLorry)
-  .map((l) => ({ ...l, original: true }));
+let lorries: Lorry[] = [];
 
 /** The lorries entered in the app. */
 export function localLorries(): Lorry[] {
@@ -319,8 +292,8 @@ export function localLorries(): Lorry[] {
 }
 
 const writeLorries = () =>
-  writeLocal("lorries.json", {
-    about: "Company lorries bought to sell straight off the truck, and what each sold for. Kept on this computer only.",
+  writeRecord("lorries.json", {
+    about: "Company lorries bought to sell straight off the truck, and what each sold for.",
     lorries: lorries.map(stored),
   });
 
@@ -377,12 +350,8 @@ function isRental(r: unknown): r is Rental {
   );
 }
 
-const chits: Chit[] = listIn("chits.json", "chits")
-  .filter(isChit)
-  .map((c) => ({ ...c, original: true }));
-const rentals: Rental[] = listIn("rents.json", "rents")
-  .filter(isRental)
-  .map((r) => ({ ...r, original: true }));
+let chits: Chit[] = [];
+let rentals: Rental[] = [];
 
 /** Puts a record in its list, replacing the one with the same id. */
 function upsert<T extends { id: string }>(list: T[], record: T) {
@@ -398,12 +367,12 @@ export function localChits(): Chit[] {
 /** Saves a new chit, or an instalment or lifting recorded on one. */
 export function saveLocalChit(chit: Chit) {
   upsert(chits, { ...chit, original: true });
-  writeLocal("chits.json", { about: "The owner's chits, with the instalments recorded in the app (Personal > Chits). Kept on this computer only.", chits: chits.map(stored) });
+  writeRecord("chits.json", { about: "The owner's chits, with the instalments recorded in the app (Personal > Chits).", chits: chits.map(stored) });
 }
 
 export function removeLocalChit(id: string): boolean {
   if (!removeFrom(chits, (c) => c.id === id)) return false;
-  writeLocal("chits.json", { about: "The owner's chits, with the instalments recorded in the app (Personal > Chits). Kept on this computer only.", chits: chits.map(stored) });
+  writeRecord("chits.json", { about: "The owner's chits, with the instalments recorded in the app (Personal > Chits).", chits: chits.map(stored) });
   return true;
 }
 
@@ -414,27 +383,25 @@ export function localRentals(): Rental[] {
 /** Saves a new rent, or a month's rent recorded on one. */
 export function saveLocalRental(rental: Rental) {
   upsert(rentals, { ...rental, original: true });
-  writeLocal("rents.json", { about: "Rent received from tenants and rent paid, with each month recorded in the app (Personal > Rents). Kept on this computer only.", rents: rentals.map(stored) });
+  writeRecord("rents.json", { about: "Rent received from tenants and rent paid, with each month recorded in the app (Personal > Rents).", rents: rentals.map(stored) });
 }
 
 export function removeLocalRental(id: string): boolean {
   if (!removeFrom(rentals, (r) => r.id === id)) return false;
-  writeLocal("rents.json", { about: "Rent received from tenants and rent paid, with each month recorded in the app (Personal > Rents). Kept on this computer only.", rents: rentals.map(stored) });
+  writeRecord("rents.json", { about: "Rent received from tenants and rent paid, with each month recorded in the app (Personal > Rents).", rents: rentals.map(stored) });
   return true;
 }
 
 // ── Destinations we deliver to (New sale › Destination): local-data/destinations.json ──────────────────────────────
 
-const destinations: string[] = listIn("destinations.json", "destinations")
-  .filter(isText)
-  .map((d) => d.trim().replace(/\s+/g, " "));
+let destinations: string[] = [];
 
 export function localDestinations(): string[] {
   return destinations;
 }
 
 const writeDestinations = () =>
-  writeLocal("destinations.json", { about: "Villages and towns we deliver to (New sale > Destination; Add destination adds more). Kept on this computer only.", destinations });
+  writeRecord("destinations.json", { about: "Villages and towns we deliver to (New sale > Destination; Add destination adds more).", destinations });
 
 export function addLocalDestination(name: string) {
   destinations.push(name);
@@ -459,7 +426,7 @@ function isCheckIn(r: unknown): r is StoredCheckIn {
   return Boolean(x && isText(x.profileId) && isISODate(x.date) && isTime(x.checkIn) && (x.checkOut === undefined || isTime(x.checkOut)));
 }
 
-const checkIns: StoredCheckIn[] = listIn("attendance.json", "records").filter(isCheckIn);
+let checkIns: StoredCheckIn[] = [];
 
 export function localCheckIns(): StoredCheckIn[] {
   return checkIns;
@@ -470,21 +437,19 @@ export function saveLocalCheckIn(record: StoredCheckIn) {
   const at = checkIns.findIndex((r) => r.profileId === record.profileId && r.date === record.date);
   if (at >= 0) checkIns[at] = record;
   else checkIns.push(record);
-  writeLocal("attendance.json", { about: "Check-in and check-out times staff record on Attendance. Kept on this computer only.", records: checkIns });
+  writeRecord("attendance.json", { about: "Check-in and check-out times staff record on Attendance.", records: checkIns });
 }
 
 // ── Drivers of rented vehicles (New sale › Rent › Driver): local-data/rent-drivers.json ───────────────────────────
 
-const rentDrivers: string[] = listIn("rent-drivers.json", "drivers")
-  .filter(isText)
-  .map((d) => d.trim().replace(/\s+/g, " "));
+let rentDrivers: string[] = [];
 
 export function localRentDrivers(): string[] {
   return rentDrivers;
 }
 
 const writeRentDrivers = () =>
-  writeLocal("rent-drivers.json", { about: "Drivers of rented vehicles (New sale > Rent > Driver; Add driver adds more). Kept on this computer only.", drivers: rentDrivers });
+  writeRecord("rent-drivers.json", { about: "Drivers of rented vehicles (New sale > Rent > Driver; Add driver adds more).", drivers: rentDrivers });
 
 export function addLocalRentDriver(name: string) {
   rentDrivers.push(name);
@@ -506,9 +471,9 @@ function isNote(n: unknown): n is StoredNote {
   return Boolean(x && isText(x.id) && isText(x.profileId) && isText(x.text) && isText(x.at));
 }
 
-const notes: StoredNote[] = listIn("notes.json", "notes").filter(isNote);
+let notes: StoredNote[] = [];
 
-const writeNotes = () => writeLocal("notes.json", { about: "Each person's quick notes from the floating notes ball. Kept on this computer only.", notes });
+const writeNotes = () => writeRecord("notes.json", { about: "Each person's quick notes from the floating notes ball.", notes });
 
 /** One person's quick notes, newest first. */
 export function notesOf(profileId: string): StoredNote[] {
@@ -543,7 +508,7 @@ function isVehicle(v: unknown): v is LocalVehicle {
   return Boolean(x && isText(x.number) && kinds.includes(x.kind as VehicleKind) && categories.includes(x.category as FleetEntry["category"]));
 }
 
-const vehicles = listIn("vehicles.json", "vehicles").filter(isVehicle);
+let vehicles: LocalVehicle[] = [];
 
 /**
  * The real vehicles in place of the sample ones they name in "replaces" (keeping that vehicle's sample papers and
@@ -555,3 +520,39 @@ export function withLocalFleet(sample: FleetEntry[]): FleetEntry[] {
   const real = vehicles.map((v) => ({ id: v.replaces ?? `v-${slug(v.number)}`, number: v.number.trim(), kind: v.kind, category: v.category, model: v.model?.trim() ?? "", original: true }));
   return [...real, ...sample.filter((s) => !replaced.has(s.id))];
 }
+
+// ── Reading the lists ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Reads every list from the records: when the server starts, and again whenever they change (index.ts). */
+export function loadLocal() {
+  staff = listIn("staff.json", "staff").filter(isPerson);
+  ownerEntry = (readRecord("staff.json") as { owner?: OwnerEntry } | undefined)?.owner;
+  ownerDesignation = isText(ownerEntry?.designation) ? ownerEntry.designation.trim() : undefined;
+  godowns = listIn("godowns.json", "godowns").filter(isGodown);
+  suppliers = listIn("suppliers.json", "suppliers").filter(isSupplier);
+  productEntries = listIn("products.json", "products").filter(isProduct);
+  accounts = listIn("banks.json", "accounts").filter(isAccount);
+  customers = listIn("customers.json", "customers")
+    .filter(isCustomer)
+    .map((c) => ({ ...c, creditLimit: typeof c.creditLimit === "number" ? c.creditLimit : null, openingBalance: Number(c.openingBalance) || 0, original: true }));
+  lorries = listIn("lorries.json", "lorries")
+    .filter(isLorry)
+    .map((l) => ({ ...l, original: true }));
+  chits = listIn("chits.json", "chits")
+    .filter(isChit)
+    .map((c) => ({ ...c, original: true }));
+  rentals = listIn("rents.json", "rents")
+    .filter(isRental)
+    .map((r) => ({ ...r, original: true }));
+  destinations = listIn("destinations.json", "destinations")
+    .filter(isText)
+    .map((d) => d.trim().replace(/\s+/g, " "));
+  checkIns = listIn("attendance.json", "records").filter(isCheckIn);
+  rentDrivers = listIn("rent-drivers.json", "drivers")
+    .filter(isText)
+    .map((d) => d.trim().replace(/\s+/g, " "));
+  notes = listIn("notes.json", "notes").filter(isNote);
+  vehicles = listIn("vehicles.json", "vehicles").filter(isVehicle);
+}
+
+loadLocal();

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { BackLink, OriginChip, SectionCard } from "@/components/ui/blocks";
+import { Suspense } from "react";
+import { BackLink, ListSkeleton, OriginChip, SectionCard } from "@/components/ui/blocks";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,10 +10,21 @@ import { AddProduct, ProductList } from "./product-list";
 export const metadata: Metadata = { title: "Products" };
 
 /** Every product by brand, and adding a product. Products have no rates: the owner prices each bill when approving it. */
-export default async function ProductSettingsPage() {
-  const products = await getProducts();
+export default function ProductSettingsPage() {
   return (
     <div className="animate-fade-up mx-auto max-w-[760px] space-y-4">
+      <Suspense fallback={<ListSkeleton rows={5} />}>
+        <Products />
+      </Suspense>
+    </div>
+  );
+}
+
+// The list is read at request time (a product can be added on another server), so it streams in.
+async function Products() {
+  const products = await getProducts();
+  return (
+    <>
       <PageHeader
         back={<BackLink href="/settings">Settings</BackLink>}
         title="Products"
@@ -32,6 +44,6 @@ export default async function ProductSettingsPage() {
       <SectionCard title="Add a product">
         <AddProduct brands={[...new Set(products.map((p) => p.brand))]} />
       </SectionCard>
-    </div>
+    </>
   );
 }

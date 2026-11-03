@@ -20,6 +20,6 @@ export async function changePassword(current: string, next: string): Promise<Cha
   }
   const problem = next === current ? "Choose a password different from the current one." : passwordProblem(next, person.mobile);
   if (problem) return { ok: false, field: "next", problem };
-  setPassword(person.id, next);
+  await setPassword(person.id, next);
   return { ok: true };
 }

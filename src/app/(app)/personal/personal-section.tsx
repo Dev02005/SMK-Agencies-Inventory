@@ -1,7 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { ListSkeleton } from "@/components/ui/blocks";
-import { isPersonalUnlocked, SAMPLE_PIN } from "@/lib/personal-lock";
-import { usesSampleData } from "@/lib/supabase/config";
+import { isPersonalUnlocked, samplePin } from "@/lib/personal-lock";
 import { OwnerOnly, PinPad } from "./personal-gate";
 import { PersonalNav } from "./personal-nav";
 
@@ -21,7 +20,7 @@ export function PersonalSection({ children }: { children: ReactNode }) {
 }
 
 async function LockedOrOpen({ children }: { children: ReactNode }) {
-  if (!(await isPersonalUnlocked())) return <PinPad sampleHint={usesSampleData ? SAMPLE_PIN : undefined} />;
+  if (!(await isPersonalUnlocked())) return <PinPad sampleHint={samplePin()} />;
   return (
     <>
       <PersonalNav />

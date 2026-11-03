@@ -1,10 +1,10 @@
 /**
- * Data access for every screen. Today each function reads the sample data; in the Supabase step each body
- * becomes a query (or a call to a database view), and the screens stay unchanged.
+ * Data access for every screen: the sample books, with the firm's own records (local-data.ts, kept in local-data/
+ * or in Supabase by store.ts) in their place. Screens only call these functions.
  */
 import "server-only";
-import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
+import { cache } from "react";
 import { requireSession } from "@/lib/auth";
 import { todayISO } from "@/lib/format";
 import { billName } from "@/lib/labels";
@@ -14,8 +14,10 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localCheckIns, saveLocalCheckIn, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, notesOf, ownerDesignation, removeLocalNote, saveLocalLorry, saveLocalProduct } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localCheckIns, saveLocalCheckIn, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, notesOf, ownerDesignation, removeLocalNote, saveLocalLorry, saveLocalProduct } from "./local-data";
+import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
+import { saving, syncRecords, whenRecordsChange } from "./store";
 import type { Ageing, AttendanceRecord, BankEntry, CashHolder, Chit, LedgerEntry, Lorry, Party, Product, Profile, Rental, Sale } from "./types";
 import { LATE_AFTER_MINUTES, WORK_STARTS_AT } from "@/lib/limits";
 
@@ -39,13 +41,28 @@ let phase2: Books["phase2"];
 let phase3: Books["phase3"];
 let phase4: Books["phase4"];
 
+// When the records change on another server (online), every list built from them is built again, in the order they
+// depend on each other, and the dated books with them.
+whenRecordsChange(() => {
+  loadLocal();
+  loadFleet();
+  base.loadMasters();
+  base2.loadPhase2();
+  base3.loadPhase3();
+  builtFor = "";
+});
+
+/** The latest records, fetched once per request (online; on a computer there is nothing to fetch). */
+const synced = cache(syncRecords);
+
 /**
- * Today's date in India (YYYY-MM-DD), with the sample records brought up to it; they are rebuilt when the date
- * changes. Every reader of dated records awaits this first. It waits for the request (connection), so a date is
- * never frozen into a page at build time. With Supabase, the queries take its place.
+ * Today's date in India (YYYY-MM-DD), with the latest records and the sample records brought up to it; they are
+ * rebuilt when the date changes. Every reader of records awaits this first. It waits for the request (connection),
+ * so neither a date nor a record is ever frozen into a page at build time.
  */
 async function live() {
   await connection();
+  await synced();
   const today = todayISO();
   if (today !== builtFor) {
     ({ sample, phase2, phase3, phase4 } = buildBooks(today));
@@ -88,6 +105,7 @@ export async function getFirms() {
 /** The signed-in person, from the session (signing in again if there is none). */
 export async function getCurrentUser(): Promise<Profile> {
   const { userId } = await requireSession();
+  await synced();
   return base.profiles.find((p) => p.id === userId) ?? base.profiles[0];
 }
 
@@ -95,36 +113,42 @@ export async function getCurrentUser(): Promise<Profile> {
 
 /** The villages and towns we deliver to, A to Z. */
 export async function getDestinations(): Promise<string[]> {
+  await live();
   return [...localDestinations()].sort((a, b) => a.localeCompare(b));
 }
 
 export async function deleteDestination(name: string): Promise<boolean> {
-  return removeLocalDestination(name);
+  return saving(() => removeLocalDestination(name));
 }
 
 /** Adds a destination unless it is already there (any capitals); returns the name as saved. */
 export async function addDestination(name: string): Promise<{ name: string; added: boolean }> {
-  const existing = localDestinations().find((d) => d.toLowerCase() === name.toLowerCase());
-  if (existing) return { name: existing, added: false };
-  addLocalDestination(name);
-  return { name, added: true };
+  return saving(() => {
+    const existing = localDestinations().find((d) => d.toLowerCase() === name.toLowerCase());
+    if (existing) return { name: existing, added: false };
+    addLocalDestination(name);
+    return { name, added: true };
+  });
 }
 
 /** Drivers of rented vehicles, A to Z (New sale › Rent › Driver). */
 export async function getRentDrivers(): Promise<string[]> {
+  await live();
   return [...localRentDrivers()].sort((a, b) => a.localeCompare(b));
 }
 
 export async function deleteRentDriver(name: string): Promise<boolean> {
-  return removeLocalRentDriver(name);
+  return saving(() => removeLocalRentDriver(name));
 }
 
 /** Adds a rent driver unless already there (any capitals); returns the name as saved. */
 export async function addRentDriver(name: string): Promise<{ name: string; added: boolean }> {
-  const existing = localRentDrivers().find((d) => d.toLowerCase() === name.toLowerCase());
-  if (existing) return { name: existing, added: false };
-  addLocalRentDriver(name);
-  return { name, added: true };
+  return saving(() => {
+    const existing = localRentDrivers().find((d) => d.toLowerCase() === name.toLowerCase());
+    if (existing) return { name: existing, added: false };
+    addLocalRentDriver(name);
+    return { name, added: true };
+  });
 }
 
 // ── Quick notes (the floating notes ball): each signed-in person's own ─────────────────────────────────────────
@@ -139,12 +163,13 @@ export async function getMyQuickNotes(): Promise<QuickNote[]> {
 export async function addMyQuickNote(text: string): Promise<QuickNote> {
   const me = await getCurrentUser();
   const note = { id: `note-${Date.now().toString(36)}`, profileId: me.id, text, at: new Date().toISOString() };
-  addLocalNote(note);
+  await saving(() => addLocalNote(note));
   return { id: note.id, text: note.text, at: note.at };
 }
 
 export async function removeMyQuickNote(id: string): Promise<boolean> {
-  return removeLocalNote((await getCurrentUser()).id, id);
+  const me = await getCurrentUser();
+  return saving(() => removeLocalNote(me.id, id));
 }
 
 /** The people the app's frame needs: everyone for the owner ("View as" previews a role's first person), only themself for anyone else. */
@@ -154,15 +179,18 @@ export async function getShellProfiles(): Promise<Profile[]> {
 }
 
 export async function getProfiles() {
+  await live();
   return base.profiles;
 }
 
 export async function getProfile(id: string | undefined) {
+  await live();
   return base.profiles.find((p) => p.id === id);
 }
 
 /** Every godown (for names and lookups); lists a person sees use getMyGodowns. */
 export async function getGodowns() {
+  await live();
   return base.godowns;
 }
 
@@ -186,39 +214,38 @@ export async function getMyGodowns() {
   return base.godowns.filter((g) => canSee(visible, g.id));
 }
 
-/** Tag for the product list's cache; Settings › Products refreshes it when a product is added. */
-export const PRODUCTS_TAG = "products";
-
 export async function getProducts() {
-  "use cache";
-  cacheLife("max");
-  cacheTag(PRODUCTS_TAG);
+  await live();
   return base.products;
 }
 
 /** Settings › Products: deletes a product; a reason when it can't be (a sample product, or one on a saved lorry). */
 export async function deleteProduct(id: string): Promise<string | null> {
-  if (localLorries().some((l) => l.lines.some((x) => x.productId === id))) return "A saved lorry has this product, so it can't be deleted.";
-  if (!removeLocalProduct(base.products, id)) return "Only products you added can be deleted.";
-  return null;
+  return saving(() => {
+    if (localLorries().some((l) => l.lines.some((x) => x.productId === id))) return "A saved lorry has this product, so it can't be deleted.";
+    if (!removeLocalProduct(base.products, id)) return "Only products you added can be deleted.";
+    return null;
+  });
 }
 
 /** Settings › Products: adds a product (a company's cement type, or a steel item). It has no rate; the owner prices each bill. */
 export async function addProduct(input: { brand: string; variant: string; category: Product["category"] }): Promise<Product> {
   const slug = `${input.brand}-${input.variant}`.toLowerCase().replace(/\+/g, "-plus").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  let id = `p-${slug}`;
-  for (let n = 2; base.products.some((p) => p.id === id); n++) id = `p-${slug}-${n}`;
-  const product: Product = {
-    id,
-    name: `${input.brand} ${input.variant}`,
-    brand: input.brand,
-    variant: input.variant,
-    category: input.category,
-    unit: input.category === "cement" ? "bag" : "kg",
-    active: true,
-  };
-  saveLocalProduct(base.products, product);
-  return product;
+  return saving(() => {
+    let id = `p-${slug}`;
+    for (let n = 2; base.products.some((p) => p.id === id); n++) id = `p-${slug}-${n}`;
+    const product: Product = {
+      id,
+      name: `${input.brand} ${input.variant}`,
+      brand: input.brand,
+      variant: input.variant,
+      category: input.category,
+      unit: input.category === "cement" ? "bag" : "kg",
+      active: true,
+    };
+    saveLocalProduct(base.products, product);
+    return product;
+  });
 }
 
 // ── Parties and ledgers ──────────────────────────────────────────────────────
@@ -356,13 +383,13 @@ export async function addCustomer(input: { name: string; mobile: string; place: 
 export async function addParty(input: Omit<Party, "id" | "original">): Promise<PartyWithBalance> {
   await live();
   const party: Party = { ...input, id: `c-${Date.now().toString(36)}` };
-  addLocalCustomer(base.parties, party);
+  await saving(() => addLocalCustomer(base.parties, party));
   return withBalance(party);
 }
 
 /** Deletes a party added in the app or a real supplier; false for a sample party. */
 export async function deleteParty(id: string): Promise<boolean> {
-  return removeLocalParty(base.parties, id);
+  return saving(() => removeLocalParty(base.parties, id));
 }
 
 export async function getParty(id: string): Promise<PartyWithBalance | undefined> {
@@ -676,6 +703,7 @@ export async function getCashBook(holder: CashHolder) {
 // ── Expenses ─────────────────────────────────────────────────────────────────
 
 export async function getVehicleNames() {
+  await live();
   return base2.vehicleNames;
 }
 
@@ -842,28 +870,32 @@ export async function getChits() {
 /** Personal › Chits › Add chit. */
 export async function addChitRecord(chit: Omit<Chit, "id" | "original">): Promise<Chit> {
   const saved = { ...chit, id: `chit-${Date.now().toString(36)}` };
-  saveLocalChit(saved);
+  await saving(() => saveLocalChit(saved));
   return saved;
 }
 
 export async function deleteChit(id: string): Promise<boolean> {
-  return removeLocalChit(id);
+  return saving(() => removeLocalChit(id));
 }
 
 /** Records the next instalment on a chit entered in the app; false when it isn't one. */
 export async function recordChitPayment(id: string, payment: NonNullable<Chit["payments"]>[number]): Promise<boolean> {
-  const chit = localChits().find((c) => c.id === id);
-  if (!chit) return false;
-  saveLocalChit({ ...chit, payments: [...(chit.payments ?? []), payment] });
-  return true;
+  return saving(() => {
+    const chit = localChits().find((c) => c.id === id);
+    if (!chit) return false;
+    saveLocalChit({ ...chit, payments: [...(chit.payments ?? []), payment] });
+    return true;
+  });
 }
 
 /** Records the month the chit was lifted and what was received; false when it isn't one entered in the app. */
 export async function recordChitLifted(id: string, lifted: NonNullable<Chit["lifted"]>): Promise<boolean> {
-  const chit = localChits().find((c) => c.id === id);
-  if (!chit) return false;
-  saveLocalChit({ ...chit, lifted });
-  return true;
+  return saving(() => {
+    const chit = localChits().find((c) => c.id === id);
+    if (!chit) return false;
+    saveLocalChit({ ...chit, lifted });
+    return true;
+  });
 }
 
 /** Rent received and paid (the ones entered in the app, then the sample ones), with what is due this month. */
@@ -884,20 +916,22 @@ export async function getRentals() {
 /** Personal › Rents › Add rent. */
 export async function addRentalRecord(rental: Omit<Rental, "id" | "original">): Promise<Rental> {
   const saved = { ...rental, id: `rent-${Date.now().toString(36)}` };
-  saveLocalRental(saved);
+  await saving(() => saveLocalRental(saved));
   return saved;
 }
 
 export async function deleteRental(id: string): Promise<boolean> {
-  return removeLocalRental(id);
+  return saving(() => removeLocalRental(id));
 }
 
 /** Records the next month's rent on a rent entered in the app; false when it isn't one. */
 export async function recordRentPayment(id: string, payment: NonNullable<Rental["payments"]>[number]): Promise<boolean> {
-  const rental = localRentals().find((r) => r.id === id);
-  if (!rental) return false;
-  saveLocalRental({ ...rental, paidThrough: payment.month, payments: [...(rental.payments ?? []), payment] });
-  return true;
+  return saving(() => {
+    const rental = localRentals().find((r) => r.id === id);
+    if (!rental) return false;
+    saveLocalRental({ ...rental, paidThrough: payment.month, payments: [...(rental.payments ?? []), payment] });
+    return true;
+  });
 }
 
 export async function getPolicies() {
@@ -963,16 +997,18 @@ export async function markMyAttendance(kind: "in" | "out"): Promise<{ ok: true; 
   const me = await getCurrentUser();
   const date = todayISO();
   const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
-  const day = localCheckIns().find((r) => r.profileId === me.id && r.date === date);
-  if (kind === "in") {
-    if (day) return { ok: false, problem: `You already checked in today at ${day.checkIn}.` };
-    saveLocalCheckIn({ profileId: me.id, date, checkIn: time });
-  } else {
-    if (!day) return { ok: false, problem: "Check in first." };
-    if (day.checkOut) return { ok: false, problem: `You already checked out today at ${day.checkOut}.` };
-    saveLocalCheckIn({ ...day, checkOut: time });
-  }
-  return { ok: true, time };
+  return saving(() => {
+    const day = localCheckIns().find((r) => r.profileId === me.id && r.date === date);
+    if (kind === "in") {
+      if (day) return { ok: false, problem: `You already checked in today at ${day.checkIn}.` };
+      saveLocalCheckIn({ profileId: me.id, date, checkIn: time });
+    } else {
+      if (!day) return { ok: false, problem: "Check in first." };
+      if (day.checkOut) return { ok: false, problem: `You already checked out today at ${day.checkOut}.` };
+      saveLocalCheckIn({ ...day, checkOut: time });
+    }
+    return { ok: true, time };
+  });
 }
 
 function attendanceSummary(profileId: string, records = attendanceRecords()) {
@@ -994,6 +1030,7 @@ function loanBalance(loan: (typeof phase3.loans)[number]) {
 
 /** Each person's designation ("Wholesale manager", "Owner"…), without the day's attendance, so any page can show it. */
 export async function getDesignations(): Promise<Record<string, string>> {
+  await live();
   const owner = base.profiles.find((p) => p.role === "owner");
   return { ...(owner ? { [owner.id]: ownerDesignation ?? "Owner" } : {}), ...Object.fromEntries(base3.employees.map((e) => [e.profileId, e.designation])) };
 }
@@ -1246,20 +1283,22 @@ export async function getLorries(): Promise<Lorry[]> {
 /** Purchases › Lorry › New lorry purchase: saves the lorry; selling starts on its invoice date. */
 export async function addLorryPurchase(lorry: Omit<Lorry, "id" | "original">): Promise<Lorry> {
   const saved = { ...lorry, id: `lorry-${Date.now().toString(36)}` };
-  saveLocalLorry(saved);
+  await saving(() => saveLocalLorry(saved));
   return saved;
 }
 
 export async function deleteLorry(id: string): Promise<boolean> {
-  return removeLocalLorry(id);
+  return saving(() => removeLocalLorry(id));
 }
 
 /** Saves an update to a lorry entered in the app (its sale so far, tick boxes, and whether it is sold out); false when it isn't one. */
 export async function updateLorry(id: string, patch: Pick<Lorry, "sale" | "sold" | "invoicePaperKept" | "unloadingCharges">): Promise<boolean> {
-  const lorry = localLorries().find((l) => l.id === id);
-  if (!lorry) return false;
-  saveLocalLorry({ ...lorry, ...patch });
-  return true;
+  return saving(() => {
+    const lorry = localLorries().find((l) => l.id === id);
+    if (!lorry) return false;
+    saveLocalLorry({ ...lorry, ...patch });
+    return true;
+  });
 }
 
 export async function getSuspenseLoads() {

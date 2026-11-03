@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "serve": "next build && next start",
+    "records:upload": "node --env-file=.env.local scripts/records.mjs upload",
+    "records:download": "node --env-file=.env.local scripts/records.mjs download",
     "lint": "eslint"
   },
   "dependencies": {

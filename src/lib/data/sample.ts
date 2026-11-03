@@ -23,19 +23,19 @@ import type {
 import { withLocalCustomers, withLocalGodowns, withLocalProducts, withLocalProfiles, withLocalSuppliers } from "./local-data";
 
 /** Sample godowns; the real list (local-data/godowns.json) replaces them, with in-charges from the staff list. */
-export const godowns: Godown[] = withLocalGodowns([
+const sampleGodowns: Godown[] = [
   { id: "g-polaki", name: "Polaki godown", place: "Polaki", own: true, inCharge: ["u-godown"] },
   { id: "g-srikakulam", name: "Srikakulam godown", place: "Srikakulam", own: true, inCharge: ["u-godown"] },
-]);
+];
 
 /** Sample products; the real list (local-data/products.json) replaces those with the same id and adds the rest. */
-export const products: Product[] = withLocalProducts([
+const sampleProducts: Product[] = [
   { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", variant: "OPC", category: "cement", unit: "bag", active: true },
   { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", variant: "PPC", category: "cement", unit: "bag", active: true },
   { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", variant: "MS iron", category: "steel", unit: "kg", active: true },
   { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", variant: "TMT 8 mm", category: "steel", unit: "kg", active: true },
   { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", variant: "TMT 12 mm", category: "steel", unit: "kg", active: true },
-]);
+];
 
 /** The owner and staff. The real staff list (local-data/staff.json, not in git) replaces the sample staff when present. */
 export const sampleProfiles: Profile[] = [
@@ -47,10 +47,8 @@ export const sampleProfiles: Profile[] = [
   { id: "u-driver", fullName: "Suresh (driver)", initials: "SU", mobile: "9000000005", role: "driver", active: true },
 ];
 
-export const profiles: Profile[] = withLocalProfiles(sampleProfiles);
-
 /** Sample parties with the real suppliers (local-data/suppliers.json), plus the customers added in the app. */
-export const parties: Party[] = withLocalCustomers(withLocalSuppliers([
+const sampleParties: Party[] = [
   { id: "cash", name: "Cash customer", kind: "cash", creditLimit: null, openingBalance: 0 },
   {
     id: "raja",
@@ -72,7 +70,24 @@ export const parties: Party[] = withLocalCustomers(withLocalSuppliers([
   { id: "deccan", name: "Deccan Cements Ltd", kind: "company", place: "Hyderabad", creditLimit: null, openingBalance: -350000 },
   { id: "vishaka", name: "Vishaka Steel Traders", kind: "company", place: "Visakhapatnam", creditLimit: null, openingBalance: -180000 },
   { id: "ganesh", name: "Ganesh Transport", kind: "lorry_owner", place: "Polaki", creditLimit: null, openingBalance: -12000 },
-]));
+];
+
+// The lists every screen reads: the sample ones with the firm's own records in their place (local-data.ts).
+export let godowns: Godown[];
+export let products: Product[];
+export let profiles: Profile[];
+export let parties: Party[];
+
+/** Builds the lists from the sample ones and the records: when the server starts, and whenever the records change. */
+export function loadMasters() {
+  godowns = withLocalGodowns(sampleGodowns);
+  // Copies, because adding a product or a party adds it to these lists.
+  products = withLocalProducts([...sampleProducts]);
+  profiles = withLocalProfiles(sampleProfiles);
+  parties = withLocalCustomers(withLocalSuppliers([...sampleParties]));
+}
+
+loadMasters();
 
 export function defaultTerms(): string[] {
   return [

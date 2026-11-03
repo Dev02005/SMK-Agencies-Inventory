@@ -28,7 +28,7 @@ import {
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { CASH_LIMIT, isLowStock } from "@/lib/limits";
 import { daysFrom, lorryState, updateDueOn } from "@/lib/lorries";
-import { dataVersion } from "@/lib/data/local-data";
+import { dataVersion } from "@/lib/data/store";
 import { noticesFor, type Notice } from "@/lib/notices";
 
 

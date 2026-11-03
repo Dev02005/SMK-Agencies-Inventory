@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
+import { recordsOnline } from "@/lib/data/store";
 import { usesSampleData } from "@/lib/supabase/config";
 
 /**
@@ -17,9 +18,15 @@ const UNLOCK_MINUTES = 30;
 export const SAMPLE_PIN = "1234";
 
 let generatedSecret: string | undefined;
-/** Without PERSONAL_LOCK_SECRET each server start makes its own, which simply locks Personal again after a restart. */
+/**
+ * Without PERSONAL_LOCK_SECRET each server start makes its own, which simply locks Personal again after a restart.
+ * Online the site runs on several servers, each of which would make its own, so there it must be set.
+ */
 function secret() {
-  return process.env.PERSONAL_LOCK_SECRET || (generatedSecret ??= randomBytes(32).toString("hex"));
+  const set = process.env.PERSONAL_LOCK_SECRET?.trim();
+  if (set) return set;
+  if (recordsOnline) throw new Error("Set PERSONAL_LOCK_SECRET: the records are online.");
+  return (generatedSecret ??= randomBytes(32).toString("hex"));
 }
 
 const sign = (value: string) => createHmac("sha256", secret()).update(value).digest("hex");
@@ -30,8 +37,13 @@ function same(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+/** The sample PIN while it is the one that opens Personal: no PERSONAL_PIN set, and the records on this computer. */
+export function samplePin() {
+  return !process.env.PERSONAL_PIN && usesSampleData && !recordsOnline ? SAMPLE_PIN : undefined;
+}
+
 export function pinMatches(pin: string) {
-  const expected = process.env.PERSONAL_PIN || (usesSampleData ? SAMPLE_PIN : "");
+  const expected = process.env.PERSONAL_PIN || samplePin() || "";
   return expected.length > 0 && same(pin, expected);
 }
 

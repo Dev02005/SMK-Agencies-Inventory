@@ -11,7 +11,13 @@ import { nextMidnightIST } from "./midnight";
 export const SESSION_COOKIE = "ska-session";
 
 /** Set SESSION_SECRET (any long random string) on the live server; the fallback is only for sample mode. */
-const secret = () => process.env.SESSION_SECRET || "ska-sample-mode-session-key";
+function secret() {
+  const set = process.env.SESSION_SECRET?.trim();
+  if (set) return set;
+  // With the records online, a sign-in must never be signed with a key anyone can read in this public code.
+  if (process.env.SKA_DATA_SECRET) throw new Error("Set SESSION_SECRET: the records are online.");
+  return "ska-sample-mode-session-key";
+}
 const sign = (value: string) => createHmac("sha256", secret()).update(value).digest("hex");
 
 function same(a: string, b: string) {

@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { getCurrentUser } from "@/lib/data";
 import { FIRMS_TAG, readFirmsFile, writeFirmsFile } from "@/lib/data/firms";
+import { saving } from "@/lib/data/store";
 
 export type FirmInput = { id?: string; name: string; gstin: string; phone: string; address: string; primary: boolean };
 export type SaveFirmResult = { ok: true } | { ok: false; problem: string };
@@ -29,33 +30,39 @@ export async function saveFirm(input: FirmInput): Promise<SaveFirmResult> {
   if (gstin && !GSTIN.test(gstin)) return { ok: false, problem: "That GSTIN doesn't look right. It has 15 letters and numbers, like 37ABCDE1234F1Z5." };
   if (phone && phone.length !== 10) return { ok: false, problem: "Enter a 10-digit phone number." };
 
-  const firms = readFirmsFile();
-  const existing = input.id ? firms.find((f) => f.id === input.id) : undefined;
-  if (input.id && !existing) return { ok: false, problem: "That firm is no longer there. Reload the page." };
-  if (firms.some((f) => f.id !== existing?.id && f.name.toLowerCase() === name.toLowerCase())) return { ok: false, problem: "There is already a firm with that name." };
-
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "firm";
-  let id = existing?.id ?? `firm-${slug}`;
-  for (let n = 2; !existing && firms.some((f) => f.id === id); n++) id = `firm-${slug}-${n}`;
+  const result = await saving((): SaveFirmResult => {
+    const firms = readFirmsFile();
+    const existing = input.id ? firms.find((f) => f.id === input.id) : undefined;
+    if (input.id && !existing) return { ok: false, problem: "That firm is no longer there. Reload the page." };
+    if (firms.some((f) => f.id !== existing?.id && f.name.toLowerCase() === name.toLowerCase())) return { ok: false, problem: "There is already a firm with that name." };
 
-  const firm = { id, name, gstin, phone, address, primary: Boolean(input.primary) || Boolean(existing?.primary) };
-  let next = existing ? firms.map((f) => (f.id === id ? firm : f)) : [...firms, firm];
-  if (firm.primary) next = next.map((f) => ({ ...f, primary: f.id === id }));
+    let id = existing?.id ?? `firm-${slug}`;
+    for (let n = 2; !existing && firms.some((f) => f.id === id); n++) id = `firm-${slug}-${n}`;
 
-  writeFirmsFile(next);
-  updateTag(FIRMS_TAG);
-  return { ok: true };
+    const firm = { id, name, gstin, phone, address, primary: Boolean(input.primary) || Boolean(existing?.primary) };
+    let next = existing ? firms.map((f) => (f.id === id ? firm : f)) : [...firms, firm];
+    if (firm.primary) next = next.map((f) => ({ ...f, primary: f.id === id }));
+
+    writeFirmsFile(next);
+    return { ok: true };
+  });
+  if (result.ok) updateTag(FIRMS_TAG);
+  return result;
 }
 
 /** Deletes a firm; the primary firm (sales are billed from it) can't be, so make another firm primary first. */
 export async function removeFirm(id: string): Promise<SaveFirmResult> {
   const user = await getCurrentUser();
   if (user.role !== "owner" && user.role !== "office") return { ok: false, problem: "Only the owner and the office can delete firms." };
-  const firms = readFirmsFile();
-  const firm = firms.find((f) => f.id === id);
-  if (!firm) return { ok: false, problem: "That firm is no longer there. Reload the page." };
-  if (firm.primary) return { ok: false, problem: "This is the primary firm. Tick another firm as primary first." };
-  writeFirmsFile(firms.filter((f) => f.id !== id));
-  updateTag(FIRMS_TAG);
-  return { ok: true };
+  const result = await saving((): SaveFirmResult => {
+    const firms = readFirmsFile();
+    const firm = firms.find((f) => f.id === id);
+    if (!firm) return { ok: false, problem: "That firm is no longer there. Reload the page." };
+    if (firm.primary) return { ok: false, problem: "This is the primary firm. Tick another firm as primary first." };
+    writeFirmsFile(firms.filter((f) => f.id !== id));
+    return { ok: true };
+  });
+  if (result.ok) updateTag(FIRMS_TAG);
+  return result;
 }

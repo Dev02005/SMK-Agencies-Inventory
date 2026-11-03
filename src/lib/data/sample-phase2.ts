@@ -26,19 +26,31 @@ export const OFFICE = "office";
 // ── Banks ────────────────────────────────────────────────────────────────────
 
 /** Sample accounts; the firms' real business accounts (local-data/banks.json) replace the business ones. */
-export const bankAccounts: BankAccount[] = withLocalBanks([
+const sampleAccounts: BankAccount[] = [
   { id: "acc-sbi", bank: "State Bank of India", name: "SBI current · Polaki", accountNo: "•••• 4521", scope: "business", openingBalance: 450000 },
   { id: "acc-ubi", bank: "Union Bank of India", name: "Union Bank current", accountNo: "•••• 0917", scope: "business", openingBalance: 120000 },
   { id: "acc-home", bank: "State Bank of India", name: "SBI savings (personal)", accountNo: "•••• 3308", scope: "personal", openingBalance: 235000 },
-]);
+];
+
+export let bankAccounts: BankAccount[];
 
 /** Opening cash in hand on the opening date. */
 export const openingCash: Record<string, number> = { [OFFICE]: 25000, "u-driver": 2000 };
 
-const VAN = fleetLabel("v-van");
-const LORRY = fleetLabel("v-lorry");
+let VAN: string;
+let LORRY: string;
 /** Company vehicles until the fleet module (phase 4) has its own records. */
-export const vehicleNames = [VAN, LORRY];
+export let vehicleNames: string[];
+
+/** Builds the accounts and vehicle names again from the records: when the server starts, and whenever they change. */
+export function loadPhase2() {
+  bankAccounts = withLocalBanks([...sampleAccounts]);
+  VAN = fleetLabel("v-van");
+  LORRY = fleetLabel("v-lorry");
+  vehicleNames = [VAN, LORRY];
+}
+
+loadPhase2();
 
 /** Who is holding the cash from a receipt: the field staff member who collected it, otherwise the office. */
 export function cashHolderOf(receipt: { collectedBy?: string }): string {

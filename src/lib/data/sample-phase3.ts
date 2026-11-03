@@ -11,7 +11,7 @@ import type { AttendanceRecord, Delivery, EmployeeDetails, Loan, Order, SalarySl
 const isSunday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay() === 0;
 const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
-const sampleEmployees: EmployeeDetails[] = [
+const sampleEmployees = (): EmployeeDetails[] => [
   { profileId: "u-office", designation: "Accounts and billing", joinedOn: "2021-06-01", monthlySalary: 18000, areas: ["Office"] },
   { profileId: "u-godown", designation: "Godown in-charge, Polaki", joinedOn: "2019-03-15", monthlySalary: 16000, areas: ["Polaki godown"] },
   { profileId: "u-ramana", designation: "Sales and collections", joinedOn: "2022-08-01", monthlySalary: 15000, areas: ["Tekkali", "Kotabommali", "Ponduru"] },
@@ -20,7 +20,14 @@ const sampleEmployees: EmployeeDetails[] = [
 ];
 
 /** The sample staff's records, or the real staff's (local-data/staff.json) with their own designations. */
-export const employees: EmployeeDetails[] = withLocalEmployees(sampleEmployees, sampleProfiles);
+export let employees: EmployeeDetails[];
+
+/** Builds the employees again from the records: when the server starts, and whenever they change. */
+export function loadPhase3() {
+  employees = withLocalEmployees(sampleEmployees(), sampleProfiles);
+}
+
+loadPhase3();
 
 /** Attendance, tour visits, targets, loans, salary, orders and today's deliveries, for the same today as `book`. */
 export function buildPhase3(book: SampleBook) {

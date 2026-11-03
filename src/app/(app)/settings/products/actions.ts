@@ -1,7 +1,6 @@
 "use server";
 
-import { updateTag } from "next/cache";
-import { addProduct, deleteProduct, getCurrentUser, getProducts, PRODUCTS_TAG } from "@/lib/data";
+import { addProduct, deleteProduct, getCurrentUser, getProducts } from "@/lib/data";
 
 export type ProductResult = { ok: true } | { ok: false; problem: string };
 
@@ -20,7 +19,6 @@ export async function createProduct(input: { brand: string; variant: string; cat
   const name = `${brand} ${variant}`.toLowerCase();
   if ((await getProducts()).some((p) => p.name.toLowerCase() === name)) return { ok: false, problem: "That product is already in the list." };
   await addProduct({ brand, variant, category: input.category === "steel" ? "steel" : "cement" });
-  updateTag(PRODUCTS_TAG);
   return { ok: true };
 }
 
@@ -29,6 +27,5 @@ export async function removeProduct(id: string): Promise<ProductResult> {
   if (!(await canEdit())) return { ok: false, problem: "Only the owner and the office can delete products." };
   const problem = await deleteProduct(String(id));
   if (problem) return { ok: false, problem };
-  updateTag(PRODUCTS_TAG);
   return { ok: true };
 }

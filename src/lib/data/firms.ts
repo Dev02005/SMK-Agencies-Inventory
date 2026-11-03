@@ -1,12 +1,12 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
-import { readLocal, writeLocal } from "./local-data";
+import { readRecord, syncRecords, writeRecord } from "./store";
 import type { Firm } from "./types";
 
 /**
- * The owner's firms, from local-data/firms.json (saved from Settings › Firm details). Exactly one is the primary
- * firm: sales are billed only from it, while purchases can be in any firm. Without the file the app shows a blank
- * firm to fill in. With Supabase this becomes the firms table.
+ * The owner's firms, from the firms.json record (saved from Settings › Firm details). Exactly one is the primary
+ * firm: sales are billed only from it, while purchases can be in any firm. Without it the app shows a blank firm
+ * to fill in.
  */
 const FILE = "firms.json";
 export const FIRMS_TAG = "firms";
@@ -20,7 +20,7 @@ function isFirm(f: unknown): f is Firm {
 
 /** The firms as saved, with exactly one primary (the first one marked, else the first firm). */
 export function readFirmsFile(): Firm[] {
-  const data = readLocal(FILE) as { firms?: unknown[] } | undefined;
+  const data = readRecord(FILE) as { firms?: unknown[] } | undefined;
   const firms = (Array.isArray(data?.firms) ? data.firms.filter(isFirm) : []).map((f) => ({
     id: f.id,
     name: f.name.trim(),
@@ -34,17 +34,22 @@ export function readFirmsFile(): Firm[] {
   return firms.map((f) => ({ ...f, primary: f.id === primary.id }));
 }
 
+/** Call it only inside saving() (store.ts). */
 export function writeFirmsFile(firms: Firm[]) {
-  writeLocal(FILE, {
+  writeRecord(FILE, {
     about: "The owner's firms, saved from Settings > Firm details. Only the primary firm makes sales; purchases can be in any firm.",
     firms,
   });
 }
 
-/** Cached until a firm is saved (the save calls updateTag(FIRMS_TAG)). */
+/**
+ * Cached, because the sign-in page, the app icon and the share image are built ahead with the firm's name. A save
+ * refreshes it at once (updateTag(FIRMS_TAG)); online, the other servers pick the change up within the hour.
+ */
 export async function loadFirms(): Promise<Firm[]> {
   "use cache";
-  cacheLife("max");
+  cacheLife("hours");
   cacheTag(FIRMS_TAG);
+  await syncRecords();
   return readFirmsFile();
 }
