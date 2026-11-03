@@ -97,7 +97,7 @@ export function AddBankForm({ holder }: { holder: string }) {
           <input id={`${id}-no`} className={inputClass} inputMode="numeric" autoComplete="off" value={accountNo} onChange={(e) => setAccountNo(e.target.value.replace(/[^\d\s]/g, ""))} />
         </Field>
         <Field label="Branch" htmlFor={`${id}-branch`}>
-          <input id={`${id}-branch`} className={inputClass} placeholder="Polaki" value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <input id={`${id}-branch`} className={inputClass} placeholder="Branch name" value={branch} onChange={(e) => setBranch(e.target.value)} />
         </Field>
       </div>
 

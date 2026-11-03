@@ -1,13 +1,13 @@
 /**
  * Sample business data used until Supabase is connected.
- * Products, rates and the Sri Rajarajeswari party come from the May 2023 SKA quotation; everything else is
- * generated (deterministically) so every screen has realistic numbers to show. Replaced in the Supabase step.
+ * Products and rates follow the firm's 2023 quotation; parties, people and numbers are made up (deterministically)
+ * so every screen has realistic numbers to show. The firm's own records come from local-data/ (see local-data.ts).
+ * Replaced in the Supabase step.
  */
 import { shiftMonth } from "@/lib/format";
 import { computeTotals, type TransportMode } from "@/lib/sales";
 import type {
   Commitment,
-  Firm,
   Godown,
   Party,
   Payment,
@@ -20,42 +20,26 @@ import type {
   Sale,
   StockMovement,
 } from "./types";
+import { withLocalCustomers, withLocalGodowns, withLocalProducts, withLocalProfiles, withLocalSuppliers } from "./local-data";
 
-export const firm: Firm = {
-  id: "firm-ska",
-  name: "Sri Kameswari Agencies",
-  gstin: "37AELPP5465R1ZE",
-  address: "Polaki 532 429, Srikakulam Dist. (A.P.)",
-  phone: "9949245484",
-};
+/** Sample godowns; the real list (local-data/godowns.json) replaces them, with in-charges from the staff list. */
+export const godowns: Godown[] = withLocalGodowns([
+  { id: "g-polaki", name: "Polaki godown", place: "Polaki", own: true, inCharge: ["u-godown"] },
+  { id: "g-srikakulam", name: "Srikakulam godown", place: "Srikakulam", own: true, inCharge: ["u-godown"] },
+]);
 
-/** The owner bills under two firms; the first is the main one (sign-in page, reports, statements). */
-export const firms: Firm[] = [
-  firm,
-  {
-    id: "firm-2",
-    name: "Second firm",
-    gstin: "",
-    address: "Polaki 532 429, Srikakulam Dist. (A.P.)",
-    phone: "9949245484",
-  },
-];
-
-export const godowns: Godown[] = [
-  { id: "g-polaki", name: "Polaki godown", place: "Polaki" },
-  { id: "g-srikakulam", name: "Srikakulam godown", place: "Srikakulam" },
-];
-
-export const products: Product[] = [
+/** Sample products; the real list (local-data/products.json) replaces those with the same id and adds the rest. */
+export const products: Product[] = withLocalProducts([
   { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", variant: "OPC", category: "cement", unit: "bag", listRate: 360, active: true },
   { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", variant: "PPC", category: "cement", unit: "bag", listRate: 340, active: true },
   { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", variant: "MS iron", category: "steel", unit: "kg", listRate: 70, active: true },
   { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", variant: "TMT 8 mm", category: "steel", unit: "kg", listRate: 72, active: true },
   { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", variant: "TMT 12 mm", category: "steel", unit: "kg", listRate: 71, active: true },
-];
+]);
 
-export const profiles: Profile[] = [
-  { id: "u-owner", fullName: "P. Srinivasa Rao", initials: "PS", mobile: "9949245484", role: "owner", active: true },
+/** The owner and staff. The real staff list (local-data/staff.json, not in git) replaces the sample staff when present. */
+export const sampleProfiles: Profile[] = [
+  { id: "u-owner", fullName: "Owner", initials: "OW", mobile: "9000000000", role: "owner", active: true },
   { id: "u-office", fullName: "Office desk", initials: "OD", mobile: "9000000001", email: "office@ska.example", role: "office", active: true },
   { id: "u-godown", fullName: "Godown in-charge", initials: "GI", mobile: "9000000002", role: "godown", active: true },
   { id: "u-ramana", fullName: "Ramana", initials: "RA", mobile: "9000000003", role: "field", active: true },
@@ -63,14 +47,17 @@ export const profiles: Profile[] = [
   { id: "u-driver", fullName: "Suresh (driver)", initials: "SU", mobile: "9000000005", role: "driver", active: true },
 ];
 
-export const parties: Party[] = [
+export const profiles: Profile[] = withLocalProfiles(sampleProfiles);
+
+/** Sample parties with the real suppliers (local-data/suppliers.json), plus the customers added in the app. */
+export const parties: Party[] = withLocalCustomers(withLocalSuppliers([
   { id: "cash", name: "Cash customer", kind: "cash", creditLimit: null, openingBalance: 0 },
   {
     id: "raja",
-    name: "Sri Rajarajeswari Agencies",
+    name: "Sri Durga Agencies",
     kind: "customer",
     place: "Srikurmam",
-    gstin: "37AEPPK7944C1Z6",
+    gstin: "37ABCDE1234F1Z5",
     creditLimit: 500000,
     openingBalance: 180000,
   },
@@ -85,7 +72,7 @@ export const parties: Party[] = [
   { id: "deccan", name: "Deccan Cements Ltd", kind: "company", place: "Hyderabad", creditLimit: null, openingBalance: -350000 },
   { id: "vishaka", name: "Vishaka Steel Traders", kind: "company", place: "Visakhapatnam", creditLimit: null, openingBalance: -180000 },
   { id: "ganesh", name: "Ganesh Transport", kind: "lorry_owner", place: "Polaki", creditLimit: null, openingBalance: -12000 },
-];
+]));
 
 export function defaultTerms(): string[] {
   return [
@@ -147,8 +134,8 @@ export function buildSample(SAMPLE_TODAY: string) {
       id: "q-2023-12",
       quoteNo: "12/2023-2024",
       date: "2023-05-10",
-      clientName: "Sri Rajarajeswari Agencies",
-      clientGstin: "37AEPPK7944C1Z6",
+      clientName: "Sri Durga Agencies",
+      clientGstin: "37ABCDE1234F1Z5",
       site: "Srikurmam",
       lines: [
         { productId: "p-deccan-opc", description: "Deccan OPC", qty: 450, qtyLabel: "450", rate: 360 },

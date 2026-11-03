@@ -3,6 +3,8 @@
  * personal records. Built on top of sample.ts so the cash book agrees with the receipts already there.
  */
 import { addDays, dateShifter, dayMonth, monthName, mulberry32, parties, profiles, salaryPayday, type SampleBook } from "./sample";
+import { fleetLabel } from "./sample-fleet";
+import { withLocalBanks } from "./local-data";
 import { shiftMonth } from "@/lib/format";
 import type {
   BadDebt,
@@ -23,17 +25,18 @@ export const OFFICE = "office";
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
-export const bankAccounts: BankAccount[] = [
+/** Sample accounts; the firms' real business accounts (local-data/banks.json) replace the business ones. */
+export const bankAccounts: BankAccount[] = withLocalBanks([
   { id: "acc-sbi", bank: "State Bank of India", name: "SBI current · Polaki", accountNo: "•••• 4521", scope: "business", openingBalance: 450000 },
   { id: "acc-ubi", bank: "Union Bank of India", name: "Union Bank current", accountNo: "•••• 0917", scope: "business", openingBalance: 120000 },
   { id: "acc-home", bank: "State Bank of India", name: "SBI savings (personal)", accountNo: "•••• 3308", scope: "personal", openingBalance: 235000 },
-];
+]);
 
 /** Opening cash in hand on the opening date. */
 export const openingCash: Record<string, number> = { [OFFICE]: 25000, "u-driver": 2000 };
 
-const VAN = "Van AP 30 TA 4521";
-const LORRY = "Lorry AP 30 TB 1186";
+const VAN = fleetLabel("v-van");
+const LORRY = fleetLabel("v-lorry");
 /** Company vehicles until the fleet module (phase 4) has its own records. */
 export const vehicleNames = [VAN, LORRY];
 
@@ -76,7 +79,7 @@ export function buildPhase2(book: SampleBook) {
       addExpense({ date: day, head: "fuel", amount: between(1500, 3500, 100), paidFrom: "cash", paidBy: "u-driver", tag: { kind: "vehicle", label: rand() < 0.7 ? LORRY : VAN }, description: "Diesel" });
     }
     if (!sunday && rand() < 0.25) {
-      addExpense({ date: day, head: "driver", amount: between(600, 1200, 100), paidFrom: "cash", paidBy: OFFICE, tag: { kind: "employee", label: "Suresh (driver)" }, description: "Trip batta" });
+      addExpense({ date: day, head: "driver", amount: between(600, 1200, 100), paidFrom: "cash", paidBy: OFFICE, tag: { kind: "employee", label: profiles.find((p) => p.id === "u-driver")?.fullName ?? "Driver" }, description: "Trip batta" });
     }
     if (new Date(`${day}T00:00:00Z`).getUTCDay() === 6) {
       addExpense({ date: day, head: "office", amount: between(300, 900, 50), paidFrom: "cash", paidBy: OFFICE, description: "Tea, water cans and stationery", hasPhoto: false });
@@ -236,7 +239,7 @@ export function buildPhase2(book: SampleBook) {
 
   const policies: InsurancePolicy[] = [
     { id: "ins-1", kind: "vehicle", title: VAN, insurer: "New India Assurance", policyNo: "•••• 7712", premium: 18500, frequency: "yearly", nextDue: at("2026-10-29"), sumAssured: 650000 },
-    { id: "ins-2", kind: "life", title: "Life policy, P. Srinivasa Rao", insurer: "LIC", policyNo: "•••• 4410", premium: 48000, frequency: "yearly", nextDue: at("2027-02-14"), sumAssured: 2500000 },
+    { id: "ins-2", kind: "life", title: `Life policy, ${profiles.find((p) => p.role === "owner")?.fullName ?? "owner"}`, insurer: "LIC", policyNo: "•••• 4410", premium: 48000, frequency: "yearly", nextDue: at("2027-02-14"), sumAssured: 2500000 },
     { id: "ins-3", kind: "health", title: "Family health cover", insurer: "Health insurer (sample)", policyNo: "•••• 9035", premium: 32400, frequency: "yearly", nextDue: at("2026-12-20"), sumAssured: 1000000 },
     { id: "ins-4", kind: "property", title: "Polaki godown stock and building", insurer: "New India Assurance", policyNo: "•••• 2261", premium: 21800, frequency: "yearly", nextDue: at("2027-01-08"), sumAssured: 4000000 },
     { id: "ins-5", kind: "vehicle", title: LORRY, insurer: "New India Assurance", policyNo: "•••• 5590", premium: 41200, frequency: "yearly", nextDue: at("2026-11-18"), sumAssured: 1400000 },

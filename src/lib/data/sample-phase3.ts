@@ -2,7 +2,8 @@
  * Sample data for phase 3 screens: employees, attendance, tour visits, targets, salary and loans,
  * orders and today's deliveries. Built on sample.ts so orders point at real sample bills.
  */
-import { addDays, dateShifter, mulberry32, parties, salaryPayday, type SampleBook } from "./sample";
+import { withLocalEmployees } from "./local-data";
+import { addDays, dateShifter, mulberry32, parties, salaryPayday, sampleProfiles, type SampleBook } from "./sample";
 import { shiftMonth } from "@/lib/format";
 import { vehicleNames } from "./sample-phase2";
 import type { AttendanceRecord, Delivery, EmployeeDetails, Loan, Order, SalarySlip, StaffTarget, TourVisit } from "./types";
@@ -10,13 +11,16 @@ import type { AttendanceRecord, Delivery, EmployeeDetails, Loan, Order, SalarySl
 const isSunday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay() === 0;
 const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
-export const employees: EmployeeDetails[] = [
+const sampleEmployees: EmployeeDetails[] = [
   { profileId: "u-office", designation: "Accounts and billing", joinedOn: "2021-06-01", monthlySalary: 18000, areas: ["Office"] },
   { profileId: "u-godown", designation: "Godown in-charge, Polaki", joinedOn: "2019-03-15", monthlySalary: 16000, areas: ["Polaki godown"] },
   { profileId: "u-ramana", designation: "Sales and collections", joinedOn: "2022-08-01", monthlySalary: 15000, areas: ["Tekkali", "Kotabommali", "Ponduru"] },
   { profileId: "u-venkatesh", designation: "Sales and collections", joinedOn: "2020-01-10", monthlySalary: 15000, areas: ["Narasannapeta", "Amadalavalasa", "Palasa"] },
   { profileId: "u-driver", designation: "Driver", joinedOn: "2023-02-20", monthlySalary: 14000, areas: ["Deliveries"], vehicle: vehicleNames[1] },
 ];
+
+/** The sample staff's records, or the real staff's (local-data/staff.json) with their own designations. */
+export const employees: EmployeeDetails[] = withLocalEmployees(sampleEmployees, sampleProfiles);
 
 /** Attendance, tour visits, targets, loans, salary, orders and today's deliveries, for the same today as `book`. */
 export function buildPhase3(book: SampleBook) {
@@ -60,7 +64,7 @@ export function buildPhase3(book: SampleBook) {
         checkIn: time(inAt),
         // Nobody has checked out yet today.
         checkOut: day === SAMPLE_TODAY ? undefined : time(outAt),
-        location: pick(workplace[e.profileId]),
+        location: pick(workplace[e.profileId] ?? e.areas),
         late: inAt > start + 15,
       });
     }
@@ -96,7 +100,7 @@ export function buildPhase3(book: SampleBook) {
       for (let i = 0; i < count; i++) {
         const purpose = rand() < 0.45 ? "collection" : rand() < 0.7 ? "order" : rand() < 0.85 ? "new_party" : "complaint";
         const party = purpose === "new_party" ? undefined : pick(mine);
-        const place = party?.place ?? pick(workplace[staff]);
+        const place = party?.place ?? pick(workplace[staff] ?? ["Polaki"]);
         const past = day < SAMPLE_TODAY || (day === SAMPLE_TODAY && i === 0);
         const roll = rand();
         const status = past ? (roll < 0.78 ? "completed" : roll < 0.9 ? "postponed" : "cancelled") : "planned";

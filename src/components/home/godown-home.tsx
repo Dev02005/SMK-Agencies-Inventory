@@ -22,7 +22,7 @@ export function GodownHome() {
       <PageHeader
         title="Godown today"
         subtitle={
-          <Suspense fallback="Sri Kameswari Agencies">
+          <Suspense fallback={null}>
             <TodayLine />
           </Suspense>
         }

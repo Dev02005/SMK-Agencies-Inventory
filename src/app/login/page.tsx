@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { SampleChip } from "@/components/ui/blocks";
 import { getFirm } from "@/lib/data";
-import { siteDescription, siteUrl } from "@/lib/site";
+import { siteDescriptionFor, siteUrl } from "@/lib/site";
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  description: siteDescription,
-  alternates: { canonical: "/login" },
-  robots: { index: true, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Sign in",
+    description: siteDescriptionFor(await getFirm()),
+    alternates: { canonical: "/login" },
+    robots: { index: true, follow: false },
+  };
+}
 
 export default async function LoginPage() {
   const firm = await getFirm();
@@ -19,7 +21,7 @@ export default async function LoginPage() {
     "@context": "https://schema.org",
     "@type": "HomeAndConstructionBusiness",
     name: firm.name,
-    description: siteDescription,
+    description: siteDescriptionFor(firm),
     url: `${siteUrl}/login`,
     logo: `${siteUrl}/icon/512`,
     telephone: `+91${firm.phone}`,

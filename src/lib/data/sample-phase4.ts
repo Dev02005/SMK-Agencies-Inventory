@@ -2,7 +2,9 @@
  * Sample data for phase 4 screens: vehicles, documents and service log, freight chart, trips, godown transfers,
  * suspense loads and GPS positions. Town positions are approximate and only for the sample map.
  */
+import type { FleetEntry } from "./local-data";
 import { addDays, dateShifter, type SampleBook } from "./sample";
+import { fleet, fleetLabel } from "./sample-fleet";
 import type { FreightRate, ServiceRecord, StockTransfer, SuspenseLoad, Trip, Vehicle } from "./types";
 
 // ── Freight chart (from Polaki) ──────────────────────────────────────────────
@@ -22,7 +24,7 @@ export const freightRates: FreightRate[] = [
 const placeByName = (name?: string) => freightRates.find((f) => f.place === name);
 
 /** Same wording the expense screens use when an expense is charged to a vehicle. */
-export const vehicleLabel = (v: Vehicle) => `${v.kind === "lorry" ? "Lorry" : v.kind === "van" ? "Van" : v.kind === "car" ? "Car" : "Bike"} ${v.number}`;
+export { vehicleLabel } from "./sample-fleet";
 
 /** The lorry's path so far today (Polaki → Srikurmam → towards Tekkali), for the map. */
 export const routeToday: [number, number][] = [
@@ -43,13 +45,10 @@ export function buildPhase4(book: SampleBook) {
 
   // ── Vehicles ─────────────────────────────────────────────────────────────────
 
-  const vehicles: Vehicle[] = [
-    {
-      id: "v-lorry",
-      number: "AP 30 TB 1186",
-      kind: "lorry",
-      category: "own",
-      model: "Ashok Leyland 2518",
+  // Papers, service and GPS for the sample vehicles. A real vehicle that replaced one (local-data/vehicles.json) keeps
+  // them until its own are entered; a real vehicle added new starts with none.
+  const details: Record<string, Omit<Vehicle, keyof FleetEntry>> = {
+    "v-lorry": {
       capacityMT: 25,
       driverId: "u-driver",
       odometer: 112480,
@@ -58,63 +57,19 @@ export function buildPhase4(book: SampleBook) {
       tyresChangedOn: at("2026-03-12"),
       gps: { lat: 18.512, lng: 84.198, updatedAt: "12:52", status: "moving", speedKmh: 38, place: "Near Kotabommali, towards Tekkali" },
     },
-    {
-      id: "v-van",
-      number: "AP 30 TA 4521",
-      kind: "van",
-      category: "godown",
-      model: "Tata Ace Gold",
+    "v-van": {
       capacityMT: 2.5,
       odometer: 48210,
       nextServiceKm: 50000,
       documents: { insurance: at("2026-10-29"), tax: at("2026-12-31"), pollution: at("2026-11-05") },
-      gps: { lat: 18.395, lng: 84.105, updatedAt: "12:50", status: "stopped", speedKmh: 0, place: "Polaki godown" },
+      gps: { lat: 18.395, lng: 84.105, updatedAt: "12:50", status: "stopped", speedKmh: 0, place: "At the godown" },
     },
-    {
-      id: "v-car",
-      number: "AP 30 BC 7007",
-      kind: "car",
-      category: "own",
-      model: "Maruti Ertiga",
-      odometer: 32100,
-      nextServiceKm: 35000,
-      documents: { insurance: at("2027-04-02"), tax: "2031-04-01", pollution: at("2026-10-20") },
-    },
-    {
-      id: "v-bike-1",
-      number: "AP 30 BK 3344",
-      kind: "bike",
-      category: "own",
-      model: "Hero Splendor+",
-      driverId: "u-ramana",
-      odometer: 21400,
-      nextServiceKm: 22000,
-      documents: { insurance: at("2027-02-11"), pollution: at("2026-12-04") },
-    },
-    {
-      id: "v-bike-2",
-      number: "AP 30 BK 5521",
-      kind: "bike",
-      category: "own",
-      model: "Honda Shine",
-      driverId: "u-venkatesh",
-      odometer: 18900,
-      nextServiceKm: 21000,
-      documents: { insurance: at("2027-05-19"), pollution: at("2027-01-09") },
-    },
-    {
-      id: "v-rent",
-      number: "AP 39 TA 6610",
-      kind: "lorry",
-      category: "rented",
-      model: "Tata 1612 (Ganesh Transport)",
-      capacityMT: 15,
-      ownerPartyId: "ganesh",
-      odometer: 0,
-      nextServiceKm: 0,
-      documents: {},
-    },
-  ];
+    "v-car": { odometer: 32100, nextServiceKm: 35000, documents: { insurance: at("2027-04-02"), tax: "2031-04-01", pollution: at("2026-10-20") } },
+    "v-bike-1": { driverId: "u-ramana", odometer: 21400, nextServiceKm: 22000, documents: { insurance: at("2027-02-11"), pollution: at("2026-12-04") } },
+    "v-bike-2": { driverId: "u-venkatesh", odometer: 18900, nextServiceKm: 21000, documents: { insurance: at("2027-05-19"), pollution: at("2027-01-09") } },
+    "v-rent": { capacityMT: 15, ownerPartyId: "ganesh", odometer: 0, nextServiceKm: 0, documents: {} },
+  };
+  const vehicles: Vehicle[] = fleet.map((v) => ({ ...v, ...(details[v.id] ?? { odometer: 0, nextServiceKm: 0, documents: {} }) }));
 
   const serviceLog: ServiceRecord[] = [
     { id: "sr-1", vehicleId: "v-lorry", date: at("2026-10-14"), kind: "brakes", odometer: 111620, cost: 6200, garage: "Sai Auto Works, Narasannapeta", notes: "Brake lining and labour" },
@@ -163,7 +118,7 @@ export function buildPhase4(book: SampleBook) {
       date: at("2026-10-10"),
       from: "g-polaki",
       to: "g-srikakulam",
-      vehicle: "Van AP 30 TA 4521",
+      vehicle: fleetLabel("v-van"),
       lines: [{ productId: "p-deccan-opc", qty: 200 }],
       status: "received",
       receivedOn: at("2026-10-10"),
@@ -174,7 +129,7 @@ export function buildPhase4(book: SampleBook) {
       date: at("2026-10-20"),
       from: "g-polaki",
       to: "g-srikakulam",
-      vehicle: "Lorry AP 30 TB 1186",
+      vehicle: fleetLabel("v-lorry"),
       lines: [
         { productId: "p-deccan-ppc", qty: 100 },
         { productId: "p-tmt-8", qty: 1000 },
@@ -189,7 +144,7 @@ export function buildPhase4(book: SampleBook) {
       date: SAMPLE_TODAY,
       from: "g-polaki",
       to: "g-srikakulam",
-      vehicle: "Van AP 30 TA 4521",
+      vehicle: fleetLabel("v-van"),
       lines: [{ productId: "p-deccan-opc", qty: 150 }],
       status: "in_transit",
     },
@@ -199,13 +154,13 @@ export function buildPhase4(book: SampleBook) {
 
   const assignedSale = sales.find((s) => s.partyId === "sai" && s.status === "saved" && s.billDate >= at("2026-10-22"));
   const suspenseLoads: SuspenseLoad[] = [
-    { id: "sl-1", date: SAMPLE_TODAY, godownId: "g-polaki", vehicle: "Van AP 30 TA 4521", productId: "p-deccan-opc", qty: 60, note: "Tekkali route; staff to find the buyer on the way" },
+    { id: "sl-1", date: SAMPLE_TODAY, godownId: "g-polaki", vehicle: fleetLabel("v-van"), productId: "p-deccan-opc", qty: 60, note: "Tekkali route; staff to find the buyer on the way" },
     { id: "sl-2", date: addDays(SAMPLE_TODAY, -2), godownId: "g-srikakulam", vehicle: "Lorry AP 39 TA 6610 (rented)", productId: "p-deccan-opc", qty: 120, note: "Palasa site; contractor to confirm who pays" },
     {
       id: "sl-3",
       date: at("2026-10-21"),
       godownId: "g-polaki",
-      vehicle: "Van AP 30 TA 4521",
+      vehicle: fleetLabel("v-van"),
       productId: "p-deccan-ppc",
       qty: 40,
       note: "Kotabommali market",

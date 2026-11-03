@@ -54,9 +54,15 @@ export default function ReportsPage() {
           ))}
           <SectionCard title="On their own screens" className="md:col-span-2">
             <ul className="-mb-2 divide-y divide-hairline md:grid md:grid-cols-2 md:gap-x-12 md:divide-y-0">
-              {elsewhere.map((r) => (
-                <ReportLink key={r.href} {...r} />
-              ))}
+              {elsewhere.map((r) =>
+                r.href === "/sales/lorries" ? (
+                  <RoleGuard key={r.href} roles={["owner"]} fallback={<></>}>
+                    <ReportLink {...r} />
+                  </RoleGuard>
+                ) : (
+                  <ReportLink key={r.href} {...r} />
+                ),
+              )}
             </ul>
           </SectionCard>
         </div>

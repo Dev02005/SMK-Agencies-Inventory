@@ -34,7 +34,7 @@ async function VehicleDetail({ params }: { params: PageProps<"/fleet/[id]">["par
 
   return (
     <>
-      <PageHeader title={v.number} subtitle={`${v.model} · ${categoryLabel[v.category]}${v.driverName ? ` · ${v.driverName}` : ""}${v.ownerName ? ` · ${v.ownerName}` : ""}`} actions={
+      <PageHeader title={v.number} subtitle={[v.model, categoryLabel[v.category], v.driverName, v.ownerName].filter(Boolean).join(" · ")} actions={
           <>
             <SampleChip />
             <ExportMenu title={`Vehicle ${v.number}`} />

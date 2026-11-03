@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getGodowns, getProducts, getPurchase } from "@/lib/data";
+import { getFirms, getGodowns, getProducts, getPurchase } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { lineQty } from "@/lib/quantities";
 import { toMT } from "@/lib/sales";
@@ -26,7 +26,8 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
   const { id } = await params;
   const purchase = await getPurchase(id);
   if (!purchase) notFound();
-  const [products, godowns] = await Promise.all([getProducts(), getGodowns()]);
+  const [products, godowns, firms] = await Promise.all([getProducts(), getGodowns(), getFirms()]);
+  const firm = firms.find((f) => f.id === purchase.firmId) ?? firms.find((f) => f.primary);
   const itemsTotal = purchase.lines.reduce((s, l) => s + l.qty * l.rate, 0);
 
   return (
@@ -76,6 +77,7 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
         <SectionCard title="Lorry">
           <DetailList
             items={[
+              { label: "For firm", value: firm?.name },
               { label: "Invoice no.", value: purchase.invoiceNo },
               { label: "Invoice date", value: formatDate(purchase.invoiceDate) },
               { label: "Truck received", value: formatDate(purchase.receivedDate) },

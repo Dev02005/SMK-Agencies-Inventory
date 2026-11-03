@@ -6,7 +6,8 @@ import { Chip } from "@/components/ui/chip";
 import { LiveTime } from "@/components/ui/live-clock";
 import { ModuleGrid } from "@/components/ui/module-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { getDashboard, getFirm, getLorryLoads, getNow, getProducts, getToday } from "@/lib/data";
+import { RoleGuard } from "@/components/ui/sub-nav";
+import { getCurrentUser, getDashboard, getFirm, getLorryLoads, getNow, getProducts, getToday } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { toMT } from "@/lib/sales";
 import { ActiveLorries } from "./active-lorries";
@@ -18,7 +19,7 @@ export function OwnerHome() {
       <PageHeader
         title="Today"
         subtitle={
-          <Suspense fallback="Sri Kameswari Agencies">
+          <Suspense fallback={null}>
             <TodayLine />
           </Suspense>
         }
@@ -46,7 +47,7 @@ export async function TodayLine() {
 }
 
 async function Dashboard() {
-  const [d, loads, products, today] = await Promise.all([getDashboard(), getLorryLoads(), getProducts(), getToday()]);
+  const [d, loads, products, today, user] = await Promise.all([getDashboard(), getLorryLoads(), getProducts(), getToday(), getCurrentUser()]);
   const selling = loads
     .filter((l) => l.status === "selling")
     .map((l) => ({
@@ -95,7 +96,11 @@ async function Dashboard() {
         </ul>
       </SectionCard>
 
-      <ActiveLorries lorries={selling} products={products} today={today} className="md:col-span-3" />
+      {user.role === "owner" && (
+        <RoleGuard roles={["owner"]} fallback={<></>}>
+          <ActiveLorries lorries={selling} products={products} today={today} className="md:col-span-3" />
+        </RoleGuard>
+      )}
 
       <StatRow className="md:col-span-3">
         <StatCard label="Collected today" value={formatINR(d.collected)} />

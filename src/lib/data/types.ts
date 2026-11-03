@@ -10,8 +10,24 @@ export type PaymentMode = "cash" | "upi" | "cheque" | "neft";
 export type SaleStatus = "saved" | "pending_approval" | "cancelled";
 export type StockSource = "godown" | "lorry" | "van";
 
-export type Firm = { id: string; name: string; gstin: string; address: string; phone: string };
-export type Godown = { id: string; name: string; place: string };
+export type Firm = {
+  id: string;
+  name: string;
+  gstin: string;
+  address: string;
+  phone: string;
+  /** The one firm sales are billed from; purchases can be in any firm. */
+  primary: boolean;
+};
+export type Godown = {
+  id: string;
+  name: string;
+  place: string;
+  /** Our own godown; the others are the cement companies' godowns where our stock is kept. */
+  own?: boolean;
+  /** Profile ids of the staff who look after it. */
+  inCharge?: string[];
+};
 
 export type Product = {
   id: string;
@@ -49,6 +65,8 @@ export type Party = {
   /** Signed: positive = they owe us (Dr), negative = we owe them (Cr). */
   openingBalance: number;
   assignedTo?: string;
+  /** For a supplier: the brands it sells, so a purchase from it offers only those. */
+  brands?: string[];
 };
 
 export type SaleLine = { productId: string; qty: number; rate: number; listRate: number };
@@ -106,6 +124,8 @@ export type Payment = {
 
 export type Purchase = {
   id: string;
+  /** Which of the owner's firms bought it; the primary firm when missing. */
+  firmId?: string;
   purchaseNo: number;
   companyId: string;
   invoiceNo: string;
@@ -231,6 +251,10 @@ export type BankAccount = {
   accountNo: string;
   scope: "business" | "personal";
   openingBalance: number;
+  /** Which of the owner's firms the account belongs to (business accounts). */
+  firmId?: string;
+  ifsc?: string;
+  branch?: string;
 };
 
 export type BankEntry = {

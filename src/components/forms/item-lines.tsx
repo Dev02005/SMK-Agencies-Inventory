@@ -3,7 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useId } from "react";
 import { ProductPicker } from "@/components/forms/product-picker";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { AffixInput, Field } from "@/components/ui/field";
 import type { Product } from "@/lib/data/types";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -14,8 +14,11 @@ export type ItemLine = { key: number; productId: string; qty: string; rate: stri
 export const toNumber = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
 
 export function newLine(key: number, product: Product, rate = product.listRate): ItemLine {
-  return { key, productId: product.id, qty: "", rate: String(rate) };
+  return { key, productId: product.id, qty: "", rate: rateText(rate) };
 }
+
+/** A rate of 0 means not known yet, so the box starts empty instead of showing "0". */
+const rateText = (rate: number) => (rate > 0 ? String(rate) : "");
 
 /** Item (cement or steel, brand, type) / quantity (/ rate) rows used by purchases and orders. */
 export function ItemLines({
@@ -49,7 +52,7 @@ export function ItemLines({
                     label={`Item ${index + 1}`}
                     products={products}
                     value={line.productId}
-                    onChange={(v) => update(line.key, { productId: v, rate: String(rateFor(product(v))) })}
+                    onChange={(v) => update(line.key, { productId: v, rate: rateText(rateFor(product(v))) })}
                   />
                 </div>
                 {lines.length > 1 && (
@@ -90,13 +93,9 @@ export function ItemLines({
           );
         })}
       </ul>
-      <Button
-        variant="secondary"
-        className="mt-1 w-full"
-        onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0], rateFor(products[0]))])}
-      >
-        <Plus size={18} strokeWidth={2} aria-hidden /> Add item
-      </Button>
+      <IconButton label="Add item" className="mt-1" onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0], rateFor(products[0]))])}>
+        <Plus size={20} strokeWidth={2} aria-hidden />
+      </IconButton>
     </>
   );
 }

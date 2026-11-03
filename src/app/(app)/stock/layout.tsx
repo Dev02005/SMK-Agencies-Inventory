@@ -8,8 +8,8 @@ export default function StockLayout({ children }: { children: ReactNode }) {
         label="Stock"
         items={[
           { href: "/stock", label: "Godown stock" },
-          { href: "/stock/transfers", label: "Transfers" },
           { href: "/stock/lorries", label: "Lorry stock" },
+          { href: "/stock/transfers", label: "Transfers" },
           { href: "/stock/suspense", label: "Suspense loads" },
         ]}
       />

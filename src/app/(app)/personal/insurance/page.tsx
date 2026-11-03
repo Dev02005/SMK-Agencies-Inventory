@@ -46,7 +46,7 @@ function InsuranceContent() {
           thing="policy"
           submitLabel="Add policy"
           fields={[
-            { name: "title", label: "What it covers", required: true, placeholder: "e.g. Lorry AP 30 TB 1186" },
+            { name: "title", label: "What it covers", required: true, placeholder: "e.g. Delivery lorry" },
             {
               name: "kind",
               label: "Type",

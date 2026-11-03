@@ -4,9 +4,10 @@ import { AlertTriangle, CheckCircle2, FileUp, Loader2, Lock, X } from "lucide-re
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { Field, inputClass } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PasswordInput } from "@/components/ui/password-input";
 import { addBankEntries, maskAccountNo } from "@/lib/bank-book";
 import { cn } from "@/lib/cn";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
@@ -178,7 +179,7 @@ export function StatementImport({
             {state.file.name} is locked with a password. Banks often use the customer ID or a date of birth.
           </p>
           <Field label="Statement password" htmlFor={`${id}-pwd`} error={state.wrong ? "That password didn't open it. Try again." : undefined}>
-            <input id={`${id}-pwd`} type="password" autoComplete="off" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
+            <PasswordInput id={`${id}-pwd`} autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="plain" className="px-3" onClick={() => setState({ step: "pick" })}>

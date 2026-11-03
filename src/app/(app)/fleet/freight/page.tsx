@@ -17,7 +17,7 @@ export default function FreightPage() {
     <>
       <PageHeader
         title="Freight chart"
-        subtitle="Fixed delivery rates from Polaki. New FOR bills fill in the transport charge from this chart."
+        subtitle="Fixed delivery rates from our godown to each place. New FOR bills fill in the transport charge from this chart."
         actions={
           <>
             <SampleChip />

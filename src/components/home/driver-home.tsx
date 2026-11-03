@@ -25,7 +25,7 @@ export function DriverHome({ profileId }: { profileId: string }) {
       <PageHeader
         title="Today's trips"
         subtitle={
-          <Suspense fallback="Sri Kameswari Agencies">
+          <Suspense fallback={null}>
             <TodayLine />
           </Suspense>
         }

@@ -1,11 +1,13 @@
 import { ImageResponse } from "next/og";
+import { getFirm } from "@/lib/data";
 
-export const alt = "SKA · Sri Kameswari Agencies, wholesale cement and steel, Polaki";
+export const alt = "SKA: sales, money, stock and deliveries";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/** The preview card shown when a link to the app is shared on WhatsApp, email or social media. */
-export default function OpengraphImage() {
+/** The preview card shown when a link to the app is shared on WhatsApp, email or social media; names the primary firm. */
+export default async function OpengraphImage() {
+  const firm = await getFirm();
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: 80, background: "#f5f5f7" }}>
@@ -27,8 +29,8 @@ export default function OpengraphImage() {
         >
           SKA
         </div>
-        <div style={{ marginTop: 44, fontSize: 68, color: "#1d1d1f", WebkitTextStroke: "1px #1d1d1f", letterSpacing: -1 }}>Sri Kameswari Agencies</div>
-        <div style={{ marginTop: 14, fontSize: 34, color: "#636368" }}>Wholesale cement &amp; TMT steel · Polaki, Srikakulam</div>
+        <div style={{ marginTop: 44, fontSize: 68, color: "#1d1d1f", WebkitTextStroke: "1px #1d1d1f", letterSpacing: -1 }}>{firm.name}</div>
+        <div style={{ marginTop: 14, fontSize: 34, color: "#636368" }}>{firm.address ? `Wholesale cement & TMT steel · ${firm.address}` : "Wholesale cement & TMT steel"}</div>
       </div>
     ),
     size,

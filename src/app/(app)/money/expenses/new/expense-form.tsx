@@ -90,7 +90,7 @@ export function ExpenseForm({
           </Field>
         </div>
         <Field label="What was it for" htmlFor={`${id}-desc`}>
-          <input id={`${id}-desc`} className={inputClass} placeholder="e.g. Diesel, Polaki to Tekkali" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <input id={`${id}-desc`} className={inputClass} placeholder="e.g. Diesel for the delivery lorry" value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
       </section>
 

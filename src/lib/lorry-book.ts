@@ -3,25 +3,31 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Lorries noted on this device (Sales › Lorry sales › Lorry arrived) while the app runs on sample data, so a new lorry
- * shows under Lorry sales and in New sale's "Load from". With Supabase these become rows (a purchase sold from the
+ * Lorries noted on this device (Purchases › Lorry purchases › Lorry arrived) while the app runs on sample data, so a new lorry
+ * shows under Lorry purchases, Lorry sales and New sale's "Load from". With Supabase these become rows (a purchase sold from the
  * lorry) and this store goes away.
  */
 export type LocalLorry = {
   id: string;
+  /** Which of the owner's firms bought it. */
+  firmId?: string;
   companyId: string;
   companyName: string;
   lorryNo: string;
   driverName: string;
   invoiceNo?: string;
+  /** YYYY-MM-DD. */
+  invoiceDate?: string;
   invoicePaperKept: boolean;
   unloadingCharges: boolean;
   /** Expected to sell out in about this many days. */
   sellOutDays?: number;
   /** YYYY-MM-DD. */
   arrivedOn: string;
-  /** What came on the lorry (bags of cement, kg of steel). Lorries saved before this was asked have none. */
-  lines?: { productId: string; qty: number }[];
+  /** What came on the lorry (bags of cement, kg of steel) and, when known, the invoice rate. Older lorries may have none. */
+  lines?: { productId: string; qty: number; rate?: number }[];
+  /** Freight paid on this lorry. */
+  freight?: number;
   /** Once sold out: the value of the lorry's material, given by whoever closes it, then confirmed by the owner. */
   closed?: { value: number; on: string; confirmed?: boolean };
 };

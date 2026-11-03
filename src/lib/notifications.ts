@@ -56,7 +56,9 @@ export async function getNotifications(): Promise<Notice[]> {
 
   // Bills waiting for the owner, and a note to whoever made them.
   for (const a of dashboard.approvals) {
-    const sale = sales.find((s) => s.id === a.id)!;
+    // A godown's in-charge only gets their own godowns' bills, so a bill may not be among them.
+    const sale = sales.find((s) => s.id === a.id);
+    if (!sale) continue;
     notices.push({ id: `approval-${a.id}`, kind: "approval", title: `Confirm ${a.title}`, body: a.detail, href: a.href, date: sale.billDate, tone: "warning", roles: ["owner"] });
     if (profiles.find((p) => p.id === sale.createdBy)?.role !== "owner") {
       notices.push({

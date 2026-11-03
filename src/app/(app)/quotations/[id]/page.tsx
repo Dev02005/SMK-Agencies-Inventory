@@ -20,7 +20,7 @@ export default function QuotationPage({ params }: PageProps<"/quotations/[id]">)
   );
 }
 
-/** Same layout as the firm's existing quotation (e.g. 12/2023-2024 for Sri Rajarajeswari Agencies). */
+/** Same layout as the firm's existing paper quotations (numbered like 12/2023-2024). */
 async function QuotationDocument({ params }: { params: PageProps<"/quotations/[id]">["params"] }) {
   const { id } = await params;
   const quotation = await getQuotation(id);

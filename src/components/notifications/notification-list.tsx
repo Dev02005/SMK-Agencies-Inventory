@@ -3,7 +3,7 @@
 import { BadgeCheck, CalendarClock, CheckCheck, ClipboardList, IndianRupee, Lock, Package, Truck, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { DataTools } from "@/components/ui/data-tools";
 import { useDateFilter } from "@/components/ui/date-filter";
 import { ExportTable } from "@/components/ui/export-table";
@@ -65,10 +65,9 @@ export function NotificationList({ notices, profiles, today }: { notices: Notice
             { value: "unread", label: "Unread", count: unread.length },
           ]}
         />
-        <Button variant="plain" onClick={() => markRead(mine.map((n) => n.id))} disabled={!unread.length}>
-          <CheckCheck size={18} strokeWidth={1.75} aria-hidden />
-          Mark all as read
-        </Button>
+        <IconButton label="Mark all as read" onClick={() => markRead(mine.map((n) => n.id))} disabled={!unread.length}>
+          <CheckCheck size={19} strokeWidth={1.9} aria-hidden />
+        </IconButton>
       </div>
 
       {groups.length === 0 && (

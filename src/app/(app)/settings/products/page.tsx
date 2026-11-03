@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { SimpleForm } from "@/components/forms/simple-form";
-import { BackLink, SampleChip, SectionCard } from "@/components/ui/blocks";
-import { Chip } from "@/components/ui/chip";
-import { DataTable } from "@/components/ui/data-table";
+import { BackLink, SectionCard } from "@/components/ui/blocks";
 import { ExportMenu } from "@/components/ui/export-menu";
+import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProducts } from "@/lib/data";
 import { formatINR } from "@/lib/format";
+import { AddProduct, ProductRates } from "./product-rates";
 
 export const metadata: Metadata = { title: "Products & rates" };
 
+/** Every product by brand with its list rate (saved straight away), and adding a product. */
 export default async function ProductSettingsPage() {
   const products = await getProducts();
   return (
@@ -18,49 +18,15 @@ export default async function ProductSettingsPage() {
         back={<BackLink href="/settings">Settings</BackLink>}
         title="Products & rates"
         subtitle="List rates fill in new bills; changing a rate on a bill needs a reason"
-        actions={
-          <>
-            <SampleChip />
-            <ExportMenu title={"Products and rates"} />
-          </>
-        }
+        actions={<ExportMenu title="Products and rates" />}
       />
-      <DataTable
-        rows={products}
-        rowKey={(p) => p.id}
-        mobile={(p) => ({
-          title: p.name,
-          subtitle: `${p.brand} · ${p.category === "cement" ? "Cement, per bag" : "Steel, per kg"}`,
-          value: formatINR(p.listRate),
-          meta: !p.active && <Chip>Inactive</Chip>,
-        })}
-        columns={[
-          { key: "name", header: "Product", cell: (p) => p.name },
-          { key: "brand", header: "Brand", cell: (p) => p.brand, className: "text-ink-secondary" },
-          { key: "category", header: "Type", cell: (p) => (p.category === "cement" ? "Cement" : "Steel"), className: "text-ink-secondary" },
-          { key: "unit", header: "Unit", cell: (p) => (p.unit === "bag" ? "Bag (20 = 1 MT)" : "Kg (1000 = 1 MT)"), className: "text-ink-secondary" },
-          { key: "rate", header: "List rate", align: "right", cell: (p) => formatINR(p.listRate) },
-        ]}
+      <ExportTable
+        columns={["Brand", "Type", "Sold by", "List rate"]}
+        rows={products.map((p) => [p.brand, p.variant ?? p.name, p.unit === "bag" ? "Bag" : "Kg", p.listRate ? formatINR(p.listRate) : ""])}
       />
+      <ProductRates products={products} />
       <SectionCard title="Add a product">
-        <SimpleForm
-          thing="product"
-          submitLabel="Add product"
-          fields={[
-            { name: "name", label: "Product name", required: true, placeholder: "e.g. Deccan OPC 53" },
-            { name: "brand", label: "Brand", required: true },
-            {
-              name: "category",
-              label: "Type",
-              type: "select",
-              options: [
-                { value: "cement", label: "Cement (sold in bags)" },
-                { value: "steel", label: "Steel (sold by kg)" },
-              ],
-            },
-            { name: "rate", label: "List rate", type: "number", prefix: "₹", required: true },
-          ]}
-        />
+        <AddProduct brands={[...new Set(products.map((p) => p.brand))]} />
       </SectionCard>
     </div>
   );

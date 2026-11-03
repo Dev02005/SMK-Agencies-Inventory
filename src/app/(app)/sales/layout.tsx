@@ -8,7 +8,7 @@ export default function SalesLayout({ children }: { children: ReactNode }) {
         label="Sales"
         items={[
           { href: "/sales", label: "Godown sales" },
-          { href: "/sales/lorries", label: "Lorry sales" },
+          { href: "/sales/lorries", label: "Lorry sales", roles: ["owner"] },
         ]}
       />
       {children}

@@ -5,20 +5,20 @@ import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTools } from "@/components/ui/data-tools";
 import { PageHeader } from "@/components/ui/page-header";
-import { getGodowns, getProducts, getPurchases } from "@/lib/data";
+import { getFirms, getGodowns, getProducts, getPurchases } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
 
-export const metadata: Metadata = { title: "Purchases" };
+export const metadata: Metadata = { title: "Godown purchases" };
 
 export default function PurchasesPage({ searchParams }: PageProps<"/purchases">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        title="Purchases"
-        subtitle="Stock bought from companies, by lorry"
+        title="Godown purchases"
+        subtitle="Stock bought from companies and unloaded into a godown"
         actions={
           <>
             <SampleChip />
@@ -34,8 +34,10 @@ export default function PurchasesPage({ searchParams }: PageProps<"/purchases">)
 }
 
 async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purchases">["searchParams"] }) {
-  const [all, products, godowns, dates] = await Promise.all([getPurchases(), getProducts(), getGodowns(), pageDateFilter(searchParams)]);
-  const purchases = all.filter((p) => inDateFilter(p.receivedDate, dates));
+  const [all, products, godowns, dates, firms] = await Promise.all([getPurchases(), getProducts(), getGodowns(), pageDateFilter(searchParams), getFirms()]);
+  const firmName = (id?: string) => (firms.find((f) => f.id === id) ?? firms.find((f) => f.primary))?.name ?? "–";
+  // Lorries sold straight off the truck are under Lorry purchases.
+  const purchases = all.filter((p) => !p.onLorry && inDateFilter(p.receivedDate, dates));
   const qty = sumQuantities(purchases.flatMap((p) => p.lines), products);
   const godownName = (id: string) => godowns.find((g) => g.id === id)?.name ?? "–";
 
@@ -61,6 +63,7 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
           { key: "no", header: "No.", cell: (p) => `#${p.purchaseNo}` },
           { key: "date", header: "Invoice date", cell: (p) => formatDate(p.invoiceDate), className: "whitespace-nowrap text-ink-secondary" },
           { key: "company", header: "Company", cell: (p) => p.companyName },
+          ...(firms.length > 1 ? [{ key: "firm", header: "For firm", cell: (p: (typeof purchases)[number]) => firmName(p.firmId), className: "hidden text-ink-secondary lg:table-cell" }] : []),
           { key: "invoice", header: "Invoice no.", cell: (p) => p.invoiceNo, className: "hidden text-ink-secondary lg:table-cell" },
           { key: "lorry", header: "Lorry", cell: (p) => p.lorryNo, className: "hidden whitespace-nowrap text-ink-secondary lg:table-cell" },
           { key: "godown", header: "Godown", cell: (p) => godownName(p.godownId), className: "hidden text-ink-secondary xl:table-cell" },

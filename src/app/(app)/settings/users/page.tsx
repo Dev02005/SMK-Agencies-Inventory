@@ -5,13 +5,13 @@ import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
-import { getProfiles } from "@/lib/data";
+import { getDesignations, getProfiles } from "@/lib/data";
 import { allRoles, roleLabels as roleNames } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Users & roles" };
 
 export default async function UserSettingsPage() {
-  const profiles = await getProfiles();
+  const [profiles, designations] = await Promise.all([getProfiles(), getDesignations()]);
   return (
     <div className="animate-fade-up mx-auto max-w-[760px] space-y-4">
       <PageHeader
@@ -30,11 +30,12 @@ export default async function UserSettingsPage() {
         rowKey={(p) => p.id}
         mobile={(p) => ({
           title: p.fullName,
-          subtitle: [`+91 ${p.mobile}`, p.email].filter(Boolean).join(" · "),
+          subtitle: [designations[p.id], `+91 ${p.mobile}`, p.email].filter(Boolean).join(" · "),
           meta: <Chip tone={p.role === "owner" ? "accent" : "neutral"}>{roleNames[p.role]}</Chip>,
         })}
         columns={[
           { key: "name", header: "Name", cell: (p) => p.fullName },
+          { key: "designation", header: "Designation", cell: (p) => designations[p.id] ?? "–", className: "text-ink-secondary" },
           { key: "mobile", header: "Mobile", cell: (p) => `+91 ${p.mobile}`, className: "tabular-nums text-ink-secondary" },
           { key: "email", header: "Email", cell: (p) => p.email ?? "–", className: "text-ink-secondary" },
           { key: "role", header: "Role", cell: (p) => <Chip tone={p.role === "owner" ? "accent" : "neutral"}>{roleNames[p.role]}</Chip> },

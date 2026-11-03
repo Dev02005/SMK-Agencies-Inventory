@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getGodowns, getProducts, getVehicles } from "@/lib/data";
+import { getGodowns, getMyGodowns, getProducts, getVehicles } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { productOptions } from "@/lib/product-options";
 
@@ -23,16 +23,18 @@ export default function NewTransferPage() {
 
 async function TransferForm() {
   await connection();
-  const [godowns, products, vehicles] = await Promise.all([getGodowns(), getProducts(), getVehicles()]);
-  const places = godowns.map((g) => ({ value: g.id, label: g.name }));
+  const [godowns, mine, products, vehicles] = await Promise.all([getGodowns(), getMyGodowns(), getProducts(), getVehicles()]);
+  // Stock leaves one of your own godowns; it can go to any godown.
+  const from = mine.map((g) => ({ value: g.id, label: g.name }));
+  const to = godowns.map((g) => ({ value: g.id, label: g.name }));
   return (
     <SectionCard>
       <SimpleForm
         thing="transfer"
         submitLabel="Send stock"
         fields={[
-          { name: "from", label: "From", type: "select", options: places },
-          { name: "to", label: "To", type: "select", options: [...places].reverse() },
+          { name: "from", label: "From", type: "select", options: from },
+          { name: "to", label: "To", type: "select", options: to.filter((g) => g.value !== from[0]?.value) },
           { name: "product", label: "Product", type: "select", options: productOptions(products) },
           { name: "qty", label: "Quantity (bags or kg)", type: "number", required: true },
           { name: "vehicle", label: "Vehicle", type: "select", options: vehicles.filter((v) => v.kind === "van" || v.kind === "lorry").map((v) => ({ value: v.id, label: v.label })) },

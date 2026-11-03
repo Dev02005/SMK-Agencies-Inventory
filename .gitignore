@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Real staff list (names and phone numbers): stays on this computer, never on GitHub.
+/local-data/

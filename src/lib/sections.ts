@@ -57,7 +57,7 @@ const sections: Section[] = [
     description: "Cement and steel bills, lorry sales, discounts and transport",
     icon: ReceiptText,
     tone: "blue",
-    roles: ["owner", "office", "field"],
+    roles: ["owner", "office", "field", "godown"],
     action: { label: "New sale", href: "/sales/new" },
   },
   {

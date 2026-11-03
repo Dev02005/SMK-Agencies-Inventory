@@ -2,7 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { ProductPicker } from "@/components/forms/product-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/sales";
 import type { Party, Product } from "@/lib/data/types";
 import { useLorryBook } from "@/lib/lorry-book";
+import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
+import { NewCustomer } from "./new-customer";
 import { partyOptions } from "@/lib/party-options";
 import { useViewAs } from "@/lib/roles";
 
@@ -33,6 +35,8 @@ export type SaleParty = {
   kind: Party["kind"];
   creditLimit: number | null;
   outstanding: number;
+  /** Lets the party search find them by number. */
+  mobile?: string;
 };
 
 type Line = { key: number; productId: string; qty: string; rate: string };
@@ -55,6 +59,9 @@ const num = (value: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** A new line's rate: the product's list rate, or empty when none is set yet (Settings › Products & rates). */
+const startRate = (product: Product) => (product.listRate > 0 ? String(product.listRate) : "");
+
 const transportHelp: Record<TransportMode, string> = {
   FOR: "Our own vehicle delivers; transport is charged.",
   EX: "The customer's own vehicle collects; no charges.",
@@ -63,6 +70,7 @@ const transportHelp: Record<TransportMode, string> = {
 
 export function NewSaleForm({
   firms,
+  primaryFirmId,
   products,
   parties,
   godowns,
@@ -72,8 +80,9 @@ export function NewSaleForm({
   preselect,
   today,
 }: {
-  /** The owner's firms; the bill goes out under the one picked at the top. */
-  firms: { id: string; name: string; gstin: string }[];
+  /** The owner's firms. A sale is billed from the primary firm unless it is changed for this one bill. */
+  firms: FirmChoice[];
+  primaryFirmId: string;
   products: Product[];
   parties: SaleParty[];
   /** The bill's bags come out of the godown, or the company lorry, picked under "Load from". */
@@ -94,21 +103,26 @@ export function NewSaleForm({
   // Only the owner prices a bill. Everyone else sends the items, quantities and vehicle; the owner sets the
   // rates, discount and charges and confirms it (on the bill's page).
   const pricing = role === "owner";
-  const [firmId, setFirmId] = useState(firms[0]?.id ?? "");
-  const firm = firms.find((f) => f.id === firmId);
+  const [firmId, setFirmId] = useState(primaryFirmId);
+  const [changingFirm, setChangingFirm] = useState(false);
+  const firm = firms.find((f) => f.id === firmId) ?? firms[0];
+  // Parties to choose from, plus any customer added here with New customer.
+  const [partyList, setPartyList] = useState(parties);
   const [partyId, setPartyId] = useState("");
+  // What was typed in the party search when New customer was picked; null while the New customer form is closed.
+  const [newCustomer, setNewCustomer] = useState<string | null>(null);
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [receivedDate, setReceivedDate] = useState("");
   const [lines, setLines] = useState<Line[]>([
-    { key: 1, productId: products[0].id, qty: "", rate: String(products[0].listRate) },
+    { key: 1, productId: products[0].id, qty: "", rate: startRate(products[0]) },
   ]);
   const [nextKey, setNextKey] = useState(2);
   const [discountMode, setDiscountMode] = useState<DiscountMode>("amount");
   const [discountValue, setDiscountValue] = useState("");
   // A godown id or a lorry id. Lorries noted on this device appear once the page is running in the browser.
   const [loadFrom, setLoadFrom] = useState(preselect ?? godowns[0]?.id ?? "");
+  // Lorries are offered only to the owner (lorry sales are the owner's alone).
   const deviceLorries: LorryOnSale[] = useLorryBook()
-    .filter((l) => !l.closed)
+    .filter((l) => pricing && !l.closed)
     .map((l) => ({
       id: l.id,
       lorryNo: l.lorryNo,
@@ -134,7 +148,7 @@ export function NewSaleForm({
   const toast = useToast();
 
   const productById = (productId: string) => products.find((p) => p.id === productId) ?? products[0];
-  const party = parties.find((p) => p.id === partyId);
+  const party = partyList.find((p) => p.id === partyId);
 
   // EX: the customer's own vehicle, so nothing is charged on top of the items. Only FOR (our vehicle) charges
   // transport; any mode but EX may add an optional "Other" charge. Rent and unloading are not put on bills.
@@ -163,7 +177,8 @@ export function NewSaleForm({
 
   const isOwner = role === "owner";
   const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
-  const rateChanged = lines.some((l) => num(l.rate) !== productById(l.productId).listRate);
+  // Only against a set list rate: a product without one has nothing to differ from.
+  const rateChanged = lines.some((l) => productById(l.productId).listRate > 0 && num(l.rate) !== productById(l.productId).listRate);
   const needsApproval = pricing && (Boolean(credit?.overLimit) || discountOverLimit);
   const needsReason = pricing && ((isOwner && needsApproval) || rateChanged);
   const hasLines = lines.some((l) => num(l.qty) > 0 && (!pricing || num(l.rate) > 0));
@@ -187,13 +202,19 @@ export function NewSaleForm({
     .filter(Boolean)
     .join(" · ");
 
+  function chooseParty(next: string, picked = partyList.find((p) => p.id === next)) {
+    // The destination follows the party's town unless it was typed by hand.
+    if (!destination || destination === (party?.place ?? "")) setDestination(picked?.place ?? "");
+    setPartyId(next);
+  }
+
   function updateLine(key: number, patch: Partial<Line>) {
     setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
   function addLine() {
     const product = products[0];
-    setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: String(product.listRate) }]);
+    setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: startRate(product) }]);
     setNextKey((k) => k + 1);
   }
 
@@ -219,64 +240,61 @@ export function NewSaleForm({
           save();
         }}
       >
-        {firms.length > 1 && (
-          <div role="radiogroup" aria-label="Bill from firm" className="grid grid-cols-2 gap-3">
-            {firms.map((f, i) => {
-              const picked = f.id === firmId;
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={picked}
-                  onClick={() => setFirmId(f.id)}
-                  className={cn(
-                    "flex min-h-[72px] items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors md:p-4",
-                    picked ? "border-accent bg-accent-soft shadow-card" : "border-hairline bg-card hover:bg-card-subtle",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-8 shrink-0 place-items-center rounded-full text-[14px] font-semibold",
-                      picked ? "bg-accent text-white" : "bg-hairline text-ink-secondary",
-                    )}
-                  >
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0">
-                    <span className={cn("block text-[15px] font-semibold leading-[20px]", picked ? "text-accent" : "text-ink")}>{f.name}</span>
-                    <span className="block truncate text-[12px] text-ink-secondary">{f.gstin ? `GSTIN ${f.gstin}` : "GSTIN not added yet"}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        <p className="px-1 text-[13px] text-ink-secondary">
+          Billed from <span className="font-medium text-ink">{firm.name}</span>
+          {firm.gstin && <span className="tabular-nums"> · GSTIN {firm.gstin}</span>}
+          {firm.id !== primaryFirmId && <span className="font-medium text-warning"> · not the primary firm</span>}
+          {firms.length > 1 && (
+            <>
+              {" · "}
+              <button type="button" onClick={() => setChangingFirm((c) => !c)} aria-expanded={changingFirm} className="font-medium text-link hover:underline">
+                {changingFirm ? "Done" : "Change firm"}
+              </button>
+            </>
+          )}
+        </p>
+        {changingFirm && (
+          <FirmPicker
+            label="Bill this sale from"
+            firms={firms}
+            value={firmId}
+            onChange={(next) => {
+              setFirmId(next);
+              setChangingFirm(false);
+            }}
+          />
         )}
 
         <section className="surface space-y-4 p-5">
-          <Field label="Party" htmlFor={`${id}-party`}>
+          <Field label="Party" htmlFor={`${id}-party`} hint="Search by name or mobile number">
             <Select
               id={`${id}-party`}
               label="Party"
               placeholder="Choose a party"
               value={partyId}
-              onChange={(next) => {
-                // The destination follows the party's town unless it was typed by hand.
-                if (!destination || destination === (party?.place ?? "")) setDestination(parties.find((p) => p.id === next)?.place ?? "");
-                setPartyId(next);
-              }}
-              options={partyOptions(parties)}
+              onChange={chooseParty}
+              options={partyOptions(partyList)}
+              searchable
+              action={{ label: "New customer", onPick: setNewCustomer }}
             />
           </Field>
+          {newCustomer !== null && (
+            <NewCustomer
+              parties={partyList}
+              typed={newCustomer}
+              onCancel={() => setNewCustomer(null)}
+              onDone={(picked, added) => {
+                if (added) setPartyList((list) => [...list, picked]);
+                chooseParty(picked.id, picked);
+                setNewCustomer(null);
+                toast(added ? `${picked.name} added as a customer` : `Billing ${picked.name}`);
+              }}
+            />
+          )}
           {credit && <CreditPanel credit={credit} billTotal={totals.total} isOwner={isOwner} />}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Bill date" htmlFor={`${id}-date`}>
-              <DatePicker id={`${id}-date`} label="Bill date" value={invoiceDate} onChange={setInvoiceDate} />
-            </Field>
-            <Field label="Truck received on" htmlFor={`${id}-received`} hint="Only if different">
-              <DatePicker id={`${id}-received`} label="Truck received on" value={receivedDate} onChange={setReceivedDate} clearable />
-            </Field>
-          </div>
+          <Field label="Bill date" htmlFor={`${id}-date`}>
+            <DatePicker id={`${id}-date`} label="Bill date" value={invoiceDate} onChange={setInvoiceDate} />
+          </Field>
         </section>
 
         <section className="surface p-5">
@@ -329,7 +347,7 @@ export function NewSaleForm({
                         value={line.productId}
                         onChange={(v) => {
                           const next = productById(v);
-                          updateLine(line.key, { productId: next.id, rate: String(next.listRate) });
+                          updateLine(line.key, { productId: next.id, rate: startRate(next) });
                         }}
                       />
                     </div>
@@ -363,7 +381,7 @@ export function NewSaleForm({
                       <Field
                         label={`Rate per ${product.unit}`}
                         htmlFor={`${id}-rate-${line.key}`}
-                        hint={rate !== product.listRate ? `List rate ${formatINR(product.listRate)}` : undefined}
+                        hint={product.listRate > 0 && rate !== product.listRate ? `List rate ${formatINR(product.listRate)}` : undefined}
                       >
                         <AffixInput
                           id={`${id}-rate-${line.key}`}
@@ -385,10 +403,9 @@ export function NewSaleForm({
               );
             })}
           </ul>
-          <Button variant="secondary" onClick={addLine} className="mt-1 w-full">
-            <Plus size={18} strokeWidth={2} aria-hidden />
-            Add item
-          </Button>
+          <IconButton label="Add item" onClick={addLine} className="mt-1">
+            <Plus size={20} strokeWidth={2} aria-hidden />
+          </IconButton>
         </section>
 
         <section className="surface space-y-4 p-5">
@@ -544,7 +561,7 @@ export function NewSaleForm({
       <aside className="hidden lg:sticky lg:top-20 lg:block">
         <section className="surface p-6">
           <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{pricing ? "Bill summary" : "Request summary"}</h2>
-          {firms.length > 1 && firm && <p className="mt-1 text-[13px] text-ink-secondary">From {firm.name}</p>}
+          <p className="mt-1 text-[13px] text-ink-secondary">From {firm.name}</p>
           {!pricing && (
             <div className="mt-4">
               <p className="text-[15px] text-ink">{quantityLine || "No items yet"}</p>

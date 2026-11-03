@@ -3,7 +3,7 @@
 import { FileUp, Plus } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink, IconButton } from "@/components/ui/button";
 import { DataTools } from "@/components/ui/data-tools";
 import { useDateFilter } from "@/components/ui/date-filter";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -58,18 +58,24 @@ export function BankAccountView({ accountId, account: saved, entries: savedEntri
     <>
       <PageHeader
         title={account.name}
-        subtitle={`${account.bank} · ${maskAccountNo(account.accountNo)} · balance ${formatINR(balance)}`}
+        subtitle={[
+          account.bank,
+          account.ifsc ? account.accountNo : maskAccountNo(account.accountNo),
+          account.ifsc && `IFSC ${account.ifsc}`,
+          account.branch && `${account.branch} branch`,
+          `balance ${formatINR(balance)}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={
           <>
             <SampleChip />
-            <Button variant="secondary" onClick={() => setPanel(panel === "import" ? null : "import")} aria-expanded={panel === "import"}>
-              <FileUp size={18} strokeWidth={1.75} aria-hidden />
-              Import statement
-            </Button>
-            <Button onClick={() => setPanel(panel === "entry" ? null : "entry")} aria-expanded={panel === "entry"}>
-              <Plus size={18} strokeWidth={2} aria-hidden />
-              Add entry
-            </Button>
+            <IconButton label="Import statement" onClick={() => setPanel(panel === "import" ? null : "import")} aria-expanded={panel === "import"}>
+              <FileUp size={19} strokeWidth={1.9} aria-hidden />
+            </IconButton>
+            <IconButton label="Add entry" variant="primary" onClick={() => setPanel(panel === "entry" ? null : "entry")} aria-expanded={panel === "entry"}>
+              <Plus size={20} strokeWidth={2} aria-hidden />
+            </IconButton>
           </>
         }
       />

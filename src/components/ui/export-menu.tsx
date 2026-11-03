@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronDown, Copy, Download, FileImage, FileSpreadsheet, FileText, Mail, MessageCircle, Printer, Share2, type LucideIcon } from "lucide-react";
+import { Copy, Download, FileImage, FileSpreadsheet, FileText, Loader2, Mail, MessageCircle, Printer, Share2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { resolveDateFilter, type DatePreset } from "@/lib/date-filter";
@@ -50,6 +50,8 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
   const toast = useToast();
   const ref = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<"download" | "share" | null>(null);
+  // The menu opens towards whichever side has room, so it never runs off the screen.
+  const [alignRight, setAlignRight] = useState(false);
   const [busy, setBusy] = useState(false);
   const [shareStep, setShareStep] = useState<ShareStep | null>(null);
 
@@ -69,8 +71,9 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
     };
   }, [menu]);
 
-  function toggle(which: "download" | "share") {
+  function toggle(which: "download" | "share", button: HTMLElement) {
     if (menu !== which) {
+      setAlignRight(button.getBoundingClientRect().left + 296 > window.innerWidth);
       setShareStep(null);
       // Load the file makers now, so sharing still counts as the same tap.
       void import("@/lib/export/excel");
@@ -175,14 +178,11 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
   return (
     <div ref={ref} className="flex flex-wrap gap-2 print:hidden">
       <div className="relative">
-        <Button variant="secondary" onClick={() => toggle("download")} aria-expanded={menu === "download"} aria-haspopup="menu" disabled={busy}>
-          <Download size={18} strokeWidth={1.75} aria-hidden />
-          {busy && menu === "download" ? "Making…" : "Download"}
-          <ChevronDown size={16} strokeWidth={2} aria-hidden />
-        </Button>
+        <IconButton label="Download" onClick={(e) => toggle("download", e.currentTarget)} aria-expanded={menu === "download"} aria-haspopup="menu" disabled={busy}>
+          {busy && menu === "download" ? <Loader2 size={19} strokeWidth={2} className="animate-spin" aria-hidden /> : <Download size={19} strokeWidth={1.9} aria-hidden />}
+        </IconButton>
         {menu === "download" && (
-          // From the button's left edge on phones (where it sits on the left), from its right edge on wide screens.
-          <MenuPanel className="left-0 lg:left-auto lg:right-0">
+          <MenuPanel alignRight={alignRight}>
             <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-tertiary">Download as</p>
             {kindButtons((kind) => void download(kind))}
             <div className="mt-1 border-t border-hairline pt-1">
@@ -204,24 +204,22 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
       </div>
 
       <div className="relative">
-        <Button variant="secondary" onClick={() => toggle("share")} aria-expanded={menu === "share"} aria-haspopup="menu" disabled={busy}>
-          <Share2 size={18} strokeWidth={1.75} aria-hidden />
-          {busy && menu === "share" ? "Making…" : "Share"}
-          <ChevronDown size={16} strokeWidth={2} aria-hidden />
-        </Button>
+        <IconButton label="Share" onClick={(e) => toggle("share", e.currentTarget)} aria-expanded={menu === "share"} aria-haspopup="menu" disabled={busy}>
+          {busy && menu === "share" ? <Loader2 size={19} strokeWidth={2} className="animate-spin" aria-hidden /> : <Share2 size={19} strokeWidth={1.9} aria-hidden />}
+        </IconButton>
         {menu === "share" && (
-          <MenuPanel className="right-0">
+          <MenuPanel alignRight={alignRight}>
             {!shareStep ? (
               <>
                 <p className="px-3 pb-1 pt-1.5 text-[12px] text-ink-tertiary">Share as (WhatsApp, mail…)</p>
                 {kindButtons((kind) => void startShare(kind))}
               </>
             ) : shareStep.step === "retry" ? (
-              <div className="space-y-2 p-2">
-                <p className="text-[14px] text-ink-secondary">{shareStep.made.file.name} is ready.</p>
-                <Button className="w-full" onClick={() => void share(shareStep.made)}>
-                  <Share2 size={18} strokeWidth={1.75} aria-hidden /> Share now
-                </Button>
+              <div className="flex items-center gap-3 p-2">
+                <p className="min-w-0 flex-1 text-[14px] text-ink-secondary">{shareStep.made.file.name} is ready.</p>
+                <IconButton label="Share now" variant="primary" onClick={() => void share(shareStep.made)}>
+                  <Share2 size={19} strokeWidth={1.9} aria-hidden />
+                </IconButton>
               </div>
             ) : (
               <div className="space-y-1 p-1">
@@ -264,9 +262,9 @@ export function ExportMenu({ title, subtitle, dated, tables }: Props) {
   );
 }
 
-function MenuPanel({ className, children }: { className: string; children: ReactNode }) {
+function MenuPanel({ alignRight, children }: { alignRight: boolean; children: ReactNode }) {
   return (
-    <div role="menu" className={cn("surface animate-fade-up absolute top-12 z-40 w-72 p-2 shadow-raised", className)}>
+    <div role="menu" className={cn("surface animate-fade-up absolute top-12 z-40 w-72 p-2 shadow-raised", alignRight ? "right-0" : "left-0")}>
       {children}
     </div>
   );

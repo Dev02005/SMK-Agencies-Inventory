@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { BackLink, ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getBankAccounts, getCashSummary, getGodowns, getProfiles, getVehicleNames } from "@/lib/data";
+import { getBankAccounts, getCashSummary, getMyGodowns, getProfiles, getVehicleNames } from "@/lib/data";
 import { formatINR, todayISO } from "@/lib/format";
 import { ExpenseForm } from "./expense-form";
 
@@ -22,7 +22,7 @@ export default function NewExpensePage() {
 
 async function FormForToday() {
   await connection();
-  const [holders, banks, godowns, profiles, vehicles] = await Promise.all([getCashSummary(), getBankAccounts(), getGodowns(), getProfiles(), getVehicleNames()]);
+  const [holders, banks, godowns, profiles, vehicles] = await Promise.all([getCashSummary(), getBankAccounts(), getMyGodowns(), getProfiles(), getVehicleNames()]);
   return (
     <ExpenseForm
       today={todayISO()}

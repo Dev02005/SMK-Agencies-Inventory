@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import { SimpleForm } from "@/components/forms/simple-form";
-import { BackLink, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { BackLink, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { getFirms } from "@/lib/data";
 import { AddFirm } from "./add-firm";
+import { FirmForm } from "./firm-form";
 
 export const metadata: Metadata = { title: "Firm details" };
 
-/** Each firm the owner bills under, with its own name, GSTIN and address; New sale asks which one a bill is from. */
+/**
+ * Each firm with its own name, GSTIN and address. The primary firm is the one sales are billed from; purchases ask
+ * which firm they are for. Saved on the computer running the app (local-data/firms.json) until Supabase is connected.
+ */
 export default async function FirmSettingsPage() {
   const firms = await getFirms();
   return (
@@ -15,8 +18,7 @@ export default async function FirmSettingsPage() {
       <PageHeader
         back={<BackLink href="/settings">Settings</BackLink>}
         title="Firm details"
-        subtitle="Printed on every bill, quotation and statement. Each bill is made under one of these firms."
-        actions={<SampleChip />}
+        subtitle="Printed on bills, quotations and statements. Sales are billed from the primary firm; purchases can be in any firm."
       />
       <div className="space-y-4">
         {firms.map((firm, i) => (
@@ -26,20 +28,11 @@ export default async function FirmSettingsPage() {
               <span className="flex items-center gap-2.5">
                 <span className="grid size-7 place-items-center rounded-full bg-accent text-[13px] font-semibold text-white">{i + 1}</span>
                 Firm {i + 1}
-                {i === 0 && <span className="text-[13px] font-normal text-ink-secondary">· main firm</span>}
               </span>
             }
           >
-            <SimpleForm
-              thing="firm details"
-              submitLabel="Save details"
-              fields={[
-                { name: "name", label: "Firm name", required: true, defaultValue: firm.name, wide: true },
-                { name: "gstin", label: "GSTIN", defaultValue: firm.gstin },
-                { name: "phone", label: "Phone", prefix: "+91", defaultValue: firm.phone },
-                { name: "address", label: "Address", required: true, defaultValue: firm.address, wide: true },
-              ]}
-            />
+            {/* Keyed by the saved values, so the form starts afresh after a save (e.g. when the primary firm changes). */}
+            <FirmForm key={[firm.name, firm.gstin, firm.phone, firm.address, firm.primary].join("|")} firm={firm} />
           </SectionCard>
         ))}
         <AddFirm next={firms.length + 1} />

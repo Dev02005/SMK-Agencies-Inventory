@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Field, inputClass } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { MIN_PASSWORD, passwordProblem } from "@/lib/password-rules";
 import { forgetSignedIn } from "@/lib/roles";
 import { setFirstPassword, signOut } from "../actions";
@@ -39,22 +40,18 @@ export function NewPasswordForm() {
       }}
     >
       <Field label="New password" htmlFor={`${id}-new`} hint={`At least ${MIN_PASSWORD} characters, not your mobile number`} error={problem ?? serverProblem}>
-        <input
+        <PasswordInput
           id={`${id}-new`}
-          type="password"
           autoComplete="new-password"
-          className={inputClass}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={problem || serverProblem ? true : undefined}
         />
       </Field>
       <Field label="New password again" htmlFor={`${id}-again`} error={mismatch}>
-        <input
+        <PasswordInput
           id={`${id}-again`}
-          type="password"
           autoComplete="new-password"
-          className={inputClass}
           value={again}
           onChange={(e) => setAgain(e.target.value)}
           aria-invalid={mismatch ? true : undefined}

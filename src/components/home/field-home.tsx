@@ -27,7 +27,7 @@ export function FieldHome({ profileId }: { profileId: string }) {
       <PageHeader
         title="Today"
         subtitle={
-          <Suspense fallback="Sri Kameswari Agencies">
+          <Suspense fallback={null}>
             <TodayLine />
           </Suspense>
         }

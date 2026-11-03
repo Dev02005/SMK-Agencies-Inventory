@@ -8,7 +8,7 @@ import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
-import { getGodowns, getProducts, getSuspenseLoads, getVehicles } from "@/lib/data";
+import { getMyGodowns, getProducts, getSuspenseLoads, getVehicles } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
 import { productOptions } from "@/lib/product-options";
 import { formatDate, formatShortDate } from "@/lib/format";
@@ -33,7 +33,7 @@ export default function SuspensePage({ searchParams }: PageProps<"/stock/suspens
 }
 
 async function Loads({ searchParams }: { searchParams: PageProps<"/stock/suspense">["searchParams"] }) {
-  const [all, godowns, products, vehicles, dates] = await Promise.all([getSuspenseLoads(), getGodowns(), getProducts(), getVehicles(), pageDateFilter(searchParams)]);
+  const [all, godowns, products, vehicles, dates] = await Promise.all([getSuspenseLoads(), getMyGodowns(), getProducts(), getVehicles(), pageDateFilter(searchParams)]);
   const loads = all.filter((l) => inDateFilter(l.date, dates));
   const open = loads.filter((l) => !l.assigned);
   const done = loads.filter((l) => l.assigned);

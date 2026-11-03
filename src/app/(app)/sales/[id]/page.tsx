@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
-import { buttonClass } from "@/components/ui/button";
+import { IconButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
@@ -59,9 +59,9 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
           <>
             <SampleChip />
             {sale.status === "saved" && (
-              <Link href={`/sales/${sale.id}/print`} className={buttonClass("primary")}>
-                <Printer size={18} strokeWidth={1.75} aria-hidden /> Print bill
-              </Link>
+              <IconButtonLink href={`/sales/${sale.id}/print`} label="Print bill" variant="primary">
+                <Printer size={19} strokeWidth={1.9} aria-hidden />
+              </IconButtonLink>
             )}
           </>
         }

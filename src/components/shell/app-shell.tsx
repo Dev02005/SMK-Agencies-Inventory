@@ -43,8 +43,8 @@ export function AppShell({
         Skip to content
       </a>
       {/* The URL is request data under Cache Components, so the active-item highlight streams in; the fallback is the same nav without it. */}
-      <Suspense fallback={<Sidebar pathname="" role={role} />}>
-        <SidebarForPath role={role} />
+      <Suspense fallback={<Sidebar pathname="" role={role} firmName={firmName} />}>
+        <SidebarForPath role={role} firmName={firmName} />
       </Suspense>
       <div className="md:pl-[72px] lg:pl-60 print:pl-0">
         <TopBar user={user} role={role} canViewAs={(signedIn?.role ?? "owner") === "owner"} notices={notices} onRoleChange={setRole} onQuickAdd={() => setQuickAddOpen(true)} />
@@ -60,8 +60,8 @@ export function AppShell({
   );
 }
 
-function SidebarForPath({ role }: { role: Role }) {
-  return <Sidebar pathname={usePathname()} role={role} />;
+function SidebarForPath({ role, firmName }: { role: Role; firmName: string }) {
+  return <Sidebar pathname={usePathname()} role={role} firmName={firmName} />;
 }
 
 function TabBarForPath({ role }: { role: Role }) {

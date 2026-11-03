@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ServiceWorker } from "@/components/shell/service-worker";
 import { ToastProvider } from "@/components/ui/toast";
-import { siteDescription, siteName, siteUrl } from "@/lib/site";
+import { getFirm } from "@/lib/data";
+import { siteDescriptionFor, siteNameFor, siteUrl } from "@/lib/site";
 import "./globals.css";
 
 // Apple devices use their own SF Pro first (see --font-sans); Inter is the close match everywhere else.
@@ -11,32 +12,38 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: {
-    default: siteName,
-    template: "%s · SKA",
-  },
-  description: siteDescription,
-  applicationName: "SKA",
-  category: "business",
-  openGraph: {
-    type: "website",
-    siteName,
-    title: siteName,
+/** Titles and share previews name the primary firm (Settings › Firm details). */
+export async function generateMetadata(): Promise<Metadata> {
+  const firm = await getFirm();
+  const siteName = siteNameFor(firm.name);
+  const siteDescription = siteDescriptionFor(firm);
+  return {
+    metadataBase: new URL(siteUrl),
+    title: {
+      default: siteName,
+      template: "%s · SKA",
+    },
     description: siteDescription,
-    locale: "en_IN",
-    url: "/",
-  },
-  twitter: { card: "summary_large_image", title: siteName, description: siteDescription },
-  // Amounts and bill numbers must not turn into phone or address links on iPhone.
-  formatDetection: { telephone: false, email: false, address: false },
-  appleWebApp: {
-    capable: true,
-    title: "SKA",
-    statusBarStyle: "default",
-  },
-};
+    applicationName: "SKA",
+    category: "business",
+    openGraph: {
+      type: "website",
+      siteName,
+      title: siteName,
+      description: siteDescription,
+      locale: "en_IN",
+      url: "/",
+    },
+    twitter: { card: "summary_large_image", title: siteName, description: siteDescription },
+    // Amounts and bill numbers must not turn into phone or address links on iPhone.
+    formatDetection: { telephone: false, email: false, address: false },
+    appleWebApp: {
+      capable: true,
+      title: "SKA",
+      statusBarStyle: "default",
+    },
+  };
+}
 
 // Light theme only: tell the browser not to apply any dark styling.
 export const viewport: Viewport = {

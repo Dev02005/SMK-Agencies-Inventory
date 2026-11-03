@@ -3,9 +3,10 @@
 import { LogOut } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { signOut } from "@/app/login/actions";
-import { Button } from "@/components/ui/button";
-import { Field, inputClass } from "@/components/ui/field";
+import { Button, IconButton } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { PasswordInput } from "@/components/ui/password-input";
 import { passwordProblem } from "@/lib/password-rules";
 import { forgetSignedIn } from "@/lib/roles";
 import { usesSampleData } from "@/lib/supabase/config";
@@ -14,17 +15,16 @@ import { changePassword } from "./actions";
 export function SignOutButton() {
   const [pending, startTransition] = useTransition();
   return (
-    <Button
-      variant="secondary"
+    <IconButton
+      label={pending ? "Signing out" : "Sign out now"}
       disabled={pending}
       onClick={() => {
         forgetSignedIn();
         startTransition(() => signOut());
       }}
     >
-      <LogOut size={16} strokeWidth={1.75} aria-hidden />
-      {pending ? "Signing out…" : "Sign out now"}
-    </Button>
+      <LogOut size={19} strokeWidth={1.9} aria-hidden />
+    </IconButton>
   );
 }
 
@@ -46,11 +46,9 @@ export function ChangePasswordForm({ mobile }: { mobile: string }) {
 
   const field = (key: string, label: string, value: string, set: (v: string) => void, autoComplete: string, error?: string) => (
     <Field label={label} htmlFor={`${id}-${key}`} error={error}>
-      <input
+      <PasswordInput
         id={`${id}-${key}`}
-        type="password"
         autoComplete={autoComplete}
-        className={inputClass}
         value={value}
         onChange={(e) => {
           set(e.target.value);

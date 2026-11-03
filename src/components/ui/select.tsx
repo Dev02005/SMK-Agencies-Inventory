@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { fieldButtonClass, fieldSizes, PopoverPanel, usePopover } from "@/components/ui/popover";
 import { cn } from "@/lib/cn";
@@ -11,6 +11,8 @@ export type SelectOption = {
   hint?: string;
   /** Options with a group sit under a row with that name, which opens when tapped; options without one come first. */
   group?: string;
+  /** Extra words the search box matches but the list doesn't show (e.g. a phone number). */
+  keywords?: string;
 };
 
 type Row = { kind: "option"; option: SelectOption; inGroup: boolean } | { kind: "group"; name: string; count: number; expanded: boolean };
@@ -18,7 +20,9 @@ type Row = { kind: "option"; option: SelectOption; inGroup: boolean } | { kind: 
 /** The rows on screen: ungrouped options, then each group's row followed by its options when it is open (or searched). */
 function buildRows(options: SelectOption[], openGroups: Set<string>, query: string): Row[] {
   const q = query.trim().toLowerCase();
-  const matches = (o: SelectOption) => !q || `${o.label} ${o.hint ?? ""} ${o.group ?? ""}`.toLowerCase().includes(q);
+  const digits = q.replace(/\D/g, "");
+  const matches = (o: SelectOption) =>
+    !q || `${o.label} ${o.hint ?? ""} ${o.group ?? ""} ${o.keywords ?? ""}`.toLowerCase().includes(q) || (digits.length >= 3 && (o.keywords ?? "").replace(/\D/g, "").includes(digits));
   const rows: Row[] = options.filter((o) => !o.group && matches(o)).map((option) => ({ kind: "option", option, inGroup: false }));
   for (const name of new Set(options.flatMap((o) => (o.group ? [o.group] : [])))) {
     const members = options.filter((o) => o.group === name && matches(o));
@@ -50,6 +54,7 @@ export function Select({
   disabled,
   className,
   "aria-label": ariaLabel,
+  action,
 }: {
   id?: string;
   value: string;
@@ -63,6 +68,8 @@ export function Select({
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
+  /** A row above the options that starts something new (e.g. "New customer"); it gets what was typed in the search box. */
+  action?: { label: string; onPick: (query: string) => void };
 }) {
   const autoId = useId();
   const triggerId = id ?? `${autoId}-select`;
@@ -188,6 +195,24 @@ export function Select({
     </div>
   );
 
+  const actionRow = action && (
+    <div className="shrink-0 px-1.5 pt-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          const typed = query.trim();
+          close();
+          action.onPick(typed);
+        }}
+        className={cn("flex w-full items-center gap-2.5 rounded-xl px-3 font-medium text-accent hover:bg-accent-soft", sheet ? "min-h-12 text-[17px]" : "min-h-10 text-[15px]")}
+      >
+        <Plus size={18} strokeWidth={2.25} aria-hidden />
+        {action.label}
+        {query.trim() && <span className="min-w-0 truncate font-normal text-ink-secondary">“{query.trim()}”</span>}
+      </button>
+    </div>
+  );
+
   const list = (
     <>
       <ul
@@ -282,6 +307,7 @@ export function Select({
 
       <PopoverPanel popover={popover} title={name}>
         {search}
+        {actionRow}
         {list}
       </PopoverPanel>
     </>

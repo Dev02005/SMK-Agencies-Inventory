@@ -22,7 +22,7 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Area | Screens |
 | --- | --- |
 | Shell | Sidebar (desktop), icon rail (tablet), tab bar + quick-add sheet (phone), search (Ctrl K), profile menu with **View as** role switcher, Account and Sign out |
-| Sign-in | `/login` first, with a mobile number or email (`src/lib/login.ts`): every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
+| Sign-in | `/login` first, in two steps: the mobile number (or email), then the person's saved name is shown and they enter their password (`src/lib/login.ts`; name look-ups are limited to 20 per 10 minutes per address): every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
 | Account | `/settings/account` (Settings › Account): who is signed in, login ID, when they signed in, a countdown to the midnight sign-out, change password, sign out |
 | Home | `/` dashboard with today's real date and a live clock: today's sales, cash with staff, collected / outstanding / overdue, approvals, dues |
 | Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill, `/sales/lorries` (+ `/new`) company lorries sold straight off the truck |
@@ -31,7 +31,7 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Parties | `/parties` with balances, `/parties/[id]` ledger (detailed / summary) and ageing, `/parties/new` |
 | Money | `/money` receipts and payments, `/money/receipts/new`, `/money/payments/new` |
 | Stock | `/stock` godown balances and movements. Stock comes in only through a purchase: saving a purchase puts its items into the purchase's godown (there is no separate inward step) |
-| Settings | `/settings` for everyone: Account and Install app; the owner and office also get firm details (two firms, with Add firm; New sale asks which firm the bill is from), godowns, products & rates, users & roles |
+| Settings | `/settings` for everyone: Account and Install app; the owner and office also get firm details (each firm's details, Add firm and the Primary firm tick: sales are billed from the primary firm, New purchase asks which firm), godowns with their in-charges, products & rates, users & roles |
 | Dates and downloads | Every list has the same date filter (All dates, Today, Last 7 days, This month, Pick a day, From – to), kept in the page address (`src/lib/date-filter.ts`), and **Download** and **Share** buttons: Excel (.xlsx), PDF (A4 pages) or a JPG picture of what is on screen after the filters, plus Print. Share opens the phone's or computer's share sheet (WhatsApp, mail…); where a browser can't share files it saves the file and opens WhatsApp or email to attach it, or copies the picture to paste. Files are made in the browser (`src/lib/export/`); card pages carry a hidden table for this (`src/components/ui/export-table.tsx`) |
 | Staff cash | `/money/cash` everyone's cash today, `/money/cash/[holder]` day-by-day cash book with counts, `/money/cash/handover/new` |
 | Expenses | `/money/expenses` by head with this month's split, `/money/expenses/new` with fixed heads, paid-from and vehicle/staff/godown tag |
@@ -63,6 +63,29 @@ Read state for notifications, the install card's "Not now" and the Excel export 
 Accessibility and phones (F6 pass): every route was checked with axe-core at 375, 800 and 1280 px wide and for sideways scrolling on phones; all pass. Small text meets WCAG AA contrast (greys, blue and green are a shade darker than Apple's web values for this), there is a "Skip to content" link, swipe rows and wide tables can be scrolled with the keyboard, and back links and tick boxes have larger tap areas.
 
 The frontend is complete. Next: connect Supabase.
+
+## The firm's own records
+
+The firm's real records are kept in `local-data/` on the computer that runs the app, never in the code: `local-data/` is in `.gitignore`, so it never goes to GitHub (the repository is public). Each file replaces the matching sample records when it is there; without it the app runs on sample data (`src/lib/data/local-data.ts` and `firms.ts` read them).
+
+| File | Holds | Changed from |
+|---|---|---|
+| `firms.json` | Each firm's name, GSTIN, phone, address and which one is primary (sales are billed only from the primary firm; purchases ask which firm) | Settings › Firm details (saved straight away) |
+| `staff.json` | The owner's name and mobile, and each staff member's name, designation, role (`office`, `field`, `godown` or `driver`), mobile and the godowns they look after | By hand for now; restart the app after editing |
+| `godowns.json` | Our own godowns and the companies' godowns, own ones first | By hand for now; restart the app |
+| `vehicles.json` | Our vehicles (`own` lorries and vans are offered for FOR deliveries) | By hand for now; restart the app |
+| `customers.json` | Customers and sub-dealers added in the app | New sale › Party › New customer (saved straight away) |
+| `suppliers.json` | The companies we buy from and the brand(s) each sells (a purchase offers only that company's products) | By hand for now; restart the app |
+| `products.json` | Each company's cement types (and any steel items) with their list rates | Settings › Products & rates (rates and new products save straight away) |
+| `banks.json` | Each firm's business bank accounts: bank, account number, IFSC, branch, opening balance | By hand for now; restart the app |
+
+Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns they look after, with only those godowns' stock, purchases, sales and transfers; the owner and staff who look after no godown see them all (`getMyGodowns` in `src/lib/data`). Lorry sales are the owner's alone, checked on the server (`src/components/auth/owner-only.tsx`).
+
+`replaces` in `staff.json` and `vehicles.json` lets a real person or vehicle take over a sample one's records. Firm details are written to the file when saved, so on a host with a read-only disk they need Supabase. With Supabase these files become database tables.
+
+```json
+{ "staff": [{ "name": "Example", "designation": "Wholesale manager", "role": "field", "mobile": "9000000000", "godowns": ["g-polaki"] }] }
+```
 
 ## Connect Supabase
 

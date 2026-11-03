@@ -2,6 +2,7 @@ import { Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { OwnerOnly } from "@/components/auth/owner-only";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -16,22 +17,31 @@ import { CloseLorry, DeviceLorries, SellOut } from "./lorry-cards";
 
 export const metadata: Metadata = { title: "Lorry sales" };
 
-/** Company lorries being sold straight off the truck: the bills made from each, then closing it. Bags left are under Stock › Lorry stock. */
+/**
+ * Company lorries being sold straight off the truck: the bills made from each, then closing it. Only the owner sees
+ * lorry sales. New lorries are noted under Purchases › Lorry purchases; bags left are under Stock › Lorry stock.
+ */
 export default function LorrySalesPage({ searchParams }: PageProps<"/sales/lorries">) {
   return (
     <div className="animate-fade-up">
-      <PageHeader
-        title="Lorry sales"
-        subtitle="Company lorries sold straight off the truck"
-        actions={
-          <>
-            <SampleChip />
-            <ButtonLink href="/sales/lorries/new">Lorry arrived</ButtonLink>
-          </>
-        }
-      />
       <Suspense fallback={<ListSkeleton />}>
-        <Loads searchParams={searchParams} />
+        <OwnerOnly what="lorry sales">
+          <PageHeader
+            title="Lorry sales"
+            subtitle="Company lorries sold straight off the truck"
+            actions={
+              <>
+                <SampleChip />
+                <ButtonLink href="/purchases/lorries" variant="secondary">
+                  Lorry purchases
+                </ButtonLink>
+              </>
+            }
+          />
+          <Suspense fallback={<ListSkeleton />}>
+            <Loads searchParams={searchParams} />
+          </Suspense>
+        </OwnerOnly>
       </Suspense>
     </div>
   );

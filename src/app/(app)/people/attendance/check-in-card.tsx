@@ -1,7 +1,7 @@
 "use client";
 
 import { LogIn, LogOut, MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { useViewAs } from "@/lib/roles";
 
@@ -23,15 +23,15 @@ export function CheckInCard({ checkedInAt }: { checkedInAt: Record<string, strin
           <MapPin size={13} strokeWidth={1.75} aria-hidden /> Your location is saved only at check-in and check-out.
         </p>
       </div>
-      <Button
-        className="md:w-auto"
+      <IconButton
+        label={time ? "Check out" : "Check in"}
+        variant="primary"
         onClick={() =>
           toast(time ? "Sample mode: check-out time and location would be saved." : "Sample mode: check-in time and location would be saved.")
         }
       >
-        {time ? <LogOut size={18} strokeWidth={1.75} aria-hidden /> : <LogIn size={18} strokeWidth={1.75} aria-hidden />}
-        {time ? "Check out" : "Check in"}
-      </Button>
+        {time ? <LogOut size={19} strokeWidth={1.9} aria-hidden /> : <LogIn size={19} strokeWidth={1.9} aria-hidden />}
+      </IconButton>
     </section>
   );
 }

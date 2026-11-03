@@ -3,6 +3,7 @@
  * becomes a query (or a call to a database view), and the screens stay unchanged.
  */
 import "server-only";
+import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { todayISO } from "@/lib/format";
@@ -11,8 +12,10 @@ import * as base from "./sample";
 import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
+import { loadFirms } from "./firms";
+import { addLocalCustomer, ownerDesignation, saveLocalProduct } from "./local-data";
 import * as phase5 from "./sample-phase5";
-import type { Ageing, BankEntry, CashHolder, LedgerEntry, Party, Profile, Sale } from "./types";
+import type { Ageing, BankEntry, CashHolder, LedgerEntry, Party, Product, Profile, Sale } from "./types";
 
 export type * from "./types";
 
@@ -69,13 +72,15 @@ export type SaleWithParty = Sale & { partyName: string };
 
 // ── Masters ──────────────────────────────────────────────────────────────────
 
+/** The primary firm: sales are billed from it, and it heads the sign-in page, reports and statements. */
 export async function getFirm() {
-  return base.firm;
+  const firms = await loadFirms();
+  return firms.find((f) => f.primary) ?? firms[0];
 }
 
-/** Every firm the owner bills under, the main one first. */
+/** Every firm the owner has, in the order they were added (one of them is marked primary). */
 export async function getFirms() {
-  return base.firms;
+  return loadFirms();
 }
 
 /** The signed-in person, from the session (signing in again if there is none). */
@@ -92,12 +97,66 @@ export async function getProfile(id: string | undefined) {
   return base.profiles.find((p) => p.id === id);
 }
 
+/** Every godown (for names and lookups); lists a person sees use getMyGodowns. */
 export async function getGodowns() {
   return base.godowns;
 }
 
+/**
+ * The godowns the signed-in person may see. Someone who is a godown's in-charge (Settings › Godowns) sees only the
+ * godowns they look after, with only those godowns' stock, purchases, sales and transfers; the owner and staff who
+ * look after no godown see them all. Null means every godown.
+ */
+async function visibleGodowns(): Promise<Set<string> | null> {
+  const user = await getCurrentUser();
+  if (user.role === "owner") return null;
+  const mine = base.godowns.filter((g) => g.inCharge?.includes(user.id)).map((g) => g.id);
+  return mine.length > 0 ? new Set(mine) : null;
+}
+
+const canSee = (visible: Set<string> | null, godownId: string | undefined) => visible === null || (godownId !== undefined && visible.has(godownId));
+
+/** The godowns the signed-in person may see and pick (stock, Load from, Unload at…). */
+export async function getMyGodowns() {
+  const visible = await visibleGodowns();
+  return base.godowns.filter((g) => canSee(visible, g.id));
+}
+
+/** Tag for the product list's cache; Settings › Products & rates refreshes it when a rate or product is saved. */
+export const PRODUCTS_TAG = "products";
+
 export async function getProducts() {
+  "use cache";
+  cacheLife("max");
+  cacheTag(PRODUCTS_TAG);
   return base.products;
+}
+
+/** Settings › Products & rates: a new list rate for one product; new bills start from it. */
+export async function setProductRate(id: string, listRate: number): Promise<boolean> {
+  const product = base.products.find((p) => p.id === id);
+  if (!product) return false;
+  saveLocalProduct(base.products, { ...product, listRate });
+  return true;
+}
+
+/** Settings › Products & rates: adds a product (a company's cement type, or a steel item). */
+export async function addProduct(input: { brand: string; variant: string; category: Product["category"]; listRate: number }): Promise<Product> {
+  const slug = `${input.brand}-${input.variant}`.toLowerCase().replace(/\+/g, "-plus").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  let id = `p-${slug}`;
+  for (let n = 2; base.products.some((p) => p.id === id); n++) id = `p-${slug}-${n}`;
+  const product: Product = {
+    id,
+    name: `${input.brand} ${input.variant}`,
+    brand: input.brand,
+    variant: input.variant,
+    category: input.category,
+    unit: input.category === "cement" ? "bag" : "kg",
+    listRate: input.listRate,
+    active: true,
+  };
+  saveLocalProduct(base.products, product);
+  return product;
 }
 
 // ── Parties and ledgers ──────────────────────────────────────────────────────
@@ -226,6 +285,14 @@ export async function getParties(): Promise<PartyWithBalance[]> {
   return sample.parties.map(withBalance);
 }
 
+/** Adds a customer or sub-dealer (New sale › New customer); they can be billed straight away. No credit until the owner sets a limit. */
+export async function addCustomer(input: { name: string; mobile: string; place: string; kind: "customer" | "sub_dealer" }): Promise<PartyWithBalance> {
+  await live();
+  const party: Party = { id: `c-${Date.now().toString(36)}`, name: input.name, kind: input.kind, place: input.place || undefined, mobile: input.mobile, creditLimit: null, openingBalance: 0 };
+  addLocalCustomer(base.parties, party);
+  return withBalance(party);
+}
+
 export async function getParty(id: string): Promise<PartyWithBalance | undefined> {
   await live();
   const party = sample.parties.find((p) => p.id === id);
@@ -250,14 +317,17 @@ const newestFirst = <T extends { date?: string; billDate?: string }>(a: T, b: T)
 
 export async function getSales(): Promise<SaleWithParty[]> {
   await live();
+  const visible = await visibleGodowns();
   return sample.sales
+    .filter((s) => canSee(visible, s.godownId))
     .map((s) => ({ ...s, partyName: partyName(s.partyId) }))
     .sort((a, b) => newestFirst(a, b) || b.billNo - a.billNo);
 }
 
 export async function getSale(id: string): Promise<SaleWithParty | undefined> {
   await live();
-  const sale = sample.sales.find((s) => s.id === id);
+  const visible = await visibleGodowns();
+  const sale = sample.sales.find((s) => s.id === id && canSee(visible, s.godownId));
   return sale && { ...sale, partyName: partyName(sale.partyId) };
 }
 
@@ -278,14 +348,17 @@ export async function getQuotationTerms() {
 
 export async function getPurchases() {
   await live();
+  const visible = await visibleGodowns();
   return sample.purchases
+    .filter((p) => canSee(visible, p.godownId))
     .map((p) => ({ ...p, companyName: partyName(p.companyId) }))
     .sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
 }
 
 export async function getPurchase(id: string) {
   await live();
-  const purchase = sample.purchases.find((p) => p.id === id);
+  const visible = await visibleGodowns();
+  const purchase = sample.purchases.find((p) => p.id === id && canSee(visible, p.godownId));
   return purchase && { ...purchase, companyName: partyName(purchase.companyId) };
 }
 
@@ -307,8 +380,9 @@ export async function getPayments() {
 
 export async function getStockBalances() {
   await live();
+  const visible = await visibleGodowns();
   const totals = new Map<string, { godownId: string; productId: string; qty: number }>();
-  for (const m of sample.stockMovements) {
+  for (const m of sample.stockMovements.filter((x) => canSee(visible, x.godownId))) {
     const key = `${m.godownId}|${m.productId}`;
     const row = totals.get(key) ?? { godownId: m.godownId, productId: m.productId, qty: 0 };
     row.qty += m.qty;
@@ -320,12 +394,14 @@ export async function getStockBalances() {
 /** Every movement including opening stock, for the stock summary report. */
 export async function getAllStockMovements() {
   await live();
-  return [...sample.stockMovements];
+  const visible = await visibleGodowns();
+  return sample.stockMovements.filter((m) => canSee(visible, m.godownId));
 }
 
 export async function getStockMovements() {
   await live();
-  return [...sample.stockMovements].filter((m) => m.kind !== "opening").sort((a, b) => b.date.localeCompare(a.date));
+  const visible = await visibleGodowns();
+  return sample.stockMovements.filter((m) => m.kind !== "opening" && canSee(visible, m.godownId)).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -729,6 +805,12 @@ function loanBalance(loan: (typeof phase3.loans)[number]) {
   return loan.amount - loan.repayments.reduce((s, r) => s + r.amount, 0);
 }
 
+/** Each person's designation ("Wholesale manager", "Owner"…), without the day's attendance, so any page can show it. */
+export async function getDesignations(): Promise<Record<string, string>> {
+  const owner = base.profiles.find((p) => p.role === "owner");
+  return { ...(owner ? { [owner.id]: ownerDesignation ?? "Owner" } : {}), ...Object.fromEntries(base3.employees.map((e) => [e.profileId, e.designation])) };
+}
+
 export async function getEmployees() {
   await live();
   return phase3.employees.map((e) => {
@@ -882,7 +964,7 @@ export async function getFieldHome(profileId: string) {
 export async function getGodownHome() {
   await live();
   const today = sample.SAMPLE_TODAY;
-  const [balances, products, godowns, orders] = await Promise.all([getStockBalances(), getProducts(), getGodowns(), getOrders()]);
+  const [balances, products, godowns, orders, visible] = await Promise.all([getStockBalances(), getProducts(), getMyGodowns(), getOrders(), visibleGodowns()]);
   return {
     attendance: phase3.attendance.find((a) => a.profileId === sample.profiles.find((p) => p.role === "godown")?.id && a.date === today),
     stock: godowns.map((g) => ({
@@ -890,10 +972,10 @@ export async function getGodownHome() {
       items: balances.filter((b) => b.godownId === g.id).map((b) => ({ ...b, product: products.find((p) => p.id === b.productId)! })),
     })),
     lorriesToday: sample.purchases
-      .filter((p) => p.receivedDate === today && !p.onLorry)
+      .filter((p) => p.receivedDate === today && !p.onLorry && canSee(visible, p.godownId))
       .map((p) => ({ ...p, companyName: partyName(p.companyId), godownName: godowns.find((g) => g.id === p.godownId)?.name })),
     toLoad: sample.sales
-      .filter((s) => s.billDate === today && s.status === "saved" && s.source === "godown")
+      .filter((s) => s.billDate === today && s.status === "saved" && s.source === "godown" && canSee(visible, s.godownId))
       .map((s) => ({
         id: s.id,
         billNo: s.billNo,
@@ -928,7 +1010,9 @@ const godownName = (id: string) => sample.godowns.find((g) => g.id === id)?.name
 
 export async function getTransfers() {
   await live();
-  return [...phase4.transfers]
+  const visible = await visibleGodowns();
+  return phase4.transfers
+    .filter((t) => canSee(visible, t.from) || canSee(visible, t.to))
     .map((t) => ({ ...t, fromName: godownName(t.from), toName: godownName(t.to) }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
@@ -964,7 +1048,9 @@ export async function getLorryLoads() {
 
 export async function getSuspenseLoads() {
   await live();
+  const visible = await visibleGodowns();
   return phase4.suspenseLoads
+    .filter((s) => canSee(visible, s.godownId))
     .map((s) => ({
       ...s,
       godownName: godownName(s.godownId),
@@ -1104,5 +1190,5 @@ export async function getReminderSetup() {
         staff: r.staff ?? "Our staff",
       };
     });
-  return { templates: [...phase5.reminderTemplates], rules: { ...phase5.reminderRules }, previews, firm: sample.firm };
+  return { templates: [...phase5.reminderTemplates], rules: { ...phase5.reminderRules }, previews, firm: await getFirm() };
 }

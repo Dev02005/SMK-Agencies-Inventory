@@ -4,7 +4,7 @@ import { BankList } from "@/components/money/bank-list";
 import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { getBankAccounts } from "@/lib/data";
+import { getBankAccounts, getFirms } from "@/lib/data";
 
 export const metadata: Metadata = { title: "Banks" };
 
@@ -32,5 +32,6 @@ export default function BanksPage() {
 }
 
 async function Accounts() {
-  return <BankList accounts={await getBankAccounts("business")} />;
+  const [accounts, firms] = await Promise.all([getBankAccounts("business"), getFirms()]);
+  return <BankList accounts={accounts} firmNames={Object.fromEntries(firms.map((f) => [f.id, f.name]))} />;
 }

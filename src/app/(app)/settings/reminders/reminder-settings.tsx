@@ -3,7 +3,7 @@
 import { Send } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { SectionCard } from "@/components/ui/blocks";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
@@ -273,13 +273,12 @@ export function ReminderSettings({
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <Button
-                variant="secondary"
+              <IconButton
+                label="Send me a test"
                 onClick={() => toast(`Sample mode: a test ${t.channel === "whatsapp" ? "WhatsApp" : "SMS"} to ${firm.phone} was checked but not sent. Sending starts once a provider is connected.`)}
               >
-                <Send size={17} strokeWidth={1.75} aria-hidden />
-                Send me a test
-              </Button>
+                <Send size={18} strokeWidth={1.9} aria-hidden />
+              </IconButton>
               <Button type="submit" disabled={unknown.length > 0 || !t.body.trim()}>
                 Save message
               </Button>

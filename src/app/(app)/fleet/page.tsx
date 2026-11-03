@@ -50,10 +50,7 @@ async function VehicleList() {
                       <Chip>{categoryLabel[v.category]}</Chip>
                     </p>
                     <p className="text-[13px] text-ink-secondary">
-                      {v.model}
-                      {v.capacityMT && ` · ${v.capacityMT} MT`}
-                      {v.driverName && ` · ${v.driverName}`}
-                      {v.ownerName && ` · ${v.ownerName}`}
+                      {[v.model, v.capacityMT && `${v.capacityMT} MT`, v.driverName, v.ownerName].filter(Boolean).join(" · ") || "Details not added yet"}
                     </p>
                   </div>
                   <ChevronRight size={18} strokeWidth={1.75} className="mt-1 text-ink-tertiary" aria-hidden />

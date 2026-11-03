@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { AttendanceChip, attendanceLabels } from "@/components/people/attendance-chip";
 import { TargetBar } from "@/components/people/target-bar";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
-import { buttonClass } from "@/components/ui/button";
+import { iconButtonClass } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
@@ -45,8 +45,8 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
         actions={
           <>
             <SampleChip />
-            <a href={`tel:+91${e.mobile}`} className={buttonClass("secondary")}>
-              <Phone size={17} strokeWidth={1.75} aria-hidden /> Call
+            <a href={`tel:+91${e.mobile}`} aria-label={`Call ${e.fullName}`} title="Call" className={iconButtonClass()}>
+              <Phone size={18} strokeWidth={1.9} aria-hidden />
             </a>
           </>
         }

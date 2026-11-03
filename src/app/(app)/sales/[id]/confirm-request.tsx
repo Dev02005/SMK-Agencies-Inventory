@@ -32,7 +32,7 @@ export function ConfirmRequest({
 }) {
   const id = useId();
   const toast = useToast();
-  const [rates, setRates] = useState(lines.map((l) => String(l.rate || l.listRate)));
+  const [rates, setRates] = useState(lines.map((l) => (l.rate || l.listRate ? String(l.rate || l.listRate) : "")));
   const [discount, setDiscount] = useState(initialDiscount ? String(initialDiscount) : "");
   const [transport, setTransport] = useState(charges.transport ? String(charges.transport) : "");
   const [other, setOther] = useState(charges.other ? String(charges.other) : "");
@@ -60,7 +60,7 @@ export function ConfirmRequest({
             <div className="min-w-0 self-center">
               <p className="truncate text-[15px] font-medium text-ink">{l.name}</p>
               <p className="text-[13px] text-ink-secondary">
-                {formatNumber(l.qty)} {l.unitLabel} · {formatNumber(l.mt, 3)} MT · list {formatINR(l.listRate)}
+                {formatNumber(l.qty)} {l.unitLabel} · {formatNumber(l.mt, 3)} MT{l.listRate > 0 && ` · list ${formatINR(l.listRate)}`}
               </p>
             </div>
             <Field label={`Rate per ${l.unit}`} htmlFor={`${id}-rate-${i}`}>

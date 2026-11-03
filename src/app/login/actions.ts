@@ -1,10 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/data";
 import type { Role } from "@/lib/data/types";
-import { findLogin } from "@/lib/login";
+import { findLogin, findPerson } from "@/lib/login";
 import { passwordProblem } from "@/lib/password-rules";
 import { setPassword } from "@/lib/passwords";
 import { PERSONAL_COOKIE } from "@/lib/personal-lock";
@@ -22,6 +22,30 @@ async function startSession(userId: string, mustChange: boolean) {
     path: "/",
     expires: session.expires,
   });
+}
+
+// Name look-ups per address in the last 10 minutes, so the staff list can't be read off number by number.
+const lookups = new Map<string, number[]>();
+const LOOKUP_LIMIT = 20;
+const LOOKUP_WINDOW = 10 * 60_000;
+
+export type LookUpResult = { ok: true; name: string; initials: string; designation: string } | { ok: false; reason: "unknown" | "too-many" };
+
+/** Sign-in step 1: the name saved for this mobile number (or email), shown before asking for the password. */
+export async function lookUpLogin(loginId: string): Promise<LookUpResult> {
+  const from = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const now = Date.now();
+  const recent = (lookups.get(from) ?? []).filter((at) => now - at < LOOKUP_WINDOW);
+  if (recent.length >= LOOKUP_LIMIT) return { ok: false, reason: "too-many" };
+  lookups.set(from, [...recent, now]);
+
+  const person = typeof loginId === "string" && loginId.length <= 100 ? await findPerson(loginId) : null;
+  if (!person) {
+    // The same short wait as a wrong password, so guessing numbers is slow.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return { ok: false, reason: "unknown" };
+  }
+  return { ok: true, ...person };
 }
 
 export type SignInResult = { ok: false } | { ok: true; user: { id: string; role: Role }; next: string };

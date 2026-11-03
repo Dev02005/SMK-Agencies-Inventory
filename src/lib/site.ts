@@ -1,7 +1,9 @@
-/** Public address and wording used in page metadata, share previews, robots.txt and the sitemap. */
+/** Public address used in page metadata, share previews, robots.txt and the sitemap. */
 export const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 
-export const siteName = "SKA · Sri Kameswari Agencies";
+/** "SKA · <primary firm>", for page titles and share previews; the firm comes from Settings › Firm details. */
+export const siteNameFor = (firmName: string) => `SKA · ${firmName}`;
 
-export const siteDescription =
-  "Sri Kameswari Agencies, Polaki: wholesale cement and TMT steel dealers in Srikakulam district. Staff sign in here for sales, money, stock and deliveries.";
+export function siteDescriptionFor(firm: { name: string; address: string }) {
+  return `${firm.name}${firm.address ? `, ${firm.address}` : ""}: wholesale cement and TMT steel. Staff sign in here for sales, money, stock and deliveries.`;
+}

@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
+import { getFirm } from "@/lib/data";
+import { siteNameFor } from "@/lib/site";
 
-export default function manifest(): MetadataRoute.Manifest {
+/** The installed app's name and description follow the primary firm (Settings › Firm details). */
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const firm = await getFirm();
   return {
     id: "/",
-    name: "SKA · Sri Kameswari Agencies",
+    name: siteNameFor(firm.name),
     short_name: "SKA",
-    description: "Sales, money, stock, staff and personal records for Sri Kameswari Agencies.",
+    description: `Sales, money, stock, staff and personal records for ${firm.name}.`,
     lang: "en-IN",
     dir: "ltr",
     start_url: "/",

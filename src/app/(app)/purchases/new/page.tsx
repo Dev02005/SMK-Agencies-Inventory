@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { BackLink, ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getGodowns, getParties, getProducts } from "@/lib/data";
+import { getFirms, getMyGodowns, getParties, getProducts } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { PurchaseForm } from "./purchase-form";
 
@@ -22,10 +22,11 @@ export default function NewPurchasePage() {
 
 async function FormForToday() {
   await connection();
-  const [parties, products, godowns] = await Promise.all([getParties(), getProducts(), getGodowns()]);
+  const [firms, parties, products, godowns] = await Promise.all([getFirms(), getParties(), getProducts(), getMyGodowns()]);
   return (
     <PurchaseForm
-      companies={parties.filter((p) => p.kind === "company").map((p) => ({ id: p.id, name: p.name }))}
+      firms={firms.map((f) => ({ id: f.id, name: f.name, gstin: f.gstin }))}
+      companies={parties.filter((p) => p.kind === "company").map((p) => ({ id: p.id, name: p.name, brands: p.brands }))}
       products={products.filter((p) => p.active)}
       godowns={godowns}
       today={todayISO()}

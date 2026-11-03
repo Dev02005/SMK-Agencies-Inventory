@@ -8,7 +8,7 @@ import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/cn";
-import { getGodowns, getProducts, getStockBalances, getStockMovements } from "@/lib/data";
+import { getMyGodowns, getProducts, getProfiles, getStockBalances, getStockMovements } from "@/lib/data";
 import { inDateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate, formatNumber, formatShortDate } from "@/lib/format";
 import { pageDateFilter } from "@/lib/page-dates";
@@ -16,7 +16,7 @@ import { lineQty } from "@/lib/quantities";
 import { toMT } from "@/lib/sales";
 import { isLowStock } from "@/lib/limits";
 
-export const metadata: Metadata = { title: "Stock" };
+export const metadata: Metadata = { title: "Godown stock" };
 
 /** Proposed low-stock levels until the owner sets them per product in Settings. */
 
@@ -27,7 +27,7 @@ export default function StockPage({ searchParams }: PageProps<"/stock">) {
   return (
     <div className="animate-fade-up">
       <PageHeader
-        title="Stock"
+        title="Godown stock"
         subtitle="What is in each godown right now"
         actions={
           <>
@@ -44,13 +44,15 @@ export default function StockPage({ searchParams }: PageProps<"/stock">) {
 }
 
 async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["searchParams"] }) {
-  const [balances, godowns, products, all, dates] = await Promise.all([
+  const [balances, godowns, products, all, dates, profiles] = await Promise.all([
     getStockBalances(),
-    getGodowns(),
+    getMyGodowns(),
     getProducts(),
     getStockMovements(),
     pageDateFilter(searchParams, movementDates),
+    getProfiles(),
   ]);
+  const inCharge = (ids: string[] = []) => ids.map((id) => profiles.find((p) => p.id === id)?.fullName).filter(Boolean).join(", ");
   const product = (id: string) => products.find((p) => p.id === id);
   const movements = all.filter((m) => inDateFilter(m.date, dates));
 
@@ -63,6 +65,8 @@ async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["
           const steelMT = rows.reduce((s, r) => s + (product(r.productId)?.unit === "kg" ? toMT(r.qty, "kg") : 0), 0);
           return (
             <SectionCard key={g.id} title={g.name} action={<span className="text-[13px] text-ink-secondary">{formatNumber(cementMT)} MT cement · {formatNumber(steelMT)} MT steel</span>}>
+              <p className="-mt-2 mb-1 text-[13px] text-ink-secondary">In-charge: {inCharge(g.inCharge) || "not assigned"}</p>
+              {rows.length === 0 && <p className="py-2.5 text-[14px] text-ink-tertiary">No stock here yet.</p>}
               <ul className="divide-y divide-hairline">
                 {rows.map((r) => {
                   const p = product(r.productId);
@@ -99,7 +103,7 @@ async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["
       />
 
       <h2 className="pt-2 text-[22px] font-semibold tracking-[-0.3px] text-ink">Movements</h2>
-      <DataTools title="Stock" presets={movementDates} />
+      <DataTools title="Godown stock" presets={movementDates} />
       <DataTable
         rows={movements}
         empty="No stock moved in these dates."

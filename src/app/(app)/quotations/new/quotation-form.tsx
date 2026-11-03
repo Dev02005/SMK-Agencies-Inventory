@@ -3,7 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 import { ProductPicker } from "@/components/forms/product-picker";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
@@ -162,16 +162,16 @@ export function QuotationForm({
             );
           })}
         </ul>
-        <Button
-          variant="secondary"
-          className="mt-1 w-full"
+        <IconButton
+          label="Add item"
+          className="mt-1"
           onClick={() => {
             setLines((ls) => [...ls, { key: nextKey, productId: products[0].id, qty: "", rate: String(products[0].listRate) }]);
             setNextKey((k) => k + 1);
           }}
         >
-          <Plus size={18} strokeWidth={2} aria-hidden /> Add item
-        </Button>
+          <Plus size={20} strokeWidth={2} aria-hidden />
+        </IconButton>
         <div className="mt-4 flex items-baseline justify-between border-t border-hairline pt-4">
           <span className="text-[15px] text-ink-secondary">Grand total</span>
           <span className="text-[28px] font-semibold tabular-nums tracking-[-0.4px] text-ink">{formatINR(total)}</span>

@@ -4,7 +4,7 @@ import { Send } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { FilterChips } from "@/components/ui/filters";
 import { useToast } from "@/components/ui/toast";
@@ -69,13 +69,15 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
             { value: "30", label: "Over 30 days" },
           ]}
         />
-        <Button
+        <IconButton
+          label="Send reminders"
+          variant="primary"
+          badge={selected.size}
           disabled={selected.size === 0}
           onClick={() => toast(`Sample mode: ${selected.size} WhatsApp reminder${selected.size === 1 ? "" : "s"} checked but not sent. Sending starts once a WhatsApp provider is connected.`)}
         >
-          <Send size={17} strokeWidth={1.75} aria-hidden />
-          Send reminders ({selected.size})
-        </Button>
+          <Send size={18} strokeWidth={1.9} aria-hidden />
+        </IconButton>
       </div>
 
       {/* Phones: one card per party */}

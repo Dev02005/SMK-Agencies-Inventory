@@ -2,13 +2,14 @@ import { ChevronRight, Landmark } from "lucide-react";
 import Link from "next/link";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
+import { maskAccountNo } from "@/lib/bank-book";
 import type { BankAccount, BankEntry } from "@/lib/data/types";
 import { formatDate, formatINR, formatShortDate } from "@/lib/format";
 
 const signed = (n: number) => (n >= 0 ? `+ ${formatINR(n)}` : `− ${formatINR(-n)}`);
 
 /** One card per bank account; used for business banks and the owner's personal accounts. */
-export function BankCards({ accounts, hrefBase }: { accounts: (BankAccount & { balance: number })[]; hrefBase: string }) {
+export function BankCards({ accounts, hrefBase, firmNames = {} }: { accounts: (BankAccount & { balance: number })[]; hrefBase: string; firmNames?: Record<string, string> }) {
   return (
     <ul className="grid gap-4 md:grid-cols-2">
       {accounts.map((a) => (
@@ -20,8 +21,12 @@ export function BankCards({ accounts, hrefBase }: { accounts: (BankAccount & { b
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[17px] font-semibold tracking-[-0.3px] text-ink">{a.name}</span>
               <span className="block text-[13px] text-ink-secondary">
-                {a.bank} · {a.accountNo}
+                {a.bank} · {maskAccountNo(a.accountNo)}
               </span>
+              {(a.ifsc || a.branch) && (
+                <span className="block text-[12px] text-ink-secondary">{[a.ifsc && `IFSC ${a.ifsc}`, a.branch && `${a.branch} branch`].filter(Boolean).join(" · ")}</span>
+              )}
+              {a.firmId && firmNames[a.firmId] && <span className="mt-1 block truncate text-[12px] font-medium text-accent">{firmNames[a.firmId]}</span>}
             </span>
             <span className="text-right">
               <span className="block text-[12px] text-ink-secondary">Balance</span>
