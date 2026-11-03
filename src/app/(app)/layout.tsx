@@ -3,8 +3,8 @@ import { Suspense, type ReactNode } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { MidnightSignOut, SignedInSync } from "@/components/shell/midnight-sign-out";
 import { requireSession } from "@/lib/auth";
-import { getCurrentUser, getFirm, getProfiles } from "@/lib/data";
-import { getNotifications } from "@/lib/notifications";
+import { getCurrentUser, getFirm, getShellProfiles } from "@/lib/data";
+import { getMyNotifications } from "@/lib/notifications";
 
 /** Everything behind sign-in holds business records, so search engines are told not to list or follow it. */
 export const metadata: Metadata = {
@@ -12,15 +12,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * Sample mode sends every role's notifications and the staff list, because "View as" picks the role in the
- * browser. With Supabase this must send only noticesFor(the signed-in user's role, their id).
- * Notices are for today, so they stream in (the shell doesn't wait for them).
+ * The owner gets the staff list and every role's notices, because "View as" picks the role in the browser; anyone
+ * else gets only their own profile and notices. Both depend on who is signed in, so they stream in.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const [profiles, firm] = await Promise.all([getProfiles(), getFirm()]);
+  const firm = await getFirm();
   return (
     <>
-      <AppShell profiles={profiles} firmName={firm.name} notices={getNotifications()}>
+      <AppShell people={getShellProfiles()} firmName={firm.name} notices={getMyNotifications()}>
         {children}
       </AppShell>
       <Suspense>

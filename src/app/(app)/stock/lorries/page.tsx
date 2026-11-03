@@ -1,53 +1,48 @@
-import { Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
-import { Chip } from "@/components/ui/chip";
+import { OwnerOnly } from "@/components/auth/owner-only";
+import { LorryDue, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { ListSkeleton, SectionCard } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { PageHeader } from "@/components/ui/page-header";
-import { getLorryLoads, getProducts } from "@/lib/data";
-import { formatDate } from "@/lib/format";
-import { DeviceLorryStock } from "./device-lorry-stock";
-import { LoadLines } from "./load-lines";
+import { getLorries, getProducts, getToday } from "@/lib/data";
+import { lorryLeft } from "@/lib/lorries";
+import { describeQuantities } from "@/lib/quantities";
 
 export const metadata: Metadata = { title: "Lorry stock" };
 
-/** Bags still on company lorries that are being sold off the truck. The lorries themselves and their bills are under Sales › Lorry sales. */
+/** What is on company lorries still selling off the truck. Once a lorry's sale is updated it leaves this list. */
 export default function LorryStockPage() {
   return (
     <div className="animate-fade-up">
-      <PageHeader title="Lorry stock" subtitle="Bags still on company lorries being sold straight off the truck" actions={<SampleChip />} />
+      <PageHeader title="Lorry stock" subtitle="What is on company lorries still selling straight off the truck" actions={<DataOrigin of="lorries" />} />
       <Suspense fallback={<ListSkeleton />}>
-        <Loads />
+        <OwnerOnly what="lorry stock">
+          <Lorries />
+        </OwnerOnly>
       </Suspense>
     </div>
   );
 }
 
-async function Loads() {
-  const [loads, products] = await Promise.all([getLorryLoads(), getProducts()]);
-  const selling = loads.filter((l) => l.status === "selling");
+async function Lorries() {
+  const [lorries, products, today] = await Promise.all([getLorries(), getProducts(), getToday()]);
+  const selling = lorries.filter((l) => !l.sold);
+  if (selling.length === 0) return <SectionCard>No lorry is selling right now.</SectionCard>;
   return (
     <div className="space-y-4">
-      <DeviceLorryStock products={products} serverCount={selling.length} />
-      {selling.map((load) => (
-        <SectionCard
-          key={load.id}
-          title={
-            <span className="flex items-center gap-2">
-              <Truck size={20} strokeWidth={1.75} className="text-warning" aria-hidden />
-              {load.lorryNo}
-            </span>
-          }
-          action={<Chip tone="warning">Selling</Chip>}
-        >
-          <p className="-mt-2 text-[13px] text-ink-secondary">
-            {load.companyName} · arrived {formatDate(load.arrivedOn)} ·{" "}
-            <Link href={`/purchases/${load.purchaseId}`} className="text-link underline underline-offset-2">
-              purchase
+      {selling.map((l) => (
+        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} today={today} />}>
+          <LorryMeta lorry={l} />
+          <LorryItems lorry={l} products={products} />
+          {l.sale && <p className="mt-2 text-[15px] font-medium text-ink">Left on it: {describeQuantities(lorryLeft(l).filter((x) => x.qty > 0), products) || "nothing"}</p>}
+          <LorryDue lorry={l} today={today} />
+          <p className="mt-2 text-[13px]">
+            <Link href={`/sales/lorries/${l.id}`} className="text-link hover:underline">
+              Update the sale ›
             </Link>
           </p>
-          <LoadLines lines={load.lines} products={products} />
         </SectionCard>
       ))}
     </div>

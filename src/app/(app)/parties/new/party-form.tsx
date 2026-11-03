@@ -1,18 +1,22 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useId, useState, useTransition } from "react";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
+import { createParty } from "../actions";
 
 type Kind = "customer" | "sub_dealer" | "company" | "lorry_owner";
 
 export function PartyForm({ staff }: { staff: { id: string; name: string }[] }) {
   const id = useId();
+  const router = useRouter();
   const toast = useToast();
+  const [pending, startTransition] = useTransition();
   const [kind, setKind] = useState<Kind>("customer");
   const [name, setName] = useState("");
   const [place, setPlace] = useState("");
@@ -34,12 +38,36 @@ export function PartyForm({ staff }: { staff: { id: string; name: string }[] }) 
       ? "Set a credit limit (0 for cash only)."
       : mobileError || gstinError;
 
+  function save() {
+    if (missing || pending) return;
+    const amount = parseFloat(opening) || 0;
+    startTransition(async () => {
+      const result = await createParty({
+        kind,
+        name,
+        place,
+        mobile,
+        email,
+        gstin,
+        creditLimit: sellsToThem ? parseFloat(creditLimit) || 0 : null,
+        openingBalance: openingSide === "dr" ? amount : -amount,
+        assignedTo,
+      });
+      if (!result.ok) {
+        toast(result.problem);
+        return;
+      }
+      toast(`${name.trim()} added`);
+      router.push(`/parties/${result.id}`);
+    });
+  }
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!missing) toast(sampleSaveMessage("party"));
+        save();
       }}
     >
       <section className="surface space-y-4 p-5">
@@ -125,7 +153,7 @@ export function PartyForm({ staff }: { staff: { id: string; name: string }[] }) 
         </Field>
       </section>
 
-      <SubmitBar label="Save party" disabled={Boolean(missing)} hint={missing} onSubmit={() => !missing && toast(sampleSaveMessage("party"))} />
+      <SubmitBar label={pending ? "Saving…" : "Save party"} disabled={Boolean(missing) || pending} hint={missing} onSubmit={save} />
     </form>
   );
 }

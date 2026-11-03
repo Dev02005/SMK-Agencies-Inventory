@@ -1,12 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { canOpen } from "@/lib/access";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 
-const SET_PASSWORD = "/login/new-password";
-
 /**
- * The app opens on the sign-in page: every page needs a session, and sessions end at 12 AM India time.
- * Someone who signed in with their starting password (their mobile number) sees only the page to set their own.
- * Runs before any page renders; the app layout checks the session again.
+ * The app opens on the sign-in page: every page needs a session, and sessions end at 12 AM India time. Each role only
+ * opens its own pages (lib/access.ts); anything else goes to Home. Runs before any page renders; the app layout checks
+ * the session again.
  */
 export function proxy(request: NextRequest) {
   const { pathname, search, searchParams } = request.nextUrl;
@@ -19,12 +18,7 @@ export function proxy(request: NextRequest) {
     if (searchParams.get("reason") === "midnight") return clearSession(NextResponse.next(), token);
     return session ? to("/") : NextResponse.next();
   }
-  if (pathname === SET_PASSWORD) {
-    if (!session) return clearSession(to("/login"), token);
-    return session.mustChange ? NextResponse.next() : to("/");
-  }
-  if (session?.mustChange) return to(`${SET_PASSWORD}${pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + search)}`}`);
-  if (session) return NextResponse.next();
+  if (session) return canOpen(session.role, pathname) ? NextResponse.next() : to("/");
 
   const login = new URL("/login", request.url);
   if (pathname !== "/") login.searchParams.set("next", pathname + search);

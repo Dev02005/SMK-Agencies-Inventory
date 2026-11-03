@@ -3,35 +3,37 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { BackLink, ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getCurrentUser, getFirm, getFirms, getLorryLoads, getMyGodowns, getParties, getProducts, getVehicles } from "@/lib/data";
+import { getDestinations, getFirm, getFirms, getMyGodowns, getNextBillNo, getParties, getProducts, getProfiles, getRentDrivers, getVehicles } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { NewSaleForm } from "./new-sale-form";
 
 export const metadata: Metadata = { title: "New sale" };
 
-export default function NewSalePage({ searchParams }: PageProps<"/sales/new">) {
+export default function NewSalePage() {
   return (
     <div className="animate-fade-up">
       <PageHeader back={<BackLink href="/sales">Sales</BackLink>} title="New sale" actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton rows={8} />}>
-        <FormForToday searchParams={searchParams} />
+        <FormForToday />
       </Suspense>
     </div>
   );
 }
 
 /** Rendered per request so the bill date defaults to today and balances are current. */
-async function FormForToday({ searchParams }: { searchParams: PageProps<"/sales/new">["searchParams"] }) {
+async function FormForToday() {
   await connection();
-  const [firm, firms, parties, products, godowns, vehicles, loads, sp] = await Promise.all([
+  const [firm, firms, parties, products, godowns, vehicles, nextBillNo, destinations, profiles, rentDrivers] = await Promise.all([
     getFirm(),
     getFirms(),
     getParties(),
     getProducts(),
     getMyGodowns(),
     getVehicles(),
-    getLorryLoads(),
-    searchParams,
+    getNextBillNo(),
+    getDestinations(),
+    getProfiles(),
+    getRentDrivers(),
   ]);
   const buyers = parties
     .filter((p) => p.kind === "cash" || p.kind === "customer" || p.kind === "sub_dealer")
@@ -40,22 +42,10 @@ async function FormForToday({ searchParams }: { searchParams: PageProps<"/sales/
   const delivery = vehicles.filter((v) => v.kind === "lorry" || v.kind === "van");
   const ownVehicles = delivery
     .filter((v) => v.category !== "rented")
-    .map((v) => ({ id: v.id, label: v.label, hint: [v.model, v.driverName].filter(Boolean).join(" · ") }));
+    .map((v) => ({ id: v.id, label: v.label, hint: [v.model, v.driverName].filter(Boolean).join(" · "), driverId: v.driverId }));
+  // Our own drivers, for FOR deliveries.
+  const ownDrivers = profiles.filter((p) => p.role === "driver" && p.active).map((p) => ({ id: p.id, name: p.fullName }));
   const rentedVehicles = delivery.filter((v) => v.category === "rented").map((v) => ({ id: v.id, label: v.label, hint: v.ownerName ?? v.model }));
-  // Company lorries still selling; "Sell from this lorry" on Sales › Lorry sales opens with that lorry chosen.
-  // Selling from company lorries is the owner's alone.
-  const isOwner = (await getCurrentUser()).role === "owner";
-  const lorries = loads
-    .filter((l) => isOwner && l.status === "selling")
-    .map((l) => ({
-      id: l.id,
-      lorryNo: l.lorryNo,
-      companyName: l.companyName,
-      driverName: l.driverName,
-      invoiceNo: l.invoiceNo,
-      invoicePaperKept: l.invoicePaperKept,
-      unloadingCharges: l.unloadingCharges,
-    }));
   return (
     <NewSaleForm
       firms={firms.map((f) => ({ id: f.id, name: f.name, gstin: f.gstin }))}
@@ -65,8 +55,10 @@ async function FormForToday({ searchParams }: { searchParams: PageProps<"/sales/
       godowns={godowns}
       ownVehicles={ownVehicles}
       rentedVehicles={rentedVehicles}
-      lorries={lorries}
-      preselect={typeof sp.lorry === "string" ? sp.lorry : undefined}
+      nextBillNo={nextBillNo}
+      destinations={destinations}
+      ownDrivers={ownDrivers}
+      rentDrivers={rentDrivers}
       today={todayISO()}
     />
   );

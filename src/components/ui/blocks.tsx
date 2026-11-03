@@ -97,6 +97,24 @@ export function SampleChip() {
   return usesSampleData ? <Chip tone="warning">Sample data</Chip> : null;
 }
 
+/** "Original data", "Sample data" or "Original + sample" for a list, from whether its records are the firm's own. */
+export function OriginChip({ records }: { records: { original?: boolean }[] }) {
+  if (!usesSampleData) return null;
+  const own = records.filter((r) => r.original).length;
+  if (own === 0) return <Chip tone="warning">Sample data</Chip>;
+  if (own === records.length) return <Chip tone="good">Original data</Chip>;
+  return <Chip tone="accent">Original + sample</Chip>;
+}
+
+/** A small "Sample" mark on one sample record in a list that also holds the firm's own records. */
+export function SampleTag({ record }: { record: { original?: boolean } }) {
+  return usesSampleData && !record.original ? (
+    <Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">
+      Sample
+    </Chip>
+  ) : null;
+}
+
 export function DetailList({ items, className }: { items: { label: string; value: ReactNode }[]; className?: string }) {
   return (
     <dl className={cn("divide-y divide-hairline", className)}>

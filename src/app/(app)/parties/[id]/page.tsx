@@ -11,6 +11,8 @@ import { cn } from "@/lib/cn";
 import { getParty, getPartyAgeing, getPartyLedger, getProfile } from "@/lib/data";
 import { formatBalance, formatINR } from "@/lib/format";
 import { partyKindLabels } from "@/lib/labels";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
+import { removeParty } from "../actions";
 import { LedgerView } from "./ledger-view";
 
 export const metadata: Metadata = { title: "Party" };
@@ -59,6 +61,7 @@ async function PartyDetail({ params }: { params: PageProps<"/parties/[id]">["par
           </>
         }
       />
+      {party.original && <ConfirmDelete what={party.name} onDelete={removeParty.bind(null, party.id)} after="/parties" className="-mt-2 mb-4" />}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title={isSupplier ? "We owe" : "Balance"}>

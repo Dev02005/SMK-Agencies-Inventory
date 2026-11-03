@@ -28,7 +28,6 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
   if (!purchase) notFound();
   const [products, godowns, firms] = await Promise.all([getProducts(), getGodowns(), getFirms()]);
   const firm = firms.find((f) => f.id === purchase.firmId) ?? firms.find((f) => f.primary);
-  const itemsTotal = purchase.lines.reduce((s, l) => s + l.qty * l.rate, 0);
 
   return (
     <>
@@ -51,26 +50,17 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
               const p = products.find((x) => x.id === l.productId);
               return (
                 <li key={i} className="flex justify-between gap-4 py-3">
-                  <div>
-                    <p className="text-[15px] font-medium text-ink">{p?.name}</p>
-                    <p className="text-[13px] text-ink-secondary">
-                      {lineQty(l.qty, p)} · {p && formatNumber(toMT(l.qty, p.unit), 3)} MT × {formatINR(l.rate)}
-                    </p>
-                  </div>
-                  <p className="text-[15px] font-medium tabular-nums text-ink">{formatINR(l.qty * l.rate)}</p>
+                  <p className="text-[15px] font-medium text-ink">{p?.name}</p>
+                  <p className="text-right text-[15px] tabular-nums text-ink">
+                    {lineQty(l.qty, p)}
+                    {p && <span className="block text-[13px] text-ink-secondary">{formatNumber(toMT(l.qty, p.unit), 3)} MT</span>}
+                  </p>
                 </li>
               );
             })}
           </ul>
-          <DetailList
-            className="mt-2 border-t border-hairline"
-            items={[
-              { label: "Items", value: formatINR(itemsTotal) },
-              { label: "Freight", value: purchase.freight ? formatINR(purchase.freight) : undefined },
-            ]}
-          />
           <div className="mt-2 flex items-baseline justify-between border-t border-hairline pt-3">
-            <span className="text-[15px] text-ink-secondary">Total</span>
+            <span className="text-[15px] text-ink-secondary">Total invoice value</span>
             <span className="text-[28px] font-semibold tabular-nums tracking-[-0.4px] text-ink">{formatINR(purchase.total)}</span>
           </div>
         </SectionCard>

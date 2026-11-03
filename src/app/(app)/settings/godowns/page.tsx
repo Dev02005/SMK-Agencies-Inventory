@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
-import { BackLink, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { BackLink, ListSkeleton, SampleTag, SectionCard } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { ExportMenu } from "@/components/ui/export-menu";
@@ -19,7 +20,7 @@ export default function GodownSettingsPage() {
         subtitle="Our godowns and the cement companies' godowns where our stock is kept, with who looks after each"
         actions={
           <>
-            <SampleChip />
+            <DataOrigin of="godowns" />
             <ExportMenu title={"Godowns"} />
           </>
         } />
@@ -48,13 +49,27 @@ async function GodownList() {
       rows={godowns}
       rowKey={(g) => g.id}
       mobile={(g) => ({
-        title: g.name,
+        title: (
+          <>
+            {g.name}
+            <SampleTag record={g} />
+          </>
+        ),
         subtitle: `In-charge: ${inCharge(g.inCharge)}`,
         value: `${products(g.id)} products`,
         meta: g.own && <Chip tone="accent">Own</Chip>,
       })}
       columns={[
-        { key: "name", header: "Godown", cell: (g) => g.name },
+        {
+          key: "name",
+          header: "Godown",
+          cell: (g) => (
+            <>
+              {g.name}
+              <SampleTag record={g} />
+            </>
+          ),
+        },
         { key: "kind", header: "", srHeader: "Own or company", cell: (g) => (g.own ? <Chip tone="accent">Own</Chip> : <Chip>Company</Chip>) },
         { key: "incharge", header: "In-charge", cell: (g) => inCharge(g.inCharge), className: "text-ink-secondary" },
         { key: "products", header: "Products in stock", align: "right", cell: (g) => products(g.id) },

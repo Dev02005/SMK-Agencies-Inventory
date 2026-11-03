@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { BackLink, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { getFirms } from "@/lib/data";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
+import { removeFirm } from "./actions";
 import { AddFirm } from "./add-firm";
 import { FirmForm } from "./firm-form";
 
@@ -33,6 +35,7 @@ export default async function FirmSettingsPage() {
           >
             {/* Keyed by the saved values, so the form starts afresh after a save (e.g. when the primary firm changes). */}
             <FirmForm key={[firm.name, firm.gstin, firm.phone, firm.address, firm.primary].join("|")} firm={firm} />
+            {!firm.primary && firms.length > 1 && <ConfirmDelete what={firm.name} onDelete={removeFirm.bind(null, firm.id)} className="mt-4" />}
           </SectionCard>
         ))}
         <AddFirm next={firms.length + 1} />

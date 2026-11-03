@@ -13,12 +13,10 @@ export type ItemLine = { key: number; productId: string; qty: string; rate: stri
 
 export const toNumber = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
 
-export function newLine(key: number, product: Product, rate = product.listRate): ItemLine {
-  return { key, productId: product.id, qty: "", rate: rateText(rate) };
+/** A new row; products have no fixed rate, so the rate starts empty. */
+export function newLine(key: number, product: Product): ItemLine {
+  return { key, productId: product.id, qty: "", rate: "" };
 }
-
-/** A rate of 0 means not known yet, so the box starts empty instead of showing "0". */
-const rateText = (rate: number) => (rate > 0 ? String(rate) : "");
 
 /** Item (cement or steel, brand, type) / quantity (/ rate) rows used by purchases and orders. */
 export function ItemLines({
@@ -26,13 +24,11 @@ export function ItemLines({
   onChange,
   products,
   withRate = true,
-  rateFor = (p) => p.listRate,
 }: {
   lines: ItemLine[];
   onChange: (lines: ItemLine[]) => void;
   products: Product[];
   withRate?: boolean;
-  rateFor?: (product: Product) => number;
 }) {
   const id = useId();
   const product = (pid: string) => products.find((p) => p.id === pid) ?? products[0];
@@ -52,7 +48,7 @@ export function ItemLines({
                     label={`Item ${index + 1}`}
                     products={products}
                     value={line.productId}
-                    onChange={(v) => update(line.key, { productId: v, rate: rateText(rateFor(product(v))) })}
+                    onChange={(v) => update(line.key, { productId: v, rate: "" })}
                   />
                 </div>
                 {lines.length > 1 && (
@@ -93,7 +89,7 @@ export function ItemLines({
           );
         })}
       </ul>
-      <IconButton label="Add item" className="mt-1" onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0], rateFor(products[0]))])}>
+      <IconButton label="Add item" className="mt-1" onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0])])}>
         <Plus size={20} strokeWidth={2} aria-hidden />
       </IconButton>
     </>

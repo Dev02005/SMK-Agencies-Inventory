@@ -13,14 +13,14 @@ import { inDateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate, formatMonth, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
 import { pageDateFilter } from "@/lib/page-dates";
-import { CheckInCard } from "./check-in-card";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Attendance" };
 
 // The records list starts on today: every day of every person is a lot of rows.
 const recordDates: DatePreset[] = ["today", "7d", "month", "all"];
 
-export default function AttendancePage({ searchParams }: PageProps<"/people/attendance">) {
+function AttendancePageContent({ searchParams }: PageProps<"/people/attendance">) {
   return (
     <>
       <PageHeader title="Attendance" subtitle={<><Today />. Weekly off on Sundays.</>} actions={<SampleChip />} />
@@ -43,11 +43,6 @@ async function AttendanceData({ searchParams }: { searchParams: PageProps<"/peop
 
   return (
     <div className="space-y-4">
-      {/* "View as" shows the first person of each role, matching the profile in the top bar. */}
-      <CheckInCard
-        checkedInAt={Object.fromEntries(rows.filter((r, i, all) => all.findIndex((x) => x.role === r.role) === i).map((r) => [r.role, r.record?.checkIn]))}
-      />
-
       <StatRow>
         <StatCard label="Present" value={`${present} of ${rows.length}`} tone="good" />
         <StatCard label="Late" value={rows.filter((r) => r.record?.late).length} tone="warning" />
@@ -135,5 +130,13 @@ async function AttendanceData({ searchParams }: { searchParams: PageProps<"/peop
         </p>
       )}
     </div>
+  );
+}
+
+export default function AttendancePage(props: PageProps<"/people/attendance">) {
+  return (
+    <OwnerPage what="people records">
+      <AttendancePageContent {...props} />
+    </OwnerPage>
   );
 }

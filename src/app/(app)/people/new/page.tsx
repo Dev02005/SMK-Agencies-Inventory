@@ -4,10 +4,11 @@ import { BackLink, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { allRoles, roleLabels } from "@/lib/labels";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "New employee" };
 
-export default function NewEmployeePage() {
+function NewEmployeePageContent() {
   return (
     <div className="mx-auto max-w-[640px]">
       <PageHeader back={<BackLink href="/people">People</BackLink>} title="New employee" subtitle="Also creates their login with this mobile number" actions={<SampleChip />} />
@@ -29,5 +30,13 @@ export default function NewEmployeePage() {
         </SectionCard>
       </RoleGuard>
     </div>
+  );
+}
+
+export default function NewEmployeePage() {
+  return (
+    <OwnerPage what="people records">
+      <NewEmployeePageContent />
+    </OwnerPage>
   );
 }

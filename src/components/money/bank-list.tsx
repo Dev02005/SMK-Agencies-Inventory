@@ -19,6 +19,7 @@ export function BankList({ accounts, firmNames }: { accounts: (BankAccount & { b
       scope: "business" as const,
       openingBalance: a.openingBalance,
       balance: a.openingBalance + saved(a.id),
+      original: true,
     })),
   ];
   return (

@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
-import { getOrder, getProducts } from "@/lib/data";
+import { getGodowns, getOrder, getProducts } from "@/lib/data";
 import { formatDate, formatINR } from "@/lib/format";
 import { orderSourceLabels, orderStatus } from "@/lib/labels";
 import { lineQty } from "@/lib/quantities";
@@ -27,7 +27,7 @@ export default function OrderPage({ params }: PageProps<"/orders/[id]">) {
 
 async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["params"] }) {
   const { id } = await params;
-  const [order, products] = await Promise.all([getOrder(id), getProducts()]);
+  const [order, products, godowns] = await Promise.all([getOrder(id), getProducts(), getGodowns()]);
   if (!order) notFound();
   const status = orderStatus[order.status];
   const open = order.status === "new" || order.status === "confirmed" || order.status === "partly_dispatched";
@@ -93,6 +93,7 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
             items={[
               { label: "Taken by", value: order.takenByName },
               { label: "How", value: orderSourceLabels[order.source] },
+              { label: "Load from", value: godowns.find((g) => g.id === order.godownId)?.name },
               { label: "Deliver by", value: order.deliverBy && formatDate(order.deliverBy) },
               { label: "Destination", value: order.destination },
               { label: "Remarks", value: order.remarks },

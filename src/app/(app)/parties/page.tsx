@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
+import { ListSkeleton } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getParties, getProfiles } from "@/lib/data";
@@ -16,7 +17,7 @@ export default function PartiesPage() {
         subtitle="Customers, sub-dealers, supplier companies and lorry owners"
         actions={
           <>
-            <SampleChip />
+            <DataOrigin of="parties" />
             <ButtonLink href="/parties/new">New party</ButtonLink>
           </>
         }

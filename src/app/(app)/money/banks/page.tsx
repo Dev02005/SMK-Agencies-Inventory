@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { BankList } from "@/components/money/bank-list";
-import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
+import { ListSkeleton } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getBankAccounts, getFirms } from "@/lib/data";
@@ -16,7 +17,7 @@ export default function BanksPage() {
         subtitle="Business bank accounts. Payments and receipts by UPI, NEFT and cheque land here automatically."
         actions={
           <>
-            <SampleChip />
+            <DataOrigin of="banks" />
             <ButtonLink href="/money/banks/new" variant="secondary">
               New bank entry
             </ButtonLink>

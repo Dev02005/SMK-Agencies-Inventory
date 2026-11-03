@@ -11,12 +11,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getVehicle } from "@/lib/data";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { expenseHeadLabels } from "@/lib/labels";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Vehicle" };
 
 const serviceKind = { service: "Service", oil: "Engine oil", tyres: "Tyres", brakes: "Brakes", battery: "Battery", repair: "Repair" } as const;
 
-export default function VehiclePage({ params }: PageProps<"/fleet/[id]">) {
+function VehiclePageContent({ params }: PageProps<"/fleet/[id]">) {
   return (
     <>
       <BackLink href="/fleet">Vehicles</BackLink>
@@ -131,5 +132,13 @@ async function VehicleDetail({ params }: { params: PageProps<"/fleet/[id]">["par
         </SectionCard>
       </div>
     </>
+  );
+}
+
+export default function VehiclePage(props: PageProps<"/fleet/[id]">) {
+  return (
+    <OwnerPage what="vehicles">
+      <VehiclePageContent {...props} />
+    </OwnerPage>
   );
 }

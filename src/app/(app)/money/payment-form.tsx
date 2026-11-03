@@ -105,7 +105,8 @@ export function PaymentForm({
             { value: "cash", label: "Cash" },
             { value: "upi", label: "UPI" },
             { value: "cheque", label: "Cheque" },
-            { value: "neft", label: "NEFT" },
+            // Receipts can come by NEFT; payments are made by cash, UPI or cheque only.
+            ...(isReceipt ? [{ value: "neft" as const, label: "NEFT" }] : []),
           ]}
         />
         {mode !== "cash" && (

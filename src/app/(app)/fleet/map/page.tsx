@@ -6,10 +6,11 @@ import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { getFleetMap } from "@/lib/data";
 import { FleetMap } from "./fleet-map";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Vehicle map" };
 
-export default function MapPage() {
+function MapPageContent() {
   return (
     <>
       <PageHeader
@@ -63,5 +64,13 @@ async function MapData() {
         <p className="mt-2 text-[12px] text-ink-tertiary">Cars and bikes have no GPS; staff location comes only from attendance check-in.</p>
       </SectionCard>
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <OwnerPage what="vehicles">
+      <MapPageContent />
+    </OwnerPage>
   );
 }

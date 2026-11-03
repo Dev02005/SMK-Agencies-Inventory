@@ -9,9 +9,9 @@ import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { RoleGuard } from "@/components/ui/sub-nav";
-import { getFirms, getGodowns, getProducts, getProfile, getSale } from "@/lib/data";
+import { getFirms, getGodowns, getNextBillNo, getProducts, getProfile, getSale } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
-import { saleStatus, transportLabels } from "@/lib/labels";
+import { billName, saleStatus, transportLabels } from "@/lib/labels";
 import { lineQty } from "@/lib/quantities";
 import { toMT, unitLabel } from "@/lib/sales";
 import { ConfirmRequest, type RequestLine } from "./confirm-request";
@@ -33,21 +33,21 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
   const { id } = await params;
   const sale = await getSale(id);
   if (!sale) notFound();
-  const [products, godowns, createdBy, firms] = await Promise.all([getProducts(), getGodowns(), getProfile(sale.createdBy), getFirms()]);
+  const [products, godowns, createdBy, firms, nextBillNo] = await Promise.all([getProducts(), getGodowns(), getProfile(sale.createdBy), getFirms(), getNextBillNo()]);
   const firm = firms.find((f) => f.id === sale.firmId) ?? firms[0];
   const status = saleStatus[sale.status];
   const pending = sale.status === "pending_approval";
   const requestLines: RequestLine[] = sale.lines.map((l) => {
     const product = products.find((p) => p.id === l.productId);
     const unit = product?.unit ?? "bag";
-    return { name: product?.name ?? "Item", unit, unitLabel: unitLabel[unit], qty: l.qty, mt: toMT(l.qty, unit), rate: l.rate, listRate: l.listRate };
+    return { name: product?.name ?? "Item", unit, unitLabel: unitLabel[unit], qty: l.qty, mt: toMT(l.qty, unit) };
   });
   const godown = godowns.find((g) => g.id === sale.godownId);
 
   return (
     <>
       <PageHeader
-        title={`Bill ${sale.billNo}`}
+        title={billName(sale)}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             {formatDate(sale.billDate)} · <Link href={`/parties/${sale.partyId}`} className="text-link hover:underline">{sale.partyName}</Link>
@@ -69,7 +69,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
 
       <div className="grid gap-4 lg:grid-cols-3">
         {pending ? (
-          // A staff request: the owner prices and confirms it; everyone else sees what was asked for.
+          // A staff sale: the owner gives it a bill no. and prices and approves it; everyone else sees the items.
           <RoleGuard
             roles={["owner"]}
             fallback={
@@ -84,17 +84,11 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-[13px] text-ink-secondary">Waiting for the owner to set the rates and confirm the sale.</p>
+                <p className="mt-3 text-[13px] text-ink-secondary">Waiting for the owner to add the bill no. and prices and approve it.</p>
               </SectionCard>
             }
           >
-            <ConfirmRequest
-              lines={requestLines}
-              requestedBy={createdBy?.fullName}
-              transportMode={sale.transportMode}
-              charges={{ transport: sale.transportCharge, unloading: sale.unloadingCharge, other: sale.otherCharge }}
-              discount={sale.discountAmount}
-            />
+            <ConfirmRequest lines={requestLines} requestedBy={createdBy?.fullName} transportMode={sale.transportMode} nextBillNo={nextBillNo} />
           </RoleGuard>
         ) : (
           <SectionCard title="Items" className="lg:col-span-2">
@@ -107,7 +101,6 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
                       <p className="text-[15px] font-medium text-ink">{product?.name}</p>
                       <p className="text-[13px] text-ink-secondary">
                         {lineQty(l.qty, product)} · {product && formatNumber(toMT(l.qty, product.unit), 3)} MT × {formatINR(l.rate)}
-                        {l.rate !== l.listRate && <span className="text-warning"> (list {formatINR(l.listRate)})</span>}
                       </p>
                     </div>
                     <p className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{formatINR(l.qty * l.rate)}</p>

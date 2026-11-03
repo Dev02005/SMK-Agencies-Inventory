@@ -1,45 +1,38 @@
-import { Truck } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { OwnerOnly } from "@/components/auth/owner-only";
-import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { LorryDue, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { getLorryLoads, getToday } from "@/lib/data";
+import { getFirms, getLorries, getProducts, getToday } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
-import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { formatDate, formatINR } from "@/lib/format";
+import { lorryCost, lorryLeft, lorrySaleValue, lorryState, lorryStateChip, updateDueOn, type LorryState } from "@/lib/lorries";
 import { pageDateFilter } from "@/lib/page-dates";
-import { CloseLorry, DeviceLorries, SellOut } from "./lorry-cards";
+import { describeQuantities } from "@/lib/quantities";
 
 export const metadata: Metadata = { title: "Lorry sales" };
 
+// Late updates first, then due today, still selling, and sold out.
+const order: Record<LorryState, number> = { late: 0, due: 1, selling: 2, sold: 3 };
+
 /**
- * Company lorries being sold straight off the truck: the bills made from each, then closing it. Only the owner sees
- * lorry sales. New lorries are noted under Purchases › Lorry purchases; bags left are under Stock › Lorry stock.
+ * Company lorries sold straight off the truck. Each is sold as a whole, not bill by bill: the owner updates what is
+ * sold from it (like a godown sale) and marks it sold out, and Home reminds them when that is late. Owner only.
  */
 export default function LorrySalesPage({ searchParams }: PageProps<"/sales/lorries">) {
   return (
     <div className="animate-fade-up">
       <Suspense fallback={<ListSkeleton />}>
         <OwnerOnly what="lorry sales">
-          <PageHeader
-            title="Lorry sales"
-            subtitle="Company lorries sold straight off the truck"
-            actions={
-              <>
-                <SampleChip />
-                <ButtonLink href="/purchases/lorries" variant="secondary">
-                  Lorry purchases
-                </ButtonLink>
-              </>
-            }
-          />
+          <PageHeader title="Lorry sales" subtitle="Update what each lorry sells; mark it sold out when it is empty" actions={<DataOrigin of="lorries" />} />
           <Suspense fallback={<ListSkeleton />}>
-            <Loads searchParams={searchParams} />
+            <Lorries searchParams={searchParams} />
           </Suspense>
         </OwnerOnly>
       </Suspense>
@@ -47,69 +40,68 @@ export default function LorrySalesPage({ searchParams }: PageProps<"/sales/lorri
   );
 }
 
-async function Loads({ searchParams }: { searchParams: PageProps<"/sales/lorries">["searchParams"] }) {
-  const [all, today, dates] = await Promise.all([getLorryLoads(), getToday(), pageDateFilter(searchParams)]);
-  const loads = all.filter((l) => inDateFilter(l.arrivedOn, dates));
+async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorries">["searchParams"] }) {
+  const [all, products, today, dates, firms] = await Promise.all([getLorries(), getProducts(), getToday(), pageDateFilter(searchParams), getFirms()]);
+  const lorries = all.filter((l) => inDateFilter(l.invoiceDate, dates)).sort((a, b) => order[lorryState(a, today)] - order[lorryState(b, today)]);
+  const firmName = (id?: string) => firms.find((f) => f.id === id)?.name;
   return (
     <div className="space-y-4">
       <DataTools title="Lorry sales" />
       <ExportTable
-        title="Bills from company lorries"
-        columns={["Lorry", "Company", "Arrived", "Bill", "Date", "Party", "Bags", "Total"]}
-        rows={loads.flatMap((l) =>
-          l.bills.map((b) => [l.lorryNo, l.companyName, formatDate(l.arrivedOn), `#${b.billNo}`, formatDate(b.date), b.partyName, formatNumber(b.qty), formatINR(b.total)]),
-        )}
+        title="Lorry sales"
+        columns={["Lorry", "Company", "Invoice date", "Update due", "Status", "Invoice value", "Sale value", "Margin", "Sold out on"]}
+        rows={lorries.map((l) => {
+          const cost = lorryCost(l);
+          const value = l.sold?.value ?? lorrySaleValue(l);
+          return [
+            l.lorryNo,
+            l.companyName,
+            formatDate(l.invoiceDate),
+            formatDate(updateDueOn(l)),
+            lorryStateChip[lorryState(l, today)].label,
+            cost ? formatINR(cost) : "",
+            value ? formatINR(value) : "",
+            value && cost ? formatINR(value - cost) : "",
+            l.sold ? formatDate(l.sold.on) : "",
+          ];
+        })}
       />
-      <DeviceLorries today={today} serverCount={loads.length} />
-      {loads.map((load) => (
-        <SectionCard
-          key={load.id}
-          title={
-            <span className="flex items-center gap-2">
-              <Truck size={20} strokeWidth={1.75} className="text-warning" aria-hidden />
-              {load.lorryNo}
-            </span>
-          }
-          action={<Chip tone={load.status === "selling" ? "warning" : "good"}>{load.status === "selling" ? "Selling" : "Closed"}</Chip>}
-        >
-          <p className="-mt-2 text-[13px] text-ink-secondary">
-            {load.companyName}
-            {load.driverName && ` · driver ${load.driverName}`} · {load.invoiceNo ? `invoice ${load.invoiceNo}` : "no invoice number"} · arrived{" "}
-            {formatDate(load.arrivedOn)}
-          </p>
-          <SellOut arrivedOn={load.arrivedOn} days={load.sellOutDays} today={today} selling={load.status === "selling"} />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Chip tone={load.invoicePaperKept ? "good" : "neutral"}>{load.invoicePaperKept ? "Invoice paper with us" : "No invoice paper"}</Chip>
-            <Chip tone={load.unloadingCharges ? "warning" : "neutral"}>{load.unloadingCharges ? "Unloading charges" : "No unloading charges"}</Chip>
-          </div>
+      {lorries.length === 0 && <SectionCard>{dates.kind === "all" ? "No lorries yet. Add one under Purchases › Lorry." : "No lorries for these dates."}</SectionCard>}
+      {lorries.map((l) => {
+        const cost = lorryCost(l);
+        const value = l.sold?.value ?? lorrySaleValue(l);
+        const left = lorryLeft(l).filter((x) => x.qty > 0);
+        return (
+          <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} today={today} />}>
+            <LorryMeta lorry={l} firmName={firmName(l.firmId)} />
+            <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Figure label="Came on it" value={describeQuantities(l.lines, products)} />
+              <Figure label={l.sold ? "Sold out on" : "Left on it"} value={l.sold ? formatDate(l.sold.on) : left.length ? describeQuantities(left, products) : "Nothing"} />
+              <Figure label={l.sold ? "Sold for" : "Sold so far"} value={formatINR(value)} strong />
+              {/* Margin only once something is sold: before that it would just be minus the invoice value. */}
+              {cost && value > 0 ? <Figure label="Margin" value={formatINR(value - cost)} tone={value >= cost ? "good" : "danger"} /> : null}
+            </dl>
+            <LorryDue lorry={l} today={today} />
+            {l.sale?.notes && <p className="mt-2 text-[13px] text-ink-secondary">{l.sale.notes}</p>}
+            {l.original ? (
+              <ButtonLink href={`/sales/lorries/${l.id}`} variant={l.sold ? "secondary" : "primary"} className="mt-4">
+                {l.sold ? "View or correct" : "Update sale"}
+              </ButtonLink>
+            ) : (
+              <p className="mt-3 text-[13px] text-ink-secondary">Sample lorry: only lorries you enter can be updated.</p>
+            )}
+          </SectionCard>
+        );
+      })}
+    </div>
+  );
+}
 
-          <h3 className="mt-5 text-[15px] font-semibold text-ink">Sold from this lorry</h3>
-          {load.bills.length === 0 ? (
-            <p className="mt-1 text-[14px] text-ink-secondary">No bills yet.</p>
-          ) : (
-            <ul className="mt-1 divide-y divide-hairline">
-              {load.bills.map((b) => (
-                <li key={b.id}>
-                  <Link href={`/sales/${b.id}`} className="flex items-center gap-3 py-2.5">
-                    <span className="w-14 shrink-0 text-[13px] text-ink-secondary">{formatShortDate(b.date)}</span>
-                    <span className="min-w-0 flex-1 truncate text-[15px] text-ink">
-                      Bill {b.billNo} · {b.partyName}
-                    </span>
-                    <span className="text-[13px] text-ink-secondary">{formatNumber(b.qty)} bags</span>
-                    <span className="w-24 text-right text-[15px] tabular-nums text-ink">{formatINR(b.total)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          {load.status === "selling" && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ButtonLink href={`/sales/new?lorry=${load.id}`}>Sell from this lorry</ButtonLink>
-              <CloseLorry id={load.id} local={false} today={today} />
-            </div>
-          )}
-        </SectionCard>
-      ))}
+function Figure({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: "good" | "danger" }) {
+  return (
+    <div>
+      <dt className="text-[13px] text-ink-secondary">{label}</dt>
+      <dd className={cn("text-[15px] tabular-nums", strong && "text-[17px] font-semibold", tone === "good" ? "text-good" : tone === "danger" ? "text-danger" : "text-ink")}>{value}</dd>
     </div>
   );
 }

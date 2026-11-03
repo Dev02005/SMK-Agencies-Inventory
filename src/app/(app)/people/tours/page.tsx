@@ -5,10 +5,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getEmployees, getToday, getVisits } from "@/lib/data";
 import { ToursBoard } from "./tours-board";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Tour programs" };
 
-export default function ToursPage() {
+function ToursPageContent() {
   return (
     <>
       <PageHeader
@@ -31,4 +32,12 @@ export default function ToursPage() {
 async function ToursData() {
   const [visits, staff] = await Promise.all([getVisits(), getEmployees()]);
   return <ToursBoard visits={visits} staff={staff.filter((s) => s.role === "field").map((s) => ({ id: s.id, name: s.fullName }))} today={await getToday()} />;
+}
+
+export default function ToursPage() {
+  return (
+    <OwnerPage what="people records">
+      <ToursPageContent />
+    </OwnerPage>
+  );
 }

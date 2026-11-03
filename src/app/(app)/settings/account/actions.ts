@@ -11,9 +11,9 @@ export type ChangePasswordResult = { ok: true } | { ok: false; field: "current" 
 /** Changes the password for signing in with a mobile number or email; needs the current one. */
 export async function changePassword(current: string, next: string): Promise<ChangePasswordResult> {
   const session = readSession((await cookies()).get(SESSION_COOKIE)?.value);
-  const person = session && !session.mustChange ? await getProfile(session.userId) : undefined;
+  const person = session ? await getProfile(session.userId) : undefined;
   if (!person) return { ok: false, field: "current", problem: "Your sign-in has ended. Sign in again." };
-  if (typeof current !== "string" || typeof next !== "string" || !checkPassword(person, current).ok) {
+  if (typeof current !== "string" || typeof next !== "string" || !checkPassword(person, current)) {
     // Same short wait as a wrong sign-in, so this can't be used to guess passwords quickly.
     await new Promise((resolve) => setTimeout(resolve, 600));
     return { ok: false, field: "current", problem: "That isn't your current password." };

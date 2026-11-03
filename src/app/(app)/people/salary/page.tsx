@@ -10,10 +10,11 @@ import { RoleGuard } from "@/components/ui/sub-nav";
 import { getEmployees, getLoans, getSalarySheet, getToday } from "@/lib/data";
 import { formatDate, formatINR, shiftMonth } from "@/lib/format";
 import { SalarySheet } from "./salary-sheet";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Salary & loans" };
 
-export default function SalaryPage() {
+function SalaryPageContent() {
   return (
     <>
       <PageHeader
@@ -92,5 +93,13 @@ async function SalaryData() {
         />
       </SectionCard>
     </div>
+  );
+}
+
+export default function SalaryPage() {
+  return (
+    <OwnerPage what="people records">
+      <SalaryPageContent />
+    </OwnerPage>
   );
 }

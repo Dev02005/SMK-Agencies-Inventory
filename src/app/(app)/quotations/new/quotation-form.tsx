@@ -41,7 +41,7 @@ export function QuotationForm({
   const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
   const [date, setDate] = useState(today);
-  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: products[0].id, qty: "", rate: String(products[0].listRate) }]);
+  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: products[0].id, qty: "", rate: "" }]);
   const [nextKey, setNextKey] = useState(2);
   const [terms, setTerms] = useState(defaultTerms.join("\n"));
 
@@ -124,7 +124,7 @@ export function QuotationForm({
                     label={`Item ${index + 1}`}
                     products={products}
                     value={line.productId}
-                    onChange={(v) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: v, rate: String(product(v).listRate) } : l)))}
+                    onChange={(v) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: v, rate: "" } : l)))}
                   />
                 </div>
                 <Field label="Quantity" htmlFor={`${id}-q-${line.key}`}>
@@ -166,7 +166,7 @@ export function QuotationForm({
           label="Add item"
           className="mt-1"
           onClick={() => {
-            setLines((ls) => [...ls, { key: nextKey, productId: products[0].id, qty: "", rate: String(products[0].listRate) }]);
+            setLines((ls) => [...ls, { key: nextKey, productId: products[0].id, qty: "", rate: "" }]);
             setNextKey((k) => k + 1);
           }}
         >

@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { requireSession } from "@/lib/auth";
 import { getCurrentUser, getFirm, getNow } from "@/lib/data";
 import { roleLabels } from "@/lib/labels";
-import { ownerLoginId } from "@/lib/session";
 import { ChangePasswordForm, SignOutButton } from "./account-forms";
 
 export const metadata: Metadata = { title: "Account" };
@@ -46,7 +45,6 @@ async function AccountDetails() {
         <DetailList
           items={[
             { label: "Sign in with", value: <span className="tabular-nums">{[`+91 ${user.mobile}`, user.email].filter(Boolean).join(" or ")}</span> },
-            { label: "Sample login ID", value: user.role === "owner" ? <span className="tabular-nums">{ownerLoginId()}</span> : undefined },
             { label: "Signed in", value: signedInAt.format(session.since) },
             {
               label: "Signs out at",

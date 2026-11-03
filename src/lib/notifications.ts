@@ -7,9 +7,11 @@ import "server-only";
 import {
   getAgeingReport,
   getCashSummary,
+  getCurrentUser,
   getDashboard,
   getDeliveries,
   getGodowns,
+  getLorries,
   getOrders,
   getParties,
   getPolicies,
@@ -25,13 +27,31 @@ import {
 } from "@/lib/data";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { CASH_LIMIT, isLowStock } from "@/lib/limits";
-import type { Notice } from "@/lib/notices";
+import { daysFrom, lorryState, updateDueOn } from "@/lib/lorries";
+import { dataVersion } from "@/lib/data/local-data";
+import { noticesFor, type Notice } from "@/lib/notices";
 
 
 
 const when = (days: number) => (days < 0 ? `${-days} ${days === -1 ? "day" : "days"} overdue` : days === 0 ? "due today" : days === 1 ? "due tomorrow" : `due in ${days} days`);
 
-export async function getNotifications(): Promise<Notice[]> {
+// Notices read most of the records and the bell is on every page, so each person's are worked out once a day and
+// again only after something is saved.
+const worked = new Map<string, { key: string; notices: Notice[] }>();
+
+/** The signed-in person's notices: every role's for the owner (so "View as" can preview them), only their own for anyone else. */
+export async function getMyNotifications(): Promise<Notice[]> {
+  const [me, today] = await Promise.all([getCurrentUser(), getToday()]);
+  const key = `${today}|${dataVersion()}`;
+  const known = worked.get(me.id);
+  if (known?.key === key) return known.notices;
+  const all = await getNotifications();
+  const notices = me.role === "owner" ? all : noticesFor(all, me.role, me.id);
+  worked.set(me.id, { key, notices });
+  return notices;
+}
+
+async function getNotifications(): Promise<Notice[]> {
   const today = await getToday();
   const [dashboard, sales, parties, ageing, vehicles, balances, products, godowns, orders, transfers, cash, deliveries, suspense, purchases, policies, profiles] =
     await Promise.all([
@@ -59,13 +79,13 @@ export async function getNotifications(): Promise<Notice[]> {
     // A godown's in-charge only gets their own godowns' bills, so a bill may not be among them.
     const sale = sales.find((s) => s.id === a.id);
     if (!sale) continue;
-    notices.push({ id: `approval-${a.id}`, kind: "approval", title: `Confirm ${a.title}`, body: a.detail, href: a.href, date: sale.billDate, tone: "warning", roles: ["owner"] });
+    notices.push({ id: `approval-${a.id}`, kind: "approval", title: `Approve ${a.title}`, body: a.detail, href: a.href, date: sale.billDate, tone: "warning", roles: ["owner"] });
     if (profiles.find((p) => p.id === sale.createdBy)?.role !== "owner") {
       notices.push({
         id: `approval-wait-${a.id}`,
         kind: "approval",
-        title: `Bill ${sale.billNo} is waiting for the owner`,
-        body: `${sale.partyName} · ${formatINR(sale.total)}. It posts once approved.`,
+        title: `${sale.partyName} sale is waiting for the owner`,
+        body: "The owner adds the bill no. and prices; it posts once approved.",
         href: a.href,
         date: sale.billDate,
         tone: "neutral",
@@ -73,6 +93,24 @@ export async function getNotifications(): Promise<Notice[]> {
         forProfile: sale.createdBy,
       });
     }
+  }
+
+  // Company lorries whose sale should be updated by now: the owner's alone (getLorries gives nobody else any).
+  for (const l of await getLorries()) {
+    const state = lorryState(l, today);
+    if (state !== "due" && state !== "late") continue;
+    const due = updateDueOn(l);
+    const late = daysFrom(due, today);
+    notices.push({
+      id: `lorry-${state}-${l.id}`,
+      kind: "lorry",
+      title: state === "late" ? `Update the sale of lorry ${l.lorryNo}` : `Lorry ${l.lorryNo}: sale update due today`,
+      body: `${l.companyName} · bought ${formatDate(l.invoiceDate)}${state === "late" ? ` · ${late} ${late === 1 ? "day" : "days"} late` : ""}. Enter what it sold for.`,
+      href: `/sales/lorries/${l.id}`,
+      date: due,
+      tone: state === "late" ? "danger" : "warning",
+      roles: ["owner"],
+    });
   }
 
   // Payment reminders for the office, and who to collect from for each field staff member.

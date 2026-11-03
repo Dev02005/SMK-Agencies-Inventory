@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useState, useTransition } from "react";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
 import { ItemLines, newLine, toNumber, type ItemLine } from "@/components/forms/item-lines";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,18 +11,17 @@ import { Select } from "@/components/ui/select";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { useToast } from "@/components/ui/toast";
 import type { Product } from "@/lib/data/types";
-import { formatINR } from "@/lib/format";
-import { addLorry } from "@/lib/lorry-book";
+import { addDaysISO, formatDate, formatINR } from "@/lib/format";
 import { describeQuantities } from "@/lib/quantities";
+import { saveLorryPurchase } from "../actions";
 
 /**
  * A lorry purchase: a company lorry bought to sell straight off the truck, laid out like a godown purchase (firm,
- * company, invoice, lorry, items) but with the driver instead of a godown. Selling has usually started already, so
- * only the firm, company, lorry number, driver and the bags are needed; the invoice, rates, freight, tick boxes and
- * sell-out days can be filled in when known. Saved lorries show under Purchases › Lorry, Sales › Lorry sales and
- * New sale's "Load from"; their bags under Stock › Lorry stock.
+ * company, invoice, lorry, items) but with the driver instead of a godown, and the invoice's total value instead of a
+ * rate per bag. No freight is taken. The lorry is sold as a whole: once it is sold out, its sale is updated under Sales › Lorry sales, and
+ * Home reminds the owner when that is late.
  */
-export function LorryArrivalForm({
+export function LorryPurchaseForm({
   firms,
   companies,
   products,
@@ -38,18 +37,18 @@ export function LorryArrivalForm({
   const id = useId();
   const router = useRouter();
   const toast = useToast();
+  const [pending, startTransition] = useTransition();
   // With more than one firm nothing is picked, so the firm is always chosen on purpose.
   const [firmId, setFirmId] = useState(firms.length === 1 ? firms[0].id : "");
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [arrivedOn, setArrivedOn] = useState(today);
   const [lorryNo, setLorryNo] = useState("");
   const [driver, setDriver] = useState("");
   const [days, setDays] = useState("");
   const [paperKept, setPaperKept] = useState(false);
   const [unloading, setUnloading] = useState(false);
-  const [freight, setFreight] = useState("");
+  const [invoiceValue, setInvoiceValue] = useState("");
 
   const offeredBy = (supplierId: string) => {
     const brands = companies.find((c) => c.id === supplierId)?.brands;
@@ -57,20 +56,11 @@ export function LorryArrivalForm({
     return theirs.length ? theirs : products;
   };
   const offered = offeredBy(companyId);
-  // Purchase rates differ from selling rates, so each line starts empty rather than at the list rate.
-  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0], 0)]);
+  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0])]);
 
-  // The same item on two rows is added together; its rate is the first one given.
-  const loaded = Object.values(
-    lines.reduce<Record<string, { productId: string; qty: number; rate: number }>>((sum, l) => {
-      const qty = toNumber(l.qty);
-      if (qty <= 0) return sum;
-      const was = sum[l.productId];
-      return { ...sum, [l.productId]: { productId: l.productId, qty: (was?.qty ?? 0) + qty, rate: was?.rate || toNumber(l.rate) } };
-    }, {}),
-  );
-  const itemsTotal = lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.rate), 0);
-  const total = itemsTotal + toNumber(freight);
+  const loaded = lines.map((l) => ({ productId: l.productId, qty: toNumber(l.qty) })).filter((l) => l.qty > 0);
+  const total = toNumber(invoiceValue);
+  const sellOutDays = parseInt(days, 10);
 
   const missing = !firmId
     ? "Choose which firm this lorry is bought for."
@@ -78,37 +68,35 @@ export function LorryArrivalForm({
       ? "Enter the lorry number."
       : !driver.trim()
         ? "Enter the driver's name."
-        : loaded.length === 0
-          ? "Enter what's on the lorry."
-          : arrivedOn < invoiceDate
-            ? "The lorry can't arrive before the invoice date."
+        : !(sellOutDays >= 1 && sellOutDays <= 60)
+          ? "Enter about how many days it takes to sell out."
+          : loaded.length === 0
+            ? "Enter what's on the lorry."
             : null;
 
   function save() {
-    if (missing) return;
-    const sellOutDays = Math.round(parseFloat(days));
-    try {
-      addLorry({
+    if (missing || pending) return;
+    startTransition(async () => {
+      const result = await saveLorryPurchase({
         firmId,
         companyId,
-        companyName: companies.find((c) => c.id === companyId)?.name ?? "Company",
-        lorryNo: lorryNo.trim(),
-        driverName: driver.trim(),
-        invoiceNo: invoiceNo.trim() || undefined,
+        lorryNo,
+        driverName: driver,
+        invoiceNo,
         invoiceDate,
         invoicePaperKept: paperKept,
         unloadingCharges: unloading,
-        sellOutDays: sellOutDays > 0 ? sellOutDays : undefined,
-        arrivedOn,
-        lines: loaded.map((l) => (l.rate > 0 ? l : { productId: l.productId, qty: l.qty })),
-        freight: toNumber(freight) || undefined,
+        sellOutDays,
+        lines: loaded,
+        invoiceValue: toNumber(invoiceValue),
       });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not save the lorry.");
-      return;
-    }
-    toast(`Lorry ${lorryNo.trim()} saved with ${describeQuantities(loaded, products)} on this device (sample mode).`);
-    router.push("/purchases/lorries");
+      if (!result.ok) {
+        toast(result.problem);
+        return;
+      }
+      toast(`Lorry ${lorryNo.trim().toUpperCase()} saved with ${describeQuantities(loaded, products)}.`);
+      router.push("/purchases/lorries");
+    });
   }
 
   return (
@@ -135,20 +123,17 @@ export function LorryArrivalForm({
             onChange={(next) => {
               setCompanyId(next);
               // Start the items again with what the new company sells.
-              setLines([newLine(1, offeredBy(next)[0], 0)]);
+              setLines([newLine(1, offeredBy(next)[0])]);
             }}
             options={companies.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Invoice no." htmlFor={`${id}-invoice`} hint="Leave empty if you don't have it">
             <input id={`${id}-invoice`} className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Optional" />
           </Field>
-          <Field label="Invoice date" htmlFor={`${id}-invdate`}>
+          <Field label="Invoice date" htmlFor={`${id}-invdate`} hint="Selling starts from this day">
             <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
-          </Field>
-          <Field label="Lorry arrived on" htmlFor={`${id}-arrived`}>
-            <DatePicker id={`${id}-arrived`} label="Lorry arrived on" value={arrivedOn} onChange={setArrivedOn} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -165,32 +150,38 @@ export function LorryArrivalForm({
           <Field label="Driver name" htmlFor={`${id}-driver`}>
             <input id={`${id}-driver`} className={inputClass} value={driver} onChange={(e) => setDriver(e.target.value)} autoCapitalize="words" />
           </Field>
-          <Field label="Sells out in" htmlFor={`${id}-days`} hint="About how many days">
-            <AffixInput id={`${id}-days`} inputMode="numeric" placeholder="2" suffix="days" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} />
+          <Field
+            label="Sells out in"
+            htmlFor={`${id}-days`}
+            hint={sellOutDays >= 1 && sellOutDays <= 60 ? `Update the sale by ${formatDate(addDaysISO(invoiceDate, sellOutDays))}` : "About how many days"}
+          >
+            <AffixInput id={`${id}-days`} inputMode="numeric" placeholder="2" suffix="days" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, "").slice(0, 2))} />
           </Field>
         </div>
         <div className="space-y-1">
-          <Tick checked={paperKept} onChange={setPaperKept} label="We have the invoice paper" hint="The physical invoice is kept with us" />
-          <Tick checked={unloading} onChange={setUnloading} label="Unloading charges" hint="Unloading is charged for this lorry" />
+          <Tick checked={paperKept} onChange={setPaperKept} label="Physical invoice paper copy" hint="We have the paper copy of the company's invoice" />
+          <Tick checked={unloading} onChange={setUnloading} label="Unloading charges" hint="Unloading charges are paid to us" />
         </div>
       </section>
 
       <section className="surface p-5">
         <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">On the lorry</h2>
-        <p className="mt-0.5 text-[13px] text-ink-secondary">Bags and the rate on the company&apos;s invoice; the rate can be added later.</p>
-        <ItemLines lines={lines} onChange={setLines} products={offered} rateFor={() => 0} />
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-t border-hairline pt-4">
-          <Field label="Freight paid on this lorry" htmlFor={`${id}-freight`}>
-            <AffixInput id={`${id}-freight`} prefix="₹" inputMode="decimal" placeholder="0" value={freight} onChange={(e) => setFreight(e.target.value)} />
+        <p className="mt-0.5 text-[13px] text-ink-secondary">The bags (or kg) that came on it.</p>
+        <ItemLines lines={lines} onChange={setLines} products={offered} withRate={false} />
+        <div className="mt-4 border-t border-hairline pt-4">
+          <Field label="Total invoice value" htmlFor={`${id}-value`} hint="The total on the company's invoice">
+            <AffixInput id={`${id}-value`} prefix="₹" inputMode="decimal" placeholder="0" value={invoiceValue} onChange={(e) => setInvoiceValue(e.target.value)} />
           </Field>
-          <div className="pb-2 text-right">
-            <p className="text-[13px] text-ink-secondary">Total</p>
-            <p className="text-[22px] font-semibold tabular-nums text-ink">{formatINR(total)}</p>
-          </div>
         </div>
       </section>
 
-      <SubmitBar label="Save lorry purchase" disabled={Boolean(missing)} hint={missing ?? undefined} summary={{ label: "Total", value: formatINR(total) }} onSubmit={save} />
+      <SubmitBar
+        label={pending ? "Saving…" : "Save lorry purchase"}
+        disabled={Boolean(missing) || pending}
+        hint={missing ?? undefined}
+        summary={{ label: "Total", value: formatINR(total) }}
+        onSubmit={save}
+      />
     </form>
   );
 }

@@ -23,6 +23,8 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { rolesFor } from "@/lib/access";
+import { allRoles } from "@/lib/labels";
 import type { Role } from "@/lib/data/types";
 
 /** Module icon colours from the design plan: blue sales, green money, amber stock, teal fleet, purple personal. */
@@ -34,12 +36,12 @@ export type Section = {
   description: string;
   icon: LucideIcon;
   tone: Tone;
-  /** Who sees this section in the navigation. */
+  /** Who sees this section in the navigation: the same roles that may open it (lib/access.ts). */
   roles: Role[];
   action?: { label: string; href: string };
 };
 
-const everyone: Role[] = ["owner", "office", "godown", "field", "driver"];
+const everyone = allRoles;
 
 export const home: Section = {
   href: "/",
@@ -57,7 +59,7 @@ const sections: Section[] = [
     description: "Cement and steel bills, lorry sales, discounts and transport",
     icon: ReceiptText,
     tone: "blue",
-    roles: ["owner", "office", "field", "godown"],
+    roles: rolesFor("/sales"),
     action: { label: "New sale", href: "/sales/new" },
   },
   {
@@ -67,7 +69,7 @@ const sections: Section[] = [
     icon: ClipboardList,
     tone: "blue",
     action: { label: "New order", href: "/orders/new" },
-    roles: ["owner", "office", "field", "godown"],
+    roles: rolesFor("/orders"),
   },
   {
     href: "/quotations",
@@ -75,7 +77,7 @@ const sections: Section[] = [
     description: "Quotations and estimates in the SKA format",
     icon: FileText,
     tone: "blue",
-    roles: ["owner", "office", "field"],
+    roles: rolesFor("/quotations"),
     action: { label: "New quotation", href: "/quotations/new" },
   },
   {
@@ -84,7 +86,7 @@ const sections: Section[] = [
     description: "Company lorries bought; their stock goes into the godown",
     icon: ShoppingCart,
     tone: "blue",
-    roles: ["owner", "office", "godown"],
+    roles: rolesFor("/purchases"),
     action: { label: "New purchase", href: "/purchases/new" },
   },
   {
@@ -93,7 +95,7 @@ const sections: Section[] = [
     description: "Money received from parties and paid to companies",
     icon: Wallet,
     tone: "green",
-    roles: ["owner", "office", "field"],
+    roles: rolesFor("/money"),
     action: { label: "New receipt", href: "/money/receipts/new" },
   },
   {
@@ -102,7 +104,7 @@ const sections: Section[] = [
     description: "Daily cash book for each employee",
     icon: HandCoins,
     tone: "green",
-    roles: ["owner", "office", "field", "driver"],
+    roles: rolesFor("/money/cash"),
   },
   {
     href: "/money/expenses",
@@ -110,7 +112,7 @@ const sections: Section[] = [
     description: "Rent, driver payments, salaries and more",
     icon: Fuel,
     tone: "green",
-    roles: ["owner", "office", "driver"],
+    roles: rolesFor("/money/expenses"),
     action: { label: "New expense", href: "/money/expenses/new" },
   },
   {
@@ -119,7 +121,7 @@ const sections: Section[] = [
     description: "Customer advances and fixed-price cement commitments",
     icon: Handshake,
     tone: "green",
-    roles: ["owner", "office"],
+    roles: rolesFor("/money/advances"),
   },
   {
     href: "/money/ageing",
@@ -127,7 +129,7 @@ const sections: Section[] = [
     description: "Who owes what, for how long, and payment reminders",
     icon: Hourglass,
     tone: "green",
-    roles: ["owner", "office"],
+    roles: rolesFor("/money/ageing"),
   },
   {
     href: "/money/banks",
@@ -135,7 +137,7 @@ const sections: Section[] = [
     description: "Bank balances and every entry in and out",
     icon: Landmark,
     tone: "green",
-    roles: ["owner", "office"],
+    roles: rolesFor("/money/banks"),
   },
   {
     href: "/money/bad-debts",
@@ -143,7 +145,7 @@ const sections: Section[] = [
     description: "Amounts written off, with the owner's approval",
     icon: CircleSlash,
     tone: "green",
-    roles: ["owner"],
+    roles: rolesFor("/money/bad-debts"),
   },
   {
     href: "/parties",
@@ -151,7 +153,7 @@ const sections: Section[] = [
     description: "Customers, sub-dealers, companies and ledgers",
     icon: Users,
     tone: "blue",
-    roles: ["owner", "office", "field"],
+    roles: rolesFor("/parties"),
     action: { label: "New party", href: "/parties/new" },
   },
   {
@@ -160,7 +162,7 @@ const sections: Section[] = [
     description: "Godown stock and movements",
     icon: Package,
     tone: "amber",
-    roles: ["owner", "office", "godown"],
+    roles: rolesFor("/stock"),
     action: { label: "New purchase", href: "/purchases/new" },
   },
   {
@@ -169,7 +171,15 @@ const sections: Section[] = [
     description: "Staff, attendance, tours, targets and salary",
     icon: IdCard,
     tone: "blue",
-    roles: everyone,
+    roles: rolesFor("/people"),
+  },
+  {
+    href: "/attendance",
+    title: "Attendance",
+    description: "Check in and out, and your own attendance",
+    icon: CalendarCheck,
+    tone: "green",
+    roles: rolesFor("/attendance"),
   },
   {
     href: "/fleet",
@@ -177,7 +187,7 @@ const sections: Section[] = [
     description: "Vans, lorries, renewals, freight and GPS",
     icon: Truck,
     tone: "teal",
-    roles: ["owner", "office", "godown", "driver"],
+    roles: rolesFor("/fleet"),
   },
   {
     href: "/reports",
@@ -185,7 +195,7 @@ const sections: Section[] = [
     description: "Daybook, ledgers, ageing and Excel exports",
     icon: ChartColumn,
     tone: "blue",
-    roles: ["owner", "office"],
+    roles: rolesFor("/reports"),
   },
   {
     href: "/personal",
@@ -193,7 +203,7 @@ const sections: Section[] = [
     description: "Chits, rents, insurance, banks and notes",
     icon: Lock,
     tone: "purple",
-    roles: ["owner"],
+    roles: rolesFor("/personal"),
   },
   {
     href: "/settings",
@@ -212,7 +222,7 @@ export const sidebarGroups: { label?: string; items: Section[] }[] = [
   { items: [home] },
   { label: "Sales", items: ["/sales", "/orders", "/quotations", "/purchases"].map(byHref) },
   { label: "Money", items: ["/money", "/money/cash", "/money/expenses", "/money/advances", "/money/ageing", "/money/banks", "/money/bad-debts"].map(byHref) },
-  { label: "Records", items: ["/parties", "/stock", "/people", "/fleet"].map(byHref) },
+  { label: "Records", items: ["/parties", "/stock", "/people", "/attendance", "/fleet"].map(byHref) },
   { label: "Insights", items: [byHref("/reports")] },
   { label: "Private", items: [byHref("/personal")] },
   { items: [byHref("/settings")] },
@@ -249,7 +259,7 @@ export const roleTabs: Record<Role, Tab[]> = {
   driver: [
     { href: "/", title: "Today", icon: Route },
     { href: "/money/expenses/new", title: "Expense", icon: ReceiptText },
-    { href: "/people", title: "Attendance", icon: CalendarCheck },
+    { href: "/attendance", title: "Attendance", icon: CalendarCheck },
     { href: "/money/cash", title: "Cash", icon: HandCoins },
   ],
 };
@@ -257,7 +267,7 @@ export const roleTabs: Record<Role, Tab[]> = {
 export const moreTab: Tab = { href: "/more", title: "More", icon: LayoutGrid };
 
 export const quickAddItems: { label: string; href: string; icon: LucideIcon; tone: Tone; roles: Role[] }[] = [
-  { label: "New sale", href: "/sales/new", icon: ReceiptText, tone: "blue", roles: ["owner", "office", "field"] },
+  { label: "New sale", href: "/sales/new", icon: ReceiptText, tone: "blue", roles: ["owner", "office", "field", "godown"] },
   { label: "Receipt", href: "/money/receipts/new", icon: Wallet, tone: "green", roles: ["owner", "office", "field"] },
   { label: "Payment", href: "/money/payments/new", icon: HandCoins, tone: "green", roles: ["owner", "office"] },
   { label: "Hand over cash", href: "/money/cash/handover/new", icon: HandCoins, tone: "green", roles: ["owner", "office", "field", "driver"] },

@@ -25,6 +25,7 @@ const icons: Record<NoticeKind, LucideIcon> = {
   cash: Wallet,
   personal: Lock,
   delivery: Truck,
+  lorry: Truck,
 };
 
 const toneClass: Record<Notice["tone"], string> = {

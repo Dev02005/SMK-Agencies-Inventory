@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 on any phone or computer. The app opens on the sign-in page. The sample owner login is ID `123456789`, password `123456789` (change them with `SKA_LOGIN_ID` and `SKA_LOGIN_PASSWORD`). Everyone on the staff list (Settings › Users & roles) can also sign in with their mobile number or email. Their starting password is their mobile number, and on that first sign-in they must set their own (at least 8 characters, not the mobile number) before anything else opens; after that the mobile number no longer works as a password. Each person sees their own role's screens, and only the owner has "View as". In sample mode the passwords people set are kept in the server's memory (hashed), so they last until the app restarts; with Supabase, Supabase Auth stores them. Everyone is signed out at 12 midnight India time.
+Open http://localhost:3000 on any phone or computer. The app opens on the sign-in page. Everyone, the owner too, signs in with the mobile number (or email) on the staff list (`local-data/staff.json`; the owner is its `owner` entry). Their password is their mobile number (typed with or without +91). They can set their own from Settings › Account (at least 8 characters, not the mobile number); after that the mobile number no longer works as a password. Each person sees and opens only their own role's screens (checked before any page renders, `src/lib/access.ts`), and only the owner has "View as". Passwords people set are kept hashed in `local-data/passwords.json`, so they last across restarts; deleting someone's line there puts them back on their mobile number. With Supabase, Supabase Auth stores them. Everyone is signed out at 12 midnight India time.
 
 Without Supabase keys the app runs on the sample data in `src/lib/data` and shows a "Sample data" chip. The sample records follow the real calendar: they are rebuilt each day around today's date in India, so "today" on every screen is the real today.
 
@@ -25,13 +25,13 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Sign-in | `/login` first, in two steps: the mobile number (or email), then the person's saved name is shown and they enter their password (`src/lib/login.ts`; name look-ups are limited to 20 per 10 minutes per address): every other page needs a session (`src/proxy.ts` checks it before the page renders, the app layout checks it again). The session is a signed, httpOnly cookie that ends at 12 midnight India time; an open app signs itself out at midnight (`midnight-sign-out.tsx`) |
 | Account | `/settings/account` (Settings › Account): who is signed in, login ID, when they signed in, a countdown to the midnight sign-out, change password, sign out |
 | Home | `/` dashboard with today's real date and a live clock: today's sales, cash with staff, collected / outstanding / overdue, approvals, dues |
-| Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill, `/sales/lorries` (+ `/new`) company lorries sold straight off the truck |
+| Sales | `/sales` list with filters, `/sales/new`, `/sales/[id]` bill, `/sales/[id]/print` A4 bill, `/sales/lorries` company lorries sold straight off the truck: each is sold as a whole, and once sold out the owner updates it with the day and what it sold for (Home and Notifications remind them when that is late). Lorry purchases are under `/purchases/lorries` (+ `/new`: firm, company, invoice no. and date, lorry, driver, sells-out days, items, total invoice value and freight) |
 | Quotations | `/quotations`, `/quotations/new`, `/quotations/[id]` in the SKA paper format, printable |
 | Purchases | `/purchases`, `/purchases/new`, `/purchases/[id]` |
 | Parties | `/parties` with balances, `/parties/[id]` ledger (detailed / summary) and ageing, `/parties/new` |
 | Money | `/money` receipts and payments, `/money/receipts/new`, `/money/payments/new` |
 | Stock | `/stock` godown balances and movements. Stock comes in only through a purchase: saving a purchase puts its items into the purchase's godown (there is no separate inward step) |
-| Settings | `/settings` for everyone: Account and Install app; the owner and office also get firm details (each firm's details, Add firm and the Primary firm tick: sales are billed from the primary firm, New purchase asks which firm), godowns with their in-charges, products & rates, users & roles |
+| Settings | `/settings` for everyone: Account and Install app; the owner and office also get firm details (each firm's details, Add firm and the Primary firm tick: sales are billed from the primary firm, New purchase asks which firm), godowns with their in-charges, products (no rates), users & roles |
 | Dates and downloads | Every list has the same date filter (All dates, Today, Last 7 days, This month, Pick a day, From – to), kept in the page address (`src/lib/date-filter.ts`), and **Download** and **Share** buttons: Excel (.xlsx), PDF (A4 pages) or a JPG picture of what is on screen after the filters, plus Print. Share opens the phone's or computer's share sheet (WhatsApp, mail…); where a browser can't share files it saves the file and opens WhatsApp or email to attach it, or copies the picture to paste. Files are made in the browser (`src/lib/export/`); card pages carry a hidden table for this (`src/components/ui/export-table.tsx`) |
 | Staff cash | `/money/cash` everyone's cash today, `/money/cash/[holder]` day-by-day cash book with counts, `/money/cash/handover/new` |
 | Expenses | `/money/expenses` by head with this month's split, `/money/expenses/new` with fixed heads, paid-from and vehicle/staff/godown tag |
@@ -43,9 +43,9 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Home by role | `/` shows a different screen per role: owner/office dashboard, field staff (cash, targets, visits, who to collect from), godown (bills to load, lorries arriving, stock, orders), driver (today's deliveries, cash, renewals) |
 | People | `/people` staff with today's attendance, `/people/[id]`, `/people/new`, `/people/mapping` (sub-dealers per staff), `/people/attendance` (check in, today, month), `/people/tours`, `/people/targets`, `/people/salary` (salary sheet, loans and advances) |
 | Orders | `/orders` pending / new / confirmed / dispatched, `/orders/[id]` ordered vs sent with bills, `/orders/new` |
-| Stock movement | `/stock/transfers` (+ `/new`) between godowns with in-transit status, `/stock/lorries` bags still on lorries being sold off the truck, `/stock/suspense` loads sent before the buyer is known |
+| Stock movement | `/stock/transfers` (+ `/new`) between godowns with in-transit status, `/stock/lorries` what is on lorries still selling off the truck, `/stock/suspense` loads sent before the buyer is known |
 | Vehicles | `/fleet` papers due and service due per vehicle, `/fleet/[id]` papers, health, service log, running cost; `/fleet/trips`; `/fleet/map` (Leaflet + OpenStreetMap); `/fleet/freight` chart with calculator; `/fleet/drivers` driver cash ledger and hired lorries |
-| Reports | `/reports` hub and `/reports/[report]`: daybook, sales summary (by party, product, staff or day), discounts and rate changes, outstanding and ageing, collections, expenses, stock summary, attendance, vehicle costs, activity log. Each has the date filter and grouping options, and Download: **Excel** (a real .xlsx, numbers stay numbers), **PDF**, **JPG**, Share and **Print** (A4 with the firm header; wide reports print landscape) |
+| Reports | `/reports` hub and `/reports/[report]`: daybook, sales summary (by party, product, staff or day), discounts, outstanding and ageing, collections, expenses, stock summary, attendance, vehicle costs, activity log. Each has the date filter and grouping options, and Download: **Excel** (a real .xlsx, numbers stay numbers), **PDF**, **JPG**, Share and **Print** (A4 with the firm header; wide reports print landscape) |
 | Notifications | Bell with unread count in the top bar and `/notifications`: approvals, payment reminders due, who to collect from, vehicle papers and service, low stock, new and pending orders, lorries arriving, transfers, suspense loads, cash above the limit, deliveries, personal dues. Each role sees its own; field staff and drivers only theirs |
 | Reminder messages | `/settings/reminders`: when reminders go (first after, repeat, stop after, time, skip Sundays, SMS if WhatsApp fails) and the message templates with fill-in fields, SMS length count and a preview with real parties. Includes a Telugu draft for the owner to check |
 | Install | Installs like an app on Android, iPhone, iPad, Windows, Mac and ChromeOS: PNG icons (192, 512, maskable, Apple), manifest with shortcuts (new bill, receipt, notifications). The install card offers one-tap install in Chrome, Edge and Samsung Internet, shows Share → Add to Home Screen on iPhone/iPad, File → Add to Dock in Safari on a Mac, and the browser menu in Firefox on Android; "Install app" is also in the profile menu |
@@ -76,10 +76,20 @@ The firm's real records are kept in `local-data/` on the computer that runs the 
 | `vehicles.json` | Our vehicles (`own` lorries and vans are offered for FOR deliveries) | By hand for now; restart the app |
 | `customers.json` | Customers and sub-dealers added in the app | New sale › Party › New customer (saved straight away) |
 | `suppliers.json` | The companies we buy from and the brand(s) each sells (a purchase offers only that company's products) | By hand for now; restart the app |
-| `products.json` | Each company's cement types (and any steel items) with their list rates | Settings › Products & rates (rates and new products save straight away) |
+| `products.json` | Each company's cement types (and any steel items). No rates: the owner prices each bill | Settings › Products (new products save straight away) |
 | `banks.json` | Each firm's business bank accounts: bank, account number, IFSC, branch, opening balance | By hand for now; restart the app |
+| `lorries.json` | Company lorries bought to sell off the truck, and what each sold for (items sold with rates, charges, tick boxes, sold out) | Purchases › Lorry › New lorry purchase; Sales › Lorry sales › Update sale (`/sales/lorries/[id]`) |
+| `notes.json` | Each person's quick notes from the floating notes ball | The ball on every screen (saved straight away) |
+| `destinations.json` | Villages and towns we deliver to | New sale › Destination › Add destination |
+| `chits.json` | The owner's chits, with each instalment and the lifting recorded | Personal › Chits › Add chit, Record instalment, Mark lifted |
+| `rents.json` | Rent received and rent paid, with each month recorded | Personal › Rents › Add rent, Mark rent received / paid |
+| `attendance.json` | Each person's check-in and check-out times | Attendance › Check in / Check out (each person, for themself) |
+| `rent-drivers.json` | Drivers of rented vehicles | New sale › Rent › Driver › Add driver |
+| `passwords.json` | Passwords people set for themselves, as salted hashes | Settings › Account › Change password |
 
-Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns they look after, with only those godowns' stock, purchases, sales and transfers; the owner and staff who look after no godown see them all (`getMyGodowns` in `src/lib/data`). Lorry sales are the owner's alone, checked on the server (`src/components/auth/owner-only.tsx`).
+Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns they look after, with only those godowns' stock, purchases, sales and transfers; the owner and staff who look after no godown see them all (`getMyGodowns` in `src/lib/data`). People, Vehicles, Users & roles, and the People and Vehicles reports are the owner's alone; staff see only their own attendance under `/attendance`, and the app's frame sends the staff list and every role's notices to the owner only (others get their own). Orders carry the godown they load from, so in-charges see only theirs. Lorry purchases and sales are the owner's alone, checked on the server (`src/components/auth/owner-only.tsx`, and `getLorries` gives nobody else any).
+
+Original or sample: records read from `local-data/` carry `original: true`. List pages show **Original data**, **Sample data** or **Original + sample** (`DataOrigin`, `OriginChip`), and in a mixed list each sample record has a small **Sample** tag (`SampleTag`). Sales, money and stock are all still sample data.
 
 `replaces` in `staff.json` and `vehicles.json` lets a real person or vehicle take over a sample one's records. Firm details are written to the file when saved, so on a host with a read-only disk they need Supabase. With Supabase these files become database tables.
 
@@ -93,6 +103,7 @@ Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns 
 2. Run `supabase/migrations/20261026000000_phase1_core.sql` in the SQL editor (or `supabase db push` with the CLI), then `supabase/seed.sql`.
 3. Create the owner's login in Authentication, then add their row to `profiles` with `role = 'owner'`.
 4. Copy `.env.example` to `.env.local` and fill in the project URL and publishable key, plus `SESSION_SECRET`, `PERSONAL_PIN`, `PERSONAL_LOCK_SECRET` and `NEXT_PUBLIC_SITE_URL` (the app's public address, used for link previews and the sitemap).
+5. Add `@supabase/ssr` and `@supabase/supabase-js` (`npm install`), create the browser and server clients in `src/lib/supabase`, and switch the functions in `src/lib/data` from the sample and local-data records to queries. Then set `usesSampleData` to false.
 
 ## Where things are
 
@@ -112,7 +123,8 @@ Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns 
 ## Rules worth knowing
 
 - Money moves only through `ledger_entries` and stock only through `stock_movements`; balances are sums, never edited numbers.
-- Over the credit limit, above the role's discount limit, or a changed rate: the owner saves with a reason; anyone else's bill waits for owner approval and posts only when approved.
+- Products have no fixed rates. Staff (godown in-charges and others) save a sale with the items and quantities only; it waits as a sale request with no bill no. The owner opens it, gives it the bill no. (the next in the series is filled in), enters the rates, discount and charges, and approves it. Only then does it post.
+- Over the credit limit or above the discount limit on the owner's own bill: the owner saves with a reason.
 - Next.js 16 here has Cache Components on: anything that depends on the request (today's date, the signed-in user, database reads) goes inside `<Suspense>`.
 - Data modules (`src/lib/data`, `reports.ts`, `notifications.ts`, `personal-lock.ts`) are marked `server-only`, so the build fails if browser code ever imports them.
 
@@ -121,4 +133,4 @@ Who sees what: a godown's in-charges (set in `staff.json`) see only the godowns 
 - Every page is sent with security headers (`next.config.ts`): no framing by other sites, no MIME sniffing, a strict referrer policy, HSTS, and only location and camera allowed.
 - Database: row-level security on every table; sales, ledger and stock are only written through checked functions. Field staff can only add cash-only parties assigned to themselves and record receipts they collected from their own parties. `npm audit` reports no known vulnerabilities in the app's packages.
 - Sign-in: the session cookie is signed (HMAC) with `SESSION_SECRET`, httpOnly, same-site and secure in production; a wrong login waits 0.6 s before answering, which slows guessing.
-- Before go-live: set `SESSION_SECRET`, `SKA_LOGIN_ID`, `SKA_LOGIN_PASSWORD` (until Supabase Auth replaces them), `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET`; make the app layout send only the signed-in user's notifications (see the note in `src/app/(app)/layout.tsx`); switch the map to a paid tile provider.
+- Before go-live: set `SESSION_SECRET`, `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET`; switch the map to a paid tile provider.

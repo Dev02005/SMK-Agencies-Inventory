@@ -27,6 +27,8 @@ export type Godown = {
   own?: boolean;
   /** Profile ids of the staff who look after it. */
   inCharge?: string[];
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type Product = {
@@ -37,8 +39,9 @@ export type Product = {
   variant?: string;
   category: "cement" | "steel";
   unit: Unit;
-  listRate: number;
   active: boolean;
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type Profile = {
@@ -50,6 +53,8 @@ export type Profile = {
   email?: string;
   role: Role;
   active: boolean;
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type Party = {
@@ -67,15 +72,18 @@ export type Party = {
   assignedTo?: string;
   /** For a supplier: the brands it sells, so a purchase from it offers only those. */
   brands?: string[];
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
-export type SaleLine = { productId: string; qty: number; rate: number; listRate: number };
+export type SaleLine = { productId: string; qty: number; rate: number };
 
 export type Sale = {
   id: string;
   /** Which of the owner's firms the bill is under; the main (first) firm when missing. */
   firmId?: string;
-  billNo: number;
+  /** Given by the owner when the sale is approved (with the prices); a sale waiting for approval has none. */
+  billNo?: number;
   partyId: string;
   billDate: string;
   receivedDate?: string;
@@ -136,7 +144,7 @@ export type Purchase = {
   godownId: string;
   /** Sold straight off the lorry without unloading into a godown. */
   onLorry?: boolean;
-  /** Noted when a lorry is sold from (Sales › Lorry sales › Lorry arrived). */
+  /** The lorry's driver. */
   driverName?: string;
   /** The physical invoice paper is kept with us. */
   invoicePaperKept?: boolean;
@@ -144,8 +152,9 @@ export type Purchase = {
   unloadingCharges?: boolean;
   /** Expected to sell out in about this many days. */
   sellOutDays?: number;
+  /** A lorry sold off the truck, once sold out: when, and what it sold for. */
+  soldOut?: { on: string; value: number; notes?: string };
   lines: { productId: string; qty: number; rate: number }[];
-  freight: number;
   total: number;
 };
 
@@ -244,6 +253,39 @@ export type Commitment = {
 
 export type BadDebt = { id: string; partyId: string; date: string; amount: number; reason: string; approvedBy: string };
 
+/**
+ * A company lorry bought to sell straight off the truck. It is sold as a whole, not bill by bill: once it is sold
+ * out the owner updates it with what it sold for, and is reminded when that update is late.
+ */
+export type Lorry = {
+  id: string;
+  /** Which of the owner's firms bought it. */
+  firmId?: string;
+  companyId: string;
+  companyName: string;
+  lorryNo: string;
+  driverName?: string;
+  invoiceNo?: string;
+  /** YYYY-MM-DD: the purchase date; selling starts then. */
+  invoiceDate: string;
+  invoicePaperKept: boolean;
+  unloadingCharges: boolean;
+  /** About how many days it takes to sell out; the sale update is due after that. */
+  sellOutDays: number;
+  /** What came on it: bags of cement, kg of steel. */
+  lines: { productId: string; qty: number }[];
+  /** The total on the company's invoice. */
+  invoiceValue?: number;
+  /** What has been sold from it so far, as the owner updates it (Sales › Lorry sales › Update): each item's quantity and rate, and charges received. */
+  sale?: { lines: { productId: string; qty: number; rate: number }[]; unloading?: number; other?: number; notes?: string; updatedOn: string };
+  /** Set once it is sold out: the day, and the total sale value. */
+  sold?: { on: string; value: number; notes?: string };
+  /** A sample lorry comes from a sample purchase. */
+  purchaseId?: string;
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
+};
+
 export type BankAccount = {
   id: string;
   bank: string;
@@ -255,6 +297,8 @@ export type BankAccount = {
   firmId?: string;
   ifsc?: string;
   branch?: string;
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type BankEntry = {
@@ -292,8 +336,15 @@ export type Chit = {
   instalment: number;
   startDate: string;
   dueDay: number;
+  /** Instalments paid before the chit was added to the app. */
   paidMonths: number;
+  /** What was paid on those, when it wasn't the full instalment each time. */
+  paidBefore?: number;
   lifted?: { month: number; amount: number; date: string };
+  /** Instalments recorded in the app: which month, the day paid and what was paid (often less than the full instalment once the dividend is taken off). */
+  payments?: { month: number; date: string; amount: number }[];
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type Rental = {
@@ -308,6 +359,12 @@ export type Rental = {
   /** Last month fully paid, "YYYY-MM". */
   paidThrough: string;
   scope: "business" | "personal";
+  /** The tenant's or owner's mobile number. */
+  phone?: string;
+  /** Rent recorded in the app, one entry per month. */
+  payments?: { month: string; date: string; amount: number }[];
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type InsurancePolicy = {
@@ -349,6 +406,8 @@ export type AttendanceRecord = {
   late?: boolean;
   correctedBy?: string;
   correctionReason?: string;
+  /** A check-in made in the app (local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type VisitPurpose = "collection" | "order" | "new_party" | "complaint";
@@ -402,6 +461,8 @@ export type Order = {
   takenBy: string;
   deliverBy?: string;
   destination?: string;
+  /** The godown it is loaded from; only that godown's in-charges see the order. */
+  godownId?: string;
   lines: { productId: string; qty: number }[];
   /** Bills raised against this order, in the order they were dispatched. */
   saleIds: string[];
@@ -453,6 +514,8 @@ export type Vehicle = {
   documents: { insurance?: string; tax?: string; pollution?: string; fitness?: string; permit?: string };
   tyresChangedOn?: string;
   gps?: { lat: number; lng: number; updatedAt: string; status: "moving" | "stopped" | "offline"; speedKmh: number; place: string };
+  /** One of the firm's own records (from local-data/), not sample data. */
+  original?: boolean;
 };
 
 export type ServiceRecord = {

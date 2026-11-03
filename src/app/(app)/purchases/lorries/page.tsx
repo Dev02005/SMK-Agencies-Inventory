@@ -1,26 +1,29 @@
-import { Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { OwnerOnly } from "@/components/auth/owner-only";
-import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { LorryCost, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
-import { Chip } from "@/components/ui/chip";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { getFirms, getLorryLoads, getProducts } from "@/lib/data";
+import { getFirms, getLorries, getProducts, getToday } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
-import { formatDate, formatNumber } from "@/lib/format";
+import { formatDate, formatINR } from "@/lib/format";
+import { lorryState, lorryStateChip } from "@/lib/lorries";
 import { pageDateFilter } from "@/lib/page-dates";
-import { lineQty } from "@/lib/quantities";
-import { DeviceLorryPurchases } from "./device-lorry-purchases";
+import { describeQuantities } from "@/lib/quantities";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
+import { removeLorry } from "./actions";
+import { DeviceLorryImport } from "./device-lorry-import";
 
 export const metadata: Metadata = { title: "Lorry purchases" };
 
 /**
- * Company lorries bought to be sold straight off the truck: who sent them, the invoice and what came on them. Their
- * bills are under Sales › Lorry sales. Only the owner deals in lorries.
+ * Company lorries bought to be sold straight off the truck: firm, company, invoice and what came on them. Each is
+ * sold as a whole; its sale is updated under Sales › Lorry sales. Only the owner deals in lorries.
  */
 export default function LorryPurchasesPage({ searchParams }: PageProps<"/purchases/lorries">) {
   return (
@@ -32,13 +35,14 @@ export default function LorryPurchasesPage({ searchParams }: PageProps<"/purchas
             subtitle="Company lorries bought to sell straight off the truck"
             actions={
               <>
-                <SampleChip />
+                <DataOrigin of="lorries" />
                 <ButtonLink href="/purchases/lorries/new">New lorry purchase</ButtonLink>
               </>
             }
           />
+          <DeviceLorryImport />
           <Suspense fallback={<ListSkeleton />}>
-            <Loads searchParams={searchParams} />
+            <Lorries searchParams={searchParams} />
           </Suspense>
         </OwnerOnly>
       </Suspense>
@@ -46,53 +50,47 @@ export default function LorryPurchasesPage({ searchParams }: PageProps<"/purchas
   );
 }
 
-async function Loads({ searchParams }: { searchParams: PageProps<"/purchases/lorries">["searchParams"] }) {
-  const [all, products, dates, firms] = await Promise.all([getLorryLoads(), getProducts(), pageDateFilter(searchParams), getFirms()]);
-  const loads = all.filter((l) => inDateFilter(l.arrivedOn, dates));
-  const product = (id: string) => products.find((p) => p.id === id);
+async function Lorries({ searchParams }: { searchParams: PageProps<"/purchases/lorries">["searchParams"] }) {
+  const [all, products, dates, firms, today] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams), getFirms(), getToday()]);
+  const lorries = all.filter((l) => inDateFilter(l.invoiceDate, dates));
+  const firmName = (id?: string) => firms.find((f) => f.id === id)?.name;
   return (
     <div className="space-y-4">
       <DataTools title="Lorry purchases" />
       <ExportTable
         title="Lorry purchases"
-        columns={["Arrived", "Lorry", "Company", "Driver", "Invoice", "Item", "Loaded"]}
-        rows={loads.flatMap((l) =>
-          l.lines.map((x) => [formatDate(l.arrivedOn), l.lorryNo, l.companyName, l.driverName, l.invoiceNo, product(x.productId)?.name, lineQty(x.loaded, product(x.productId))]),
-        )}
+        columns={["Invoice date", "Firm", "Lorry", "Company", "Driver", "Invoice", "Items", "Invoice value", "Paper copy", "Unloading paid to us", "Status"]}
+        rows={lorries.map((l) => [
+          formatDate(l.invoiceDate),
+          firmName(l.firmId) ?? "",
+          l.lorryNo,
+          l.companyName,
+          l.driverName,
+          l.invoiceNo,
+          describeQuantities(l.lines, products),
+          l.invoiceValue ? formatINR(l.invoiceValue) : "",
+          l.invoicePaperKept ? "Yes" : "No",
+          l.unloadingCharges ? "Yes" : "No",
+          lorryStateChip[lorryState(l, today)].label,
+        ])}
       />
-      <DeviceLorryPurchases products={products} firmNames={Object.fromEntries(firms.map((f) => [f.id, f.name]))} serverCount={loads.length} />
-      {loads.map((load) => (
-        <SectionCard
-          key={load.id}
-          title={
-            <span className="flex items-center gap-2">
-              <Truck size={20} strokeWidth={1.75} className="text-warning" aria-hidden />
-              {load.lorryNo}
-            </span>
-          }
-          action={<Chip tone={load.status === "selling" ? "warning" : "good"}>{load.status === "selling" ? "Selling" : "Sold out"}</Chip>}
-        >
-          <p className="-mt-2 text-[13px] text-ink-secondary">
-            {load.companyName}
-            {load.driverName && ` · driver ${load.driverName}`} · {load.invoiceNo ? `invoice ${load.invoiceNo}` : "no invoice number"} · arrived {formatDate(load.arrivedOn)} ·{" "}
-            <Link href={`/purchases/${load.purchaseId}`} className="text-link underline underline-offset-2">
-              purchase
+      {lorries.length === 0 && <SectionCard>{dates.kind === "all" ? "No lorry purchases yet." : "No lorry purchases for these dates."}</SectionCard>}
+      {lorries.map((l) => (
+        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} today={today} />}>
+          <LorryMeta lorry={l} firmName={firmName(l.firmId)} />
+          <LorryItems lorry={l} products={products} />
+          <LorryCost lorry={l} />
+          <p className="mt-3 flex flex-wrap gap-3 text-[13px]">
+            <Link href={`/sales/lorries/${l.id}`} className="text-link hover:underline">
+              {l.sold ? "Lorry sale ›" : "Update the sale ›"}
             </Link>
+            {l.purchaseId && (
+              <Link href={`/purchases/${l.purchaseId}`} className="text-link hover:underline">
+                Purchase ›
+              </Link>
+            )}
           </p>
-          <ul className="mt-3 divide-y divide-hairline">
-            {load.lines.map((l) => (
-              <li key={l.productId} className="flex justify-between py-2 text-[15px]">
-                <span className="text-ink">{product(l.productId)?.name}</span>
-                <span className="tabular-nums text-ink">{lineQty(l.loaded, product(l.productId))}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-[13px] text-ink-secondary">
-            {formatNumber(load.bills.length)} {load.bills.length === 1 ? "bill" : "bills"} so far ·{" "}
-            <Link href="/sales/lorries" className="text-link hover:underline">
-              Lorry sales ›
-            </Link>
-          </p>
+          {l.original && <ConfirmDelete what={`lorry ${l.lorryNo}`} onDelete={removeLorry.bind(null, l.id)} className="mt-3" />}
         </SectionCard>
       ))}
     </div>

@@ -3,8 +3,8 @@ import { Suspense } from "react";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getProfiles, getToday } from "@/lib/data";
-import { getNotifications } from "@/lib/notifications";
+import { getShellProfiles, getToday } from "@/lib/data";
+import { getMyNotifications } from "@/lib/notifications";
 
 export const metadata: Metadata = { title: "Notifications" };
 
@@ -20,6 +20,7 @@ export default function NotificationsPage() {
 }
 
 async function NotificationData() {
-  const [notices, profiles] = await Promise.all([getNotifications(), getProfiles()]);
+  // Every role's notices and the staff list for the owner (View as); anyone else gets only their own.
+  const [notices, profiles] = await Promise.all([getMyNotifications(), getShellProfiles()]);
   return <NotificationList notices={notices} profiles={profiles} today={await getToday()} />;
 }

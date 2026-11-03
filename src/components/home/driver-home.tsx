@@ -115,7 +115,7 @@ async function DriverDay({ profileId }: { profileId: string }) {
             <p className="mt-2 text-[12px] text-ink-tertiary">The office handles the renewal; keep the papers in the vehicle.</p>
           </SectionCard>
         )}
-        <Link href="/people/attendance" className="block text-center text-[15px] text-link hover:underline">
+        <Link href="/attendance" className="block text-center text-[15px] text-link hover:underline">
           Check in / check out ›
         </Link>
       </div>

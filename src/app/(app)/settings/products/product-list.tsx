@@ -1,18 +1,18 @@
 "use client";
 
-import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { Button, IconButton } from "@/components/ui/button";
-import { AffixInput, Field, inputClass } from "@/components/ui/field";
+import { SampleTag } from "@/components/ui/blocks";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
+import { Button } from "@/components/ui/button";
+import { Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { useToast } from "@/components/ui/toast";
 import type { Product } from "@/lib/data/types";
-import { formatINR } from "@/lib/format";
-import { createProduct, saveRate } from "./actions";
+import { createProduct, removeProduct } from "./actions";
 
-/** Each product with its list rate, grouped by brand; a changed rate is saved with the tick next to it. */
-export function ProductRates({ products }: { products: Product[] }) {
+/** Each product grouped by brand. No rates: the owner puts the price on each bill. */
+export function ProductList({ products }: { products: Product[] }) {
   const brands = [...new Set(products.map((p) => p.brand))];
   return (
     <div className="space-y-4">
@@ -25,56 +25,21 @@ export function ProductRates({ products }: { products: Product[] }) {
             {products
               .filter((p) => p.brand === brand)
               .map((p) => (
-                // Keyed by the saved rate, so the box starts afresh after a save.
-                <RateRow key={`${p.id}:${p.listRate}`} product={p} />
+                <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+                  <span className="text-[15px] text-ink">
+                    {p.variant ?? p.name}
+                    <SampleTag record={p} />
+                  </span>
+                  <span className="flex items-center gap-2 text-[13px] text-ink-secondary">
+                    {p.unit === "bag" ? "Sold by the bag" : "Sold by the kg"}
+                    {p.original && <ConfirmDelete what={p.name} onDelete={() => removeProduct(p.id)} compact />}
+                  </span>
+                </li>
               ))}
           </ul>
         </section>
       ))}
     </div>
-  );
-}
-
-function RateRow({ product }: { product: Product }) {
-  const id = useId();
-  const router = useRouter();
-  const toast = useToast();
-  const [rate, setRate] = useState(product.listRate ? String(product.listRate) : "");
-  const [pending, startTransition] = useTransition();
-  const value = parseFloat(rate);
-  const changed = rate.trim() !== "" && Number.isFinite(value) && value !== product.listRate;
-
-  return (
-    <li className="flex flex-wrap items-center gap-3 py-3">
-      <label htmlFor={`${id}-rate`} className="min-w-0 flex-1">
-        <span className="block text-[15px] text-ink">{product.variant ?? product.name}</span>
-        <span className="block text-[12px] text-ink-secondary">
-          {product.category === "cement" ? "per bag" : "per kg"}
-          {!product.listRate && " · no list rate yet"}
-        </span>
-      </label>
-      <div className="w-36">
-        <AffixInput id={`${id}-rate`} prefix="₹" inputMode="decimal" placeholder="0" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ""))} />
-      </div>
-      <IconButton
-        label={`Save ${product.name} rate`}
-        variant={changed ? "primary" : "secondary"}
-        disabled={!changed || pending}
-        onClick={() =>
-          startTransition(async () => {
-            const result = await saveRate(product.id, value);
-            if (!result.ok) {
-              toast(result.problem);
-              return;
-            }
-            toast(`${product.name}: ${formatINR(value)} ${product.category === "cement" ? "a bag" : "a kg"}`);
-            router.refresh();
-          })
-        }
-      >
-        <Check size={19} strokeWidth={2.25} aria-hidden />
-      </IconButton>
-    </li>
   );
 }
 
@@ -86,7 +51,6 @@ export function AddProduct({ brands }: { brands: string[] }) {
   const [category, setCategory] = useState<"cement" | "steel">("cement");
   const [brand, setBrand] = useState("");
   const [variant, setVariant] = useState("");
-  const [rate, setRate] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -97,14 +61,13 @@ export function AddProduct({ brands }: { brands: string[] }) {
         e.preventDefault();
         setProblem(null);
         startTransition(async () => {
-          const result = await createProduct({ brand, variant, category, listRate: parseFloat(rate) || 0 });
+          const result = await createProduct({ brand, variant, category });
           if (!result.ok) {
             setProblem(result.problem);
             return;
           }
           toast(`${brand.trim()} ${variant.trim()} added`);
           setVariant("");
-          setRate("");
           router.refresh();
         });
       }}
@@ -118,15 +81,12 @@ export function AddProduct({ brands }: { brands: string[] }) {
           { value: "steel", label: "Steel (kg)" },
         ]}
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Brand" htmlFor={`${id}-brand`} hint={brands.length ? `e.g. ${brands.slice(0, 2).join(", ")}` : undefined}>
           <input id={`${id}-brand`} className={inputClass} value={brand} onChange={(e) => setBrand(e.target.value)} maxLength={40} autoCapitalize="words" />
         </Field>
         <Field label="Type" htmlFor={`${id}-variant`} hint="e.g. PPC, OPC, TMT 8 mm">
           <input id={`${id}-variant`} className={inputClass} value={variant} onChange={(e) => setVariant(e.target.value)} maxLength={40} />
-        </Field>
-        <Field label="List rate" htmlFor={`${id}-rate`}>
-          <AffixInput id={`${id}-rate`} prefix="₹" inputMode="decimal" placeholder="0" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ""))} />
         </Field>
       </div>
       {problem && (

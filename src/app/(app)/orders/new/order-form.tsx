@@ -12,17 +12,35 @@ import { cn } from "@/lib/cn";
 import type { Party, Product } from "@/lib/data/types";
 import { partyOptions } from "@/lib/party-options";
 
-export function OrderForm({ parties, products, today }: { parties: Pick<Party, "id" | "name" | "place" | "kind">[]; products: Product[]; today: string }) {
+export function OrderForm({
+  parties,
+  products,
+  godowns,
+  today,
+}: {
+  parties: Pick<Party, "id" | "name" | "place" | "kind">[];
+  products: Product[];
+  /** Where it can be loaded from; that godown's in-charges see the order. */
+  godowns: { id: string; name: string }[];
+  today: string;
+}) {
   const id = useId();
   const toast = useToast();
   const [partyId, setPartyId] = useState("");
   const [source, setSource] = useState<"staff" | "phone" | "sub_dealer">("phone");
   const [deliverBy, setDeliverBy] = useState(today);
   const [destination, setDestination] = useState("");
+  const [godownId, setGodownId] = useState(godowns.length === 1 ? godowns[0].id : "");
   const [lines, setLines] = useState<ItemLine[]>([newLine(1, products[0])]);
   const [remarks, setRemarks] = useState("");
 
-  const missing = !partyId ? "Choose the party." : !lines.some((l) => toNumber(l.qty) > 0) ? "Enter a quantity." : null;
+  const missing = !partyId
+    ? "Choose the party."
+    : !godownId
+      ? "Choose the godown it is loaded from."
+      : !lines.some((l) => toNumber(l.qty) > 0)
+        ? "Enter a quantity."
+        : null;
   const save = () => !missing && toast(sampleSaveMessage("order"));
 
   return (
@@ -57,6 +75,9 @@ export function OrderForm({ parties, products, today }: { parties: Pick<Party, "
             { value: "sub_dealer", label: "Sub-dealer" },
           ]}
         />
+        <Field label="Load from" htmlFor={`${id}-godown`} hint="Only this godown's in-charges see the order">
+          <Select id={`${id}-godown`} label="Load from" placeholder="Choose a godown" value={godownId} onChange={setGodownId} options={godowns.map((g) => ({ value: g.id, label: g.name }))} />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Deliver by" htmlFor={`${id}-by`}>
             <DatePicker id={`${id}-by`} label="Deliver by" value={deliverBy} onChange={setDeliverBy} clearable />

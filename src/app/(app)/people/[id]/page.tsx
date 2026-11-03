@@ -14,10 +14,11 @@ import { cn } from "@/lib/cn";
 import { getEmployee, getToday } from "@/lib/data";
 import { formatBalance, formatDate, formatINR, formatMonth, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Employee" };
 
-export default function EmployeePage({ params }: PageProps<"/people/[id]">) {
+function EmployeePageContent({ params }: PageProps<"/people/[id]">) {
   return (
     <>
       <BackLink href="/people">People</BackLink>
@@ -158,5 +159,13 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
         </SectionCard>
       )}
     </>
+  );
+}
+
+export default function EmployeePage(props: PageProps<"/people/[id]">) {
+  return (
+    <OwnerPage what="people records">
+      <EmployeePageContent {...props} />
+    </OwnerPage>
   );
 }

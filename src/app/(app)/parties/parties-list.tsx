@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StatCard, StatRow } from "@/components/ui/blocks";
+import { SampleTag, StatCard, StatRow } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTools } from "@/components/ui/data-tools";
@@ -72,13 +72,27 @@ export function PartiesList({ parties, staff }: { parties: PartyWithBalance[]; s
         rowHref={(p) => `/parties/${p.id}`}
         empty="No parties match your search."
         mobile={(p) => ({
-          title: p.name,
+          title: (
+            <>
+              {p.name}
+              <SampleTag record={p} />
+            </>
+          ),
           subtitle: [p.place, partyKindLabels[p.kind]].filter(Boolean).join(" · "),
           value: formatBalance(p.balance),
           meta: <StatusChips party={p} />,
         })}
         columns={[
-          { key: "name", header: "Party", cell: (p) => p.name },
+          {
+            key: "name",
+            header: "Party",
+            cell: (p) => (
+              <>
+                {p.name}
+                <SampleTag record={p} />
+              </>
+            ),
+          },
           { key: "place", header: "Place", cell: (p) => p.place ?? "–", className: "text-ink-secondary" },
           { key: "kind", header: "Type", cell: (p) => partyKindLabels[p.kind], className: "text-ink-secondary" },
           {

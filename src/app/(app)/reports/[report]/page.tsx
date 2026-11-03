@@ -73,6 +73,11 @@ function OptionLinks({ label, items }: { label: string; items: { href: string; l
 async function ReportBody({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const def = findReport((await params).report);
   if (!def) notFound();
+  // Checked here, before the report runs: reports are for the owner and the office; People and Vehicles for the owner alone.
+  const viewer = await getCurrentUser();
+  if (viewer.role !== "owner" && (viewer.role !== "office" || def.group === "People" || def.group === "Vehicles")) {
+    return <div className="surface px-6 py-12 text-center text-[15px] text-ink-secondary">Only the owner can see this report.</div>;
+  }
   const [sp, today] = await Promise.all([searchParams, getToday()]);
   const by = def.groupings?.find((g) => g.key === sp.by)?.key ?? def.groupings?.[0]?.key;
   // Reports without date choices are "as of today": every date is included.

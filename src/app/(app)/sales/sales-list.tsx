@@ -11,7 +11,7 @@ import type { SaleWithParty } from "@/lib/data";
 import type { Product, SaleStatus } from "@/lib/data/types";
 import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
-import { saleStatus } from "@/lib/labels";
+import { billName, saleStatus } from "@/lib/labels";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
 
 export function SalesList({ sales, products }: { sales: SaleWithParty[]; products: Product[] }) {
@@ -24,7 +24,7 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
   const rows = inPeriod.filter(
     (s) =>
       (status === "all" || s.status === status) &&
-      (!q || `${s.partyName} ${s.billNo} ${s.destination ?? ""} ${s.paperMemo ?? ""}`.toLowerCase().includes(q)),
+      (!q || `${s.partyName} ${s.billNo ?? ""} ${s.destination ?? ""} ${s.paperMemo ?? ""}`.toLowerCase().includes(q)),
   );
 
   const saved = rows.filter((s) => s.status === "saved");
@@ -68,12 +68,12 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
         empty="No bills for these dates."
         mobile={(s) => ({
           title: s.partyName,
-          subtitle: `Bill ${s.billNo} · ${formatShortDate(s.billDate)} · ${describeQuantities(s.lines, products)}`,
-          value: <span className={s.status === "cancelled" ? "text-ink-tertiary line-through" : undefined}>{formatINR(s.total)}</span>,
+          subtitle: `${billName(s)} · ${formatShortDate(s.billDate)} · ${describeQuantities(s.lines, products)}`,
+          value: <SaleTotal sale={s} />,
           meta: s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>,
         })}
         columns={[
-          { key: "bill", header: "Bill", cell: (s) => `#${s.billNo}`, className: "whitespace-nowrap" },
+          { key: "bill", header: "Bill", cell: (s) => (s.billNo ? `#${s.billNo}` : "No bill no. yet"), className: "whitespace-nowrap" },
           { key: "date", header: "Date", cell: (s) => formatDate(s.billDate), className: "whitespace-nowrap text-ink-secondary" },
           { key: "party", header: "Party", cell: (s) => s.partyName },
           {
@@ -87,7 +87,7 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
             key: "total",
             header: "Total",
             align: "right",
-            cell: (s) => <span className={s.status === "cancelled" ? "text-ink-tertiary line-through" : undefined}>{formatINR(s.total)}</span>,
+            cell: (s) => <SaleTotal sale={s} />,
           },
           {
             key: "status",
@@ -98,4 +98,10 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
       />
     </div>
   );
+}
+
+/** The bill's total; a sale waiting for approval has no price until the owner adds it. */
+function SaleTotal({ sale }: { sale: SaleWithParty }) {
+  if (sale.status === "pending_approval") return <span className="text-[13px] text-ink-secondary">Price by owner</span>;
+  return <span className={sale.status === "cancelled" ? "text-ink-tertiary line-through" : undefined}>{formatINR(sale.total)}</span>;
 }

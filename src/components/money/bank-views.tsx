@@ -1,5 +1,6 @@
 import { ChevronRight, Landmark } from "lucide-react";
 import Link from "next/link";
+import { SampleTag } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { maskAccountNo } from "@/lib/bank-book";
@@ -19,7 +20,10 @@ export function BankCards({ accounts, hrefBase, firmNames = {} }: { accounts: (B
               <Landmark size={21} strokeWidth={1.75} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[17px] font-semibold tracking-[-0.3px] text-ink">{a.name}</span>
+              <span className="block truncate text-[17px] font-semibold tracking-[-0.3px] text-ink">
+                {a.name}
+                <SampleTag record={a} />
+              </span>
               <span className="block text-[13px] text-ink-secondary">
                 {a.bank} · {maskAccountNo(a.accountNo)}
               </span>

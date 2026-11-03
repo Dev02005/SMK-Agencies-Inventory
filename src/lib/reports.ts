@@ -23,7 +23,7 @@ import {
 } from "@/lib/data";
 import { inDateFilter, type DateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate, formatMonth } from "@/lib/format";
-import { expenseHeadLabels, paymentModeLabels } from "@/lib/labels";
+import { billName, expenseHeadLabels, paymentModeLabels } from "@/lib/labels";
 import { toMT } from "@/lib/sales";
 
 /** Quick date choices a report offers (lib/date-filter); Pick a day and From – to are always there too. */
@@ -160,8 +160,8 @@ export const reports: ReportDef[] = [
   },
   {
     key: "discounts",
-    title: "Discounts and rate changes",
-    description: "Bills with a discount or a rate below the list rate, and the reason given",
+    title: "Discounts",
+    description: "Bills with a discount, and the reason given",
     group: "Sales",
     periods: ["month", "7d", "all"],
     async run(dates) {
@@ -169,26 +169,21 @@ export const reports: ReportDef[] = [
       const [sales, profiles] = await Promise.all([getSales(), getProfiles()]);
       const rows = sales
         .filter((s) => s.status !== "cancelled" && inRange(s.billDate))
-        .map((s) => {
-          const listValue = sumBy(s.lines, (l) => l.qty * l.listRate);
-          const rateGiven = listValue - s.subtotal;
-          return { date: s.billDate, bill: `Bill ${s.billNo}`, party: s.partyName, rateGiven, discount: s.discountAmount, total: rateGiven + s.discountAmount, reason: s.overrideReason ?? "", by: profiles.find((p) => p.id === s.createdBy)?.fullName ?? "" };
-        })
-        .filter((r) => r.total > 0)
+        .map((s) => ({ date: s.billDate, bill: billName(s), party: s.partyName, total: s.total, discount: s.discountAmount, reason: s.overrideReason ?? "", by: profiles.find((p) => p.id === s.createdBy)?.fullName ?? "" }))
+        .filter((r) => r.discount > 0)
         .sort((a, b) => b.date.localeCompare(a.date));
       return {
         columns: [
           { key: "date", label: "Date", kind: "date" },
           { key: "bill", label: "Bill" },
           { key: "party", label: "Party" },
-          { key: "rateGiven", label: "Below list rate", kind: "inr" },
+          { key: "total", label: "Bill total", kind: "inr" },
           { key: "discount", label: "Discount", kind: "inr" },
-          { key: "total", label: "Given away", kind: "inr" },
           { key: "reason", label: "Reason" },
           { key: "by", label: "Entered by" },
         ],
         rows,
-        totals: { party: "Total", rateGiven: sumBy(rows, (r) => r.rateGiven), discount: sumBy(rows, (r) => r.discount), total: sumBy(rows, (r) => r.total) },
+        totals: { party: "Total", total: sumBy(rows, (r) => r.total), discount: sumBy(rows, (r) => r.discount) },
       };
     },
   },
@@ -410,7 +405,7 @@ export const reports: ReportDef[] = [
       const [sales, receipts, expenses, orders, profiles] = await Promise.all([getSales(), getReceipts(), getExpenses(), getOrders(), getProfiles()]);
       const name = (id?: string) => profiles.find((p) => p.id === id)?.fullName ?? "Office";
       const rows: ReportRow[] = [
-        ...sales.filter((s) => inRange(s.billDate)).map((s) => ({ date: s.billDate, who: name(s.createdBy), action: s.status === "cancelled" ? "Cancelled bill" : s.status === "pending_approval" ? "Bill sent for approval" : "Made bill", detail: `Bill ${s.billNo} · ${s.partyName}${s.overrideReason ? ` · reason: ${s.overrideReason}` : ""}`, amount: s.total })),
+        ...sales.filter((s) => inRange(s.billDate)).map((s) => ({ date: s.billDate, who: name(s.createdBy), action: s.status === "cancelled" ? "Cancelled bill" : s.status === "pending_approval" ? "Sale sent for approval" : "Made bill", detail: `${billName(s)} · ${s.partyName}${s.overrideReason ? ` · reason: ${s.overrideReason}` : ""}`, amount: s.total })),
         ...receipts.filter((r) => inRange(r.date)).map((r) => ({ date: r.date, who: name(r.collectedBy), action: "Recorded receipt", detail: `Receipt ${r.receiptNo} · ${r.partyName}`, amount: r.amount })),
         ...expenses.filter((e) => inRange(e.date)).map((e) => ({ date: e.date, who: e.paidBy && e.paidBy !== "office" ? name(e.paidBy) : "Office", action: "Added expense", detail: e.description, amount: e.amount })),
         ...orders.filter((o) => inRange(o.date)).map((o) => ({ date: o.date, who: o.takenByName, action: "Took order", detail: `Order ${o.orderNo} · ${o.partyName}`, amount: undefined })),

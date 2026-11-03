@@ -74,14 +74,7 @@ async function FieldDay({ profileId }: { profileId: string }) {
         </SectionCard>
       )}
 
-      <SectionCard
-        title="Today's visits"
-        action={
-          <Link href="/people/tours" className="text-[15px] text-link hover:underline">
-            Plan ›
-          </Link>
-        }
-      >
+      <SectionCard title="Today's visits">
         {d.visits.length === 0 ? (
           <p className="py-2 text-[15px] text-ink-secondary">No visits planned today.</p>
         ) : (

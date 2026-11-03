@@ -5,10 +5,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getEmployees, getParties } from "@/lib/data";
 import { MappingBoard } from "./mapping-board";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Sub-dealer mapping" };
 
-export default function MappingPage() {
+function MappingPageContent() {
   return (
     <>
       <PageHeader
@@ -34,5 +35,13 @@ async function MappingData() {
         .map((p) => ({ id: p.id, name: p.name, place: p.place, kind: p.kind, assignedTo: p.assignedTo ?? "", balance: p.balance }))}
       staff={staff.filter((s) => s.role === "field").map((s) => ({ id: s.id, name: s.fullName, areas: s.areas }))}
     />
+  );
+}
+
+export default function MappingPage() {
+  return (
+    <OwnerPage what="people records">
+      <MappingPageContent />
+    </OwnerPage>
   );
 }

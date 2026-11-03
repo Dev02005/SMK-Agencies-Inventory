@@ -11,10 +11,11 @@ import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities } from "@/lib/quantities";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Trips" };
 
-export default function TripsPage({ searchParams }: PageProps<"/fleet/trips">) {
+function TripsPageContent({ searchParams }: PageProps<"/fleet/trips">) {
   return (
     <>
       <PageHeader title="Trips" subtitle="Our lorry's delivery runs: stops, km, freight charged and diesel spent" actions={<SampleChip />} />
@@ -85,5 +86,13 @@ async function TripList({ searchParams }: { searchParams: PageProps<"/fleet/trip
         </section>
       ))}
     </div>
+  );
+}
+
+export default function TripsPage(props: PageProps<"/fleet/trips">) {
+  return (
+    <OwnerPage what="vehicles">
+      <TripsPageContent {...props} />
+    </OwnerPage>
   );
 }

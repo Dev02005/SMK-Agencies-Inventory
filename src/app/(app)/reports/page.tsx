@@ -15,13 +15,16 @@ const elsewhere = [
   { href: "/parties", title: "Party ledger and statement", description: "Open a party, then print or share its statement" },
   { href: "/money/cash", title: "Staff cash book", description: "Day-by-day cash with each staff member" },
   { href: "/money/banks", title: "Bank book", description: "Each account with a running balance" },
-  { href: "/people/salary", title: "Salary sheet", description: "This month's salary, loans and advances" },
-  { href: "/fleet/drivers", title: "Driver ledger", description: "Cash with each driver and hired lorry dues" },
-  { href: "/sales/lorries", title: "Lorry sales", description: "Bills from lorries sold straight off the truck" },
-  { href: "/stock/lorries", title: "Lorry stock", description: "Bags still on those lorries" },
+  { href: "/people/salary", title: "Salary sheet", description: "This month's salary, loans and advances", ownerOnly: true },
+  { href: "/fleet/drivers", title: "Driver ledger", description: "Cash with each driver and hired lorry dues", ownerOnly: true },
+  { href: "/sales/lorries", title: "Lorry sales", description: "Each company lorry and what it sold for", ownerOnly: true },
+  { href: "/stock/lorries", title: "Lorry stock", description: "What is on lorries still selling", ownerOnly: true },
 ];
 
-function ReportLink({ href, title, description }: { href: string; title: string; description: string }) {
+/** People and Vehicles are the owner's alone, so are their reports. */
+const ownerOnlyGroups: ReportDef["group"][] = ["People", "Vehicles"];
+
+function ReportLink({ href, title, description }: { href: string; title: string; description: string; ownerOnly?: boolean }) {
   return (
     <li>
       <Link href={href} className="-mx-5 flex items-center gap-3 px-5 py-3 hover:bg-card-subtle md:-mx-6 md:px-6">
@@ -46,16 +49,22 @@ export default function ReportsPage() {
               <ul className="-mb-2 divide-y divide-hairline">
                 {reports
                   .filter((r) => r.group === g)
-                  .map((r) => (
-                    <ReportLink key={r.key} href={`/reports/${r.key}`} title={r.title} description={r.description} />
-                  ))}
+                  .map((r) =>
+                    ownerOnlyGroups.includes(r.group) ? (
+                      <RoleGuard key={r.key} roles={["owner"]} fallback={<></>}>
+                        <ReportLink href={`/reports/${r.key}`} title={r.title} description={r.description} />
+                      </RoleGuard>
+                    ) : (
+                      <ReportLink key={r.key} href={`/reports/${r.key}`} title={r.title} description={r.description} />
+                    ),
+                  )}
               </ul>
             </SectionCard>
           ))}
           <SectionCard title="On their own screens" className="md:col-span-2">
             <ul className="-mb-2 divide-y divide-hairline md:grid md:grid-cols-2 md:gap-x-12 md:divide-y-0">
               {elsewhere.map((r) =>
-                r.href === "/sales/lorries" ? (
+                r.ownerOnly ? (
                   <RoleGuard key={r.href} roles={["owner"]} fallback={<></>}>
                     <ReportLink {...r} />
                   </RoleGuard>

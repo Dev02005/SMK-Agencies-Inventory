@@ -37,24 +37,24 @@ export function PurchaseForm({
   const [receivedDate, setReceivedDate] = useState(today);
   const [lorryNo, setLorryNo] = useState("");
   const [godownId, setGodownId] = useState(godowns[0]?.id ?? "");
-  const [freight, setFreight] = useState("");
-  // Purchase rates differ from selling rates, so each line starts at 0 rather than the list rate.
   const offeredBy = (supplierId: string) => {
     const brands = companies.find((c) => c.id === supplierId)?.brands;
     const theirs = brands?.length ? products.filter((p) => brands.includes(p.brand)) : [];
     return theirs.length ? theirs : products;
   };
   const offered = offeredBy(companyId);
-  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0], 0)]);
-
-  const itemsTotal = lines.reduce((s, l) => s + toNumber(l.qty) * toNumber(l.rate), 0);
-  const total = itemsTotal + toNumber(freight);
+  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0])]);
+  // One total from the company's invoice instead of a rate per bag.
+  const [invoiceValue, setInvoiceValue] = useState("");
+  const total = toNumber(invoiceValue);
   const missing = !firmId
     ? "Choose which firm this purchase is for."
     : !invoiceNo.trim()
     ? "Enter the company's invoice number."
-    : !lines.some((l) => toNumber(l.qty) > 0 && toNumber(l.rate) > 0)
-      ? "Enter quantity and rate for at least one item."
+    : !lines.some((l) => toNumber(l.qty) > 0)
+      ? "Enter the quantity for at least one item."
+      : !(total > 0)
+        ? "Enter the total invoice value."
       : receivedDate < invoiceDate
         ? "The truck can't arrive before the invoice date."
         : null;
@@ -84,7 +84,7 @@ export function PurchaseForm({
             onChange={(next) => {
               setCompanyId(next);
               // Start the items again with what the new company sells.
-              setLines([newLine(1, offeredBy(next)[0], 0)]);
+              setLines([newLine(1, offeredBy(next)[0])]);
             }}
             options={companies.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
           />
@@ -118,19 +118,15 @@ export function PurchaseForm({
 
       <section className="surface p-5">
         <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">Items</h2>
-        <ItemLines lines={lines} onChange={setLines} products={offered} rateFor={() => 0} />
-        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-t border-hairline pt-4">
-          <Field label="Freight paid on this lorry" htmlFor={`${id}-freight`}>
-            <AffixInput id={`${id}-freight`} prefix="₹" inputMode="decimal" placeholder="0" value={freight} onChange={(e) => setFreight(e.target.value)} />
+        <ItemLines lines={lines} onChange={setLines} products={offered} withRate={false} />
+        <div className="mt-4 border-t border-hairline pt-4">
+          <Field label="Total invoice value" htmlFor={`${id}-value`} hint="The total on the company's invoice">
+            <AffixInput id={`${id}-value`} prefix="₹" inputMode="decimal" placeholder="0" value={invoiceValue} onChange={(e) => setInvoiceValue(e.target.value)} />
           </Field>
-          <div className="pb-2 text-right">
-            <p className="text-[13px] text-ink-secondary">Total</p>
-            <p className="text-[22px] font-semibold tabular-nums text-ink">{formatINR(total)}</p>
-          </div>
         </div>
       </section>
 
-      <SubmitBar label="Save purchase" disabled={Boolean(missing)} hint={missing} summary={{ label: "Total", value: formatINR(total) }} onSubmit={save} />
+      <SubmitBar label="Save purchase" disabled={Boolean(missing)} hint={missing} summary={{ label: "Invoice value", value: formatINR(total) }} onSubmit={save} />
     </form>
   );
 }

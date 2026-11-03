@@ -46,3 +46,16 @@ export async function saveFirm(input: FirmInput): Promise<SaveFirmResult> {
   updateTag(FIRMS_TAG);
   return { ok: true };
 }
+
+/** Deletes a firm; the primary firm (sales are billed from it) can't be, so make another firm primary first. */
+export async function removeFirm(id: string): Promise<SaveFirmResult> {
+  const user = await getCurrentUser();
+  if (user.role !== "owner" && user.role !== "office") return { ok: false, problem: "Only the owner and the office can delete firms." };
+  const firms = readFirmsFile();
+  const firm = firms.find((f) => f.id === id);
+  if (!firm) return { ok: false, problem: "That firm is no longer there. Reload the page." };
+  if (firm.primary) return { ok: false, problem: "This is the primary firm. Tick another firm as primary first." };
+  writeFirmsFile(firms.filter((f) => f.id !== id));
+  updateTag(FIRMS_TAG);
+  return { ok: true };
+}

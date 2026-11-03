@@ -3,18 +3,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { categoryLabel, DueChip, GpsChip, kindIcon } from "@/components/fleet/fleet-bits";
-import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
+import { ListSkeleton, SampleTag, StatCard, StatRow } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { getVehicles } from "@/lib/data";
 import { formatINR, formatNumber } from "@/lib/format";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Vehicles" };
 
-export default function VehiclesPage() {
+function VehiclesPageContent() {
   return (
     <>
-      <PageHeader title="Vehicles" subtitle="Renewals, service and running cost for every vehicle" actions={<SampleChip />} />
+      <PageHeader title="Vehicles" subtitle="Renewals, service and running cost for every vehicle" actions={<DataOrigin of="vehicles" />} />
       <Suspense fallback={<ListSkeleton />}>
         <VehicleList />
       </Suspense>
@@ -48,6 +50,7 @@ async function VehicleList() {
                     <p className="flex flex-wrap items-center gap-2">
                       <span className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{v.number}</span>
                       <Chip>{categoryLabel[v.category]}</Chip>
+                      <SampleTag record={v} />
                     </p>
                     <p className="text-[13px] text-ink-secondary">
                       {[v.model, v.capacityMT && `${v.capacityMT} MT`, v.driverName, v.ownerName].filter(Boolean).join(" · ") || "Details not added yet"}
@@ -69,5 +72,13 @@ async function VehicleList() {
         })}
       </ul>
     </div>
+  );
+}
+
+export default function VehiclesPage() {
+  return (
+    <OwnerPage what="vehicles">
+      <VehiclesPageContent />
+    </OwnerPage>
   );
 }

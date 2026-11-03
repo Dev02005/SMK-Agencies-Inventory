@@ -7,10 +7,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getEmployees, getParties } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { partyOptions } from "@/lib/party-options";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Plan a visit" };
 
-export default function NewVisitPage() {
+function NewVisitPageContent() {
   return (
     <div className="mx-auto max-w-[640px]">
       <PageHeader back={<BackLink href="/people/tours">Tour programs</BackLink>} title="Plan a visit" actions={<SampleChip />} />
@@ -58,5 +59,13 @@ async function VisitForm() {
         ]}
       />
     </SectionCard>
+  );
+}
+
+export default function NewVisitPage() {
+  return (
+    <OwnerPage what="people records">
+      <NewVisitPageContent />
+    </OwnerPage>
   );
 }

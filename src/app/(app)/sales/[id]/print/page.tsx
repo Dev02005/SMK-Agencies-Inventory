@@ -22,7 +22,8 @@ export default function PrintSalePage({ params }: PageProps<"/sales/[id]/print">
 async function PrintBill({ params }: { params: PageProps<"/sales/[id]/print">["params"] }) {
   const { id } = await params;
   const sale = await getSale(id);
-  if (!sale) notFound();
+  // A sale waiting for approval has no bill no. or prices yet, so there is no bill to print.
+  if (!sale || !sale.billNo) notFound();
   const [firms, party, products, profiles] = await Promise.all([getFirms(), getParty(sale.partyId), getProducts(), getProfiles()]);
   const firm = firms.find((f) => f.id === sale.firmId) ?? firms[0];
   const owner = profiles.find((p) => p.role === "owner")?.fullName ?? "";

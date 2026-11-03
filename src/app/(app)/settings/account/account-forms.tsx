@@ -29,8 +29,8 @@ export function SignOutButton() {
 }
 
 /**
- * The password for signing in with a mobile number or email (the sample owner login 123456789 stays as it is).
- * Sample mode keeps it until the app restarts; with Supabase it is stored for good.
+ * The password for signing in with a mobile number or email. It is kept (hashed) in local-data/passwords.json; once
+ * it is set the mobile number no longer works as the password.
  */
 export function ChangePasswordForm({ mobile }: { mobile: string }) {
   const id = useId();

@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SampleActionButton } from "@/components/ui/sample-action";
 import { getCommitment } from "@/lib/data";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
-import { paymentModeLabels } from "@/lib/labels";
+import { billName, paymentModeLabels } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Advance" };
 
@@ -91,7 +91,7 @@ async function AdvanceDetail({ params }: { params: PageProps<"/money/advances/[i
         rowHref={(s) => `/sales/${s.saleId}`}
         empty="Nothing supplied yet."
         mobile={(s) => ({
-          title: `Bill ${s.billNo}`,
+          title: billName(s),
           subtitle: formatShortDate(s.date),
           value: fixed ? `${formatNumber(s.bags)} bags` : formatINR(s.amount),
           meta: fixed && <span className="text-[12px] text-ink-secondary">{formatINR(s.amount)}</span>,

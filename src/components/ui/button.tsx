@@ -14,7 +14,7 @@ const variants: Record<Variant, string> = {
   plain: "h-auto px-0 text-[15px] text-link hover:underline",
 };
 
-export function buttonClass(variant: Variant = "primary", className?: string) {
+function buttonClass(variant: Variant = "primary", className?: string) {
   return cn(base, variants[variant], className);
 }
 

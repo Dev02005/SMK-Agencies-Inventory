@@ -1,5 +1,5 @@
 /** Rules for a new password, shared by the forms (instant feedback) and the server (the real check). */
-export const MIN_PASSWORD = 8;
+const MIN_PASSWORD = 8;
 
 export function passwordProblem(password: string, mobile?: string): string | undefined {
   if (password.length < MIN_PASSWORD) return `Use at least ${MIN_PASSWORD} characters.`;

@@ -9,10 +9,11 @@ import { Today } from "@/components/ui/today";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getEmployees, getTargets, getToday } from "@/lib/data";
 import { formatINR, formatMonth, formatNumber, shiftMonth } from "@/lib/format";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Targets" };
 
-export default function TargetsPage() {
+function TargetsPageContent() {
   return (
     <>
       <PageHeader
@@ -74,5 +75,13 @@ async function Targets() {
         </SectionCard>
       </RoleGuard>
     </div>
+  );
+}
+
+export default function TargetsPage() {
+  return (
+    <OwnerPage what="people records">
+      <TargetsPageContent />
+    </OwnerPage>
   );
 }

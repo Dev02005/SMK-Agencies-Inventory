@@ -9,10 +9,11 @@ import { RoleGuard } from "@/components/ui/sub-nav";
 import { getFreightRates } from "@/lib/data";
 import { formatINR } from "@/lib/format";
 import { FreightCalculator } from "./freight-calculator";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Freight chart" };
 
-export default function FreightPage() {
+function FreightPageContent() {
   return (
     <>
       <PageHeader
@@ -69,5 +70,13 @@ async function Rates() {
         </RoleGuard>
       </div>
     </div>
+  );
+}
+
+export default function FreightPage() {
+  return (
+    <OwnerPage what="vehicles">
+      <FreightPageContent />
+    </OwnerPage>
   );
 }

@@ -208,6 +208,7 @@ export function buildPhase3(book: SampleBook) {
         takenBy: party.assignedTo ?? "u-office",
         deliverBy: s.billDate,
         destination: party.place,
+        godownId: s.godownId,
         lines: s.lines.map((l) => ({ productId: l.productId, qty: partly ? l.qty + (l.productId.includes("deccan") ? 100 : 1000) : l.qty })),
         saleIds: [s.id],
         status: partly ? "partly_dispatched" : "dispatched",
@@ -226,6 +227,7 @@ export function buildPhase3(book: SampleBook) {
       takenBy: party.assignedTo ?? "u-office",
       deliverBy: addDays(date, between(0, 3)),
       destination: party.place,
+      godownId: rand() < 0.75 ? "g-polaki" : "g-srikakulam",
       lines: cement
         ? [{ productId: pick(["p-deccan-opc", "p-deccan-ppc"]), qty: between(50, 300, 10) }]
         : [{ productId: pick(["p-tmt-8", "p-tmt-12", "p-ms-vishaka"]), qty: between(1000, 4000, 500) }],

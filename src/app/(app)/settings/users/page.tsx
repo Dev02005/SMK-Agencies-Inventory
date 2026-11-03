@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { OwnerPage } from "@/components/auth/owner-only";
 import { SimpleForm } from "@/components/forms/simple-form";
-import { BackLink, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { BackLink, SampleTag, SectionCard } from "@/components/ui/blocks";
+import { DataOrigin } from "@/components/ui/data-origin";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { ExportMenu } from "@/components/ui/export-menu";
@@ -10,7 +12,15 @@ import { allRoles, roleLabels as roleNames } from "@/lib/labels";
 
 export const metadata: Metadata = { title: "Users & roles" };
 
-export default async function UserSettingsPage() {
+export default function UserSettingsPage() {
+  return (
+    <OwnerPage what="users and roles">
+      <UserSettings />
+    </OwnerPage>
+  );
+}
+
+async function UserSettings() {
   const [profiles, designations] = await Promise.all([getProfiles(), getDesignations()]);
   return (
     <div className="animate-fade-up mx-auto max-w-[760px] space-y-4">
@@ -20,7 +30,7 @@ export default async function UserSettingsPage() {
         subtitle="Each person signs in with their mobile number or email; their first password is their mobile number"
         actions={
           <>
-            <SampleChip />
+            <DataOrigin of="staff" />
             <ExportMenu title={"Users and roles"} />
           </>
         }
@@ -29,12 +39,26 @@ export default async function UserSettingsPage() {
         rows={profiles}
         rowKey={(p) => p.id}
         mobile={(p) => ({
-          title: p.fullName,
+          title: (
+            <>
+              {p.fullName}
+              <SampleTag record={p} />
+            </>
+          ),
           subtitle: [designations[p.id], `+91 ${p.mobile}`, p.email].filter(Boolean).join(" · "),
           meta: <Chip tone={p.role === "owner" ? "accent" : "neutral"}>{roleNames[p.role]}</Chip>,
         })}
         columns={[
-          { key: "name", header: "Name", cell: (p) => p.fullName },
+          {
+            key: "name",
+            header: "Name",
+            cell: (p) => (
+              <>
+                {p.fullName}
+                <SampleTag record={p} />
+              </>
+            ),
+          },
           { key: "designation", header: "Designation", cell: (p) => designations[p.id] ?? "–", className: "text-ink-secondary" },
           { key: "mobile", header: "Mobile", cell: (p) => `+91 ${p.mobile}`, className: "tabular-nums text-ink-secondary" },
           { key: "email", header: "Email", cell: (p) => p.email ?? "–", className: "text-ink-secondary" },

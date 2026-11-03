@@ -7,10 +7,10 @@ import { LiveTime } from "@/components/ui/live-clock";
 import { ModuleGrid } from "@/components/ui/module-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
-import { getCurrentUser, getDashboard, getFirm, getLorryLoads, getNow, getProducts, getToday } from "@/lib/data";
+import { getCurrentUser, getDashboard, getFirm, getLorries, getNow, getProducts, getToday } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { toMT } from "@/lib/sales";
-import { ActiveLorries } from "./active-lorries";
+import { ActiveLorries, LorryUpdateReminder } from "./active-lorries";
 
 /** Owner and office: the whole business today. */
 export function OwnerHome() {
@@ -47,20 +47,15 @@ export async function TodayLine() {
 }
 
 async function Dashboard() {
-  const [d, loads, products, today, user] = await Promise.all([getDashboard(), getLorryLoads(), getProducts(), getToday(), getCurrentUser()]);
-  const selling = loads
-    .filter((l) => l.status === "selling")
-    .map((l) => ({
-      id: l.id,
-      lorryNo: l.lorryNo,
-      companyName: l.companyName,
-      driverName: l.driverName,
-      arrivedOn: l.arrivedOn,
-      sellOutDays: l.sellOutDays,
-      left: l.lines.filter((x) => x.left > 0).map((x) => ({ productId: x.productId, qty: x.left })),
-    }));
+  // Lorries are the owner's alone; getLorries gives nobody else any.
+  const [d, lorries, products, today, user] = await Promise.all([getDashboard(), getLorries(), getProducts(), getToday(), getCurrentUser()]);
   return (
     <div className="grid gap-4 md:grid-cols-3">
+      {user.role === "owner" && (
+        <RoleGuard roles={["owner"]} fallback={<></>}>
+          <LorryUpdateReminder lorries={lorries} today={today} className="md:col-span-3" />
+        </RoleGuard>
+      )}
       <section className="surface p-5 md:col-span-2 md:p-6">
         <div className="flex items-center gap-3">
           <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
@@ -98,7 +93,7 @@ async function Dashboard() {
 
       {user.role === "owner" && (
         <RoleGuard roles={["owner"]} fallback={<></>}>
-          <ActiveLorries lorries={selling} products={products} today={today} className="md:col-span-3" />
+          <ActiveLorries lorries={lorries} products={products} today={today} className="md:col-span-3" />
         </RoleGuard>
       )}
 

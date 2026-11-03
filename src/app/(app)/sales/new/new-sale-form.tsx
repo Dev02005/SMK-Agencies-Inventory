@@ -22,8 +22,8 @@ import {
   type TransportMode,
 } from "@/lib/sales";
 import type { Party, Product } from "@/lib/data/types";
-import { useLorryBook } from "@/lib/lorry-book";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
+import { DestinationField, RentDriverField } from "./destination-field";
 import { NewCustomer } from "./new-customer";
 import { partyOptions } from "@/lib/party-options";
 import { useViewAs } from "@/lib/roles";
@@ -40,27 +40,14 @@ export type SaleParty = {
 };
 
 type Line = { key: number; productId: string; qty: string; rate: string };
-/** The company lorry a bill is sold from, as noted when it arrived. Invoice and tick boxes may be empty. */
-export type LorryOnSale = {
-  id: string;
-  lorryNo: string;
-  companyName: string;
-  driverName?: string;
-  invoiceNo?: string;
-  invoicePaperKept?: boolean;
-  unloadingCharges?: boolean;
-};
 
 /** A vehicle to pick for delivery: "Lorry AP 30 TB 1186", with its model, driver or owner as the hint. */
-export type VehicleChoice = { id: string; label: string; hint?: string };
+export type VehicleChoice = { id: string; label: string; hint?: string; /** Who usually drives it (our vehicles). */ driverId?: string };
 
 const num = (value: string) => {
   const n = parseFloat(value);
   return Number.isFinite(n) ? n : 0;
 };
-
-/** A new line's rate: the product's list rate, or empty when none is set yet (Settings › Products & rates). */
-const startRate = (product: Product) => (product.listRate > 0 ? String(product.listRate) : "");
 
 const transportHelp: Record<TransportMode, string> = {
   FOR: "Our own vehicle delivers; transport is charged.",
@@ -76,8 +63,10 @@ export function NewSaleForm({
   godowns,
   ownVehicles,
   rentedVehicles,
-  lorries,
-  preselect,
+  nextBillNo,
+  destinations,
+  ownDrivers,
+  rentDrivers,
   today,
 }: {
   /** The owner's firms. A sale is billed from the primary firm unless it is changed for this one bill. */
@@ -85,23 +74,28 @@ export function NewSaleForm({
   primaryFirmId: string;
   products: Product[];
   parties: SaleParty[];
-  /** The bill's bags come out of the godown, or the company lorry, picked under "Load from". */
+  /** The godown the bill's bags come out of. Company lorries are sold as a whole under Sales › Lorry sales, not billed here. */
   godowns: { id: string; name: string }[];
   /** Our own lorries and vans, for FOR deliveries. */
   ownVehicles: VehicleChoice[];
   /** Rented vehicles, for RENT deliveries. */
   rentedVehicles: VehicleChoice[];
-  /** Company lorries selling now (the ones noted on this device are added here). */
-  lorries: LorryOnSale[];
-  /** A godown or lorry to start on (Sales › Lorry sales › Sell from this lorry). */
-  preselect?: string;
+  /** The next number in the bill series, for the owner to keep or change. */
+  nextBillNo: number;
+  /** Villages and towns we deliver to, for Destination. */
+  destinations: string[];
+  /** Our own drivers, for FOR deliveries. */
+  ownDrivers: { id: string; name: string }[];
+  /** Saved drivers of rented vehicles, for RENT deliveries. */
+  rentDrivers: string[];
   /** "YYYY-MM-DD", worked out on the server so it matches between server and browser. */
   today: string;
 }) {
   const id = useId();
   const [role] = useViewAs();
-  // Only the owner prices a bill. Everyone else sends the items, quantities and vehicle; the owner sets the
-  // rates, discount and charges and confirms it (on the bill's page).
+  // Only the owner prices a bill and gives it a bill no. Everyone else saves the items, quantities and vehicle with
+  // no prices; the owner adds the bill no., rates, discount and charges and approves it (on the sale's page).
+  // Products have no fixed rates, so every rate is typed in.
   const pricing = role === "owner";
   const [firmId, setFirmId] = useState(primaryFirmId);
   const [changingFirm, setChangingFirm] = useState(false);
@@ -112,32 +106,19 @@ export function NewSaleForm({
   // What was typed in the party search when New customer was picked; null while the New customer form is closed.
   const [newCustomer, setNewCustomer] = useState<string | null>(null);
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [lines, setLines] = useState<Line[]>([
-    { key: 1, productId: products[0].id, qty: "", rate: startRate(products[0]) },
-  ]);
+  const [billNo, setBillNo] = useState(String(nextBillNo));
+  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: products[0].id, qty: "", rate: "" }]);
   const [nextKey, setNextKey] = useState(2);
   const [discountMode, setDiscountMode] = useState<DiscountMode>("amount");
   const [discountValue, setDiscountValue] = useState("");
-  // A godown id or a lorry id. Lorries noted on this device appear once the page is running in the browser.
-  const [loadFrom, setLoadFrom] = useState(preselect ?? godowns[0]?.id ?? "");
-  // Lorries are offered only to the owner (lorry sales are the owner's alone).
-  const deviceLorries: LorryOnSale[] = useLorryBook()
-    .filter((l) => pricing && !l.closed)
-    .map((l) => ({
-      id: l.id,
-      lorryNo: l.lorryNo,
-      companyName: l.companyName,
-      driverName: l.driverName,
-      invoiceNo: l.invoiceNo,
-      invoicePaperKept: l.invoicePaperKept,
-      unloadingCharges: l.unloadingCharges,
-    }));
-  const allLorries = [...lorries, ...deviceLorries];
-  const lorry = allLorries.find((l) => l.id === loadFrom);
-  const loadFromKnown = Boolean(lorry) || godowns.some((g) => g.id === loadFrom);
+  const [loadFrom, setLoadFrom] = useState(godowns[0]?.id ?? "");
+  const loadFromKnown = godowns.some((g) => g.id === loadFrom);
   const [transportMode, setTransportMode] = useState<TransportMode>("FOR");
   const [ownVehicleId, setOwnVehicleId] = useState("");
   const [rentedVehicleId, setRentedVehicleId] = useState("");
+  // FOR: one of our drivers (the vehicle's usual driver to start with); RENT: the rented vehicle's driver.
+  const [ownDriverId, setOwnDriverId] = useState("");
+  const [rentDriver, setRentDriver] = useState("");
   const [customerVehicle, setCustomerVehicle] = useState("");
   const [transportCharge, setTransportCharge] = useState("");
   const [otherCharge, setOtherCharge] = useState("");
@@ -177,16 +158,17 @@ export function NewSaleForm({
 
   const isOwner = role === "owner";
   const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
-  // Only against a set list rate: a product without one has nothing to differ from.
-  const rateChanged = lines.some((l) => productById(l.productId).listRate > 0 && num(l.rate) !== productById(l.productId).listRate);
   const needsApproval = pricing && (Boolean(credit?.overLimit) || discountOverLimit);
-  const needsReason = pricing && ((isOwner && needsApproval) || rateChanged);
+  const needsReason = isOwner && needsApproval;
+  const billNumber = Number(billNo);
   const hasLines = lines.some((l) => num(l.qty) > 0 && (!pricing || num(l.rate) > 0));
 
   const missing = !party
     ? "Choose a party to continue."
-    : !loadFromKnown
-      ? "Choose the godown or lorry the bags are loaded from."
+    : pricing && !(Number.isInteger(billNumber) && billNumber > 0)
+      ? "Enter the bill no."
+      : !loadFromKnown
+      ? "Choose the godown the bags are loaded from."
       : !hasLines
       ? pricing
         ? "Enter a quantity and rate for at least one item."
@@ -194,7 +176,7 @@ export function NewSaleForm({
       : needsReason && !reason.trim()
         ? "Enter the reason before saving."
         : null;
-  const actionLabel = !pricing ? "Send to owner" : needsApproval ? (isOwner ? "Save with override" : "Send for approval") : "Save sale";
+  const actionLabel = !pricing ? "Save sale" : needsApproval ? (isOwner ? "Save with override" : "Send for approval") : "Save sale";
   const quantityLine = [
     quantities.cement.qty > 0 && `${formatNumber(quantities.cement.qty)} bags (${formatNumber(quantities.cement.mt, 3)} MT)`,
     quantities.steel.qty > 0 && `${formatNumber(quantities.steel.qty)} kg (${formatNumber(quantities.steel.mt, 3)} MT)`,
@@ -214,14 +196,14 @@ export function NewSaleForm({
 
   function addLine() {
     const product = products[0];
-    setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: startRate(product) }]);
+    setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: "" }]);
     setNextKey((k) => k + 1);
   }
 
   function save() {
     if (missing) return;
     if (!pricing) {
-      toast("Sample mode: the request to the owner was checked but not sent. Sending starts once Supabase is connected.");
+      toast("Sample mode: the sale was checked but not saved. Once saved, it waits for the owner to add the bill no. and prices.");
       return;
     }
     toast(
@@ -292,9 +274,16 @@ export function NewSaleForm({
             />
           )}
           {credit && <CreditPanel credit={credit} billTotal={totals.total} isOwner={isOwner} />}
-          <Field label="Bill date" htmlFor={`${id}-date`}>
-            <DatePicker id={`${id}-date`} label="Bill date" value={invoiceDate} onChange={setInvoiceDate} />
-          </Field>
+          <div className={cn("grid gap-4", pricing && "grid-cols-2")}>
+            {pricing && (
+              <Field label="Bill no." htmlFor={`${id}-bill`} hint="Next in the series; change it if needed">
+                <input id={`${id}-bill`} className={inputClass} inputMode="numeric" value={billNo} onChange={(e) => setBillNo(e.target.value.replace(/\D/g, ""))} />
+              </Field>
+            )}
+            <Field label="Bill date" htmlFor={`${id}-date`}>
+              <DatePicker id={`${id}-date`} label="Bill date" value={invoiceDate} onChange={setInvoiceDate} />
+            </Field>
+          </div>
         </section>
 
         <section className="surface p-5">
@@ -303,35 +292,12 @@ export function NewSaleForm({
             <Select
               id={`${id}-from`}
               label="Load from"
-              placeholder="Choose a godown or lorry"
+              placeholder="Choose a godown"
               value={loadFrom}
               onChange={setLoadFrom}
-              options={[
-                ...godowns.map((g) => ({ value: g.id, label: g.name })),
-                ...allLorries.map((l) => ({
-                  value: l.id,
-                  label: l.lorryNo,
-                  hint: [l.companyName, l.driverName && `driver ${l.driverName}`].filter(Boolean).join(" · "),
-                  group: "Lorries selling now",
-                })),
-              ]}
+              options={godowns.map((g) => ({ value: g.id, label: g.name }))}
             />
           </Field>
-          {lorry && (
-            <div className="mt-3 rounded-xl bg-accent-soft px-3.5 py-2.5 text-[14px] text-ink">
-              <p>
-                Selling from lorry <span className="font-semibold">{lorry.lorryNo}</span> · {lorry.companyName}
-                {lorry.driverName && ` · driver ${lorry.driverName}`}. These bags come off the lorry, not out of a godown.
-              </p>
-              <p className="mt-1 text-[13px] text-ink-secondary">
-                {[
-                  lorry.invoiceNo ? `Invoice ${lorry.invoiceNo}` : "No invoice number yet",
-                  lorry.invoicePaperKept ? "invoice paper with us" : "invoice paper not with us",
-                  lorry.unloadingCharges ? "unloading charges" : "no unloading charges",
-                ].join(" · ")}
-              </p>
-            </div>
-          )}
           <ul className="divide-y divide-hairline">
             {lines.map((line, index) => {
               const product = productById(line.productId);
@@ -347,7 +313,7 @@ export function NewSaleForm({
                         value={line.productId}
                         onChange={(v) => {
                           const next = productById(v);
-                          updateLine(line.key, { productId: next.id, rate: startRate(next) });
+                          updateLine(line.key, { productId: next.id, rate: "" });
                         }}
                       />
                     </div>
@@ -378,11 +344,7 @@ export function NewSaleForm({
                       />
                     </Field>
                     {pricing && (
-                      <Field
-                        label={`Rate per ${product.unit}`}
-                        htmlFor={`${id}-rate-${line.key}`}
-                        hint={product.listRate > 0 && rate !== product.listRate ? `List rate ${formatINR(product.listRate)}` : undefined}
-                      >
+                      <Field label={`Rate per ${product.unit}`} htmlFor={`${id}-rate-${line.key}`}>
                         <AffixInput
                           id={`${id}-rate-${line.key}`}
                           inputMode="decimal"
@@ -475,20 +437,30 @@ export function NewSaleForm({
                   label={transportMode === "FOR" ? "Our vehicle" : "Rented vehicle"}
                   placeholder="Choose a vehicle"
                   value={transportMode === "FOR" ? ownVehicleId : rentedVehicleId}
-                  onChange={transportMode === "FOR" ? setOwnVehicleId : setRentedVehicleId}
+                  onChange={(next) => {
+                    if (transportMode !== "FOR") return setRentedVehicleId(next);
+                    setOwnVehicleId(next);
+                    const usual = ownVehicles.find((v) => v.id === next)?.driverId;
+                    if (usual && ownDrivers.some((d) => d.id === usual)) setOwnDriverId(usual);
+                  }}
                   options={(transportMode === "FOR" ? ownVehicles : rentedVehicles).map((v) => ({ value: v.id, label: v.label, hint: v.hint }))}
                 />
               </Field>
             )}
-            <Field label="Destination" htmlFor={`${id}-destination`}>
-              <input
-                id={`${id}-destination`}
-                className={inputClass}
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="Village or site"
-              />
-            </Field>
+            {transportMode === "FOR" && (
+              <Field label="Driver" htmlFor={`${id}-driver`} hint={ownDrivers.length === 0 ? "Add drivers under People" : "Our driver"}>
+                <Select
+                  id={`${id}-driver`}
+                  label="Driver"
+                  placeholder="Choose our driver"
+                  value={ownDriverId}
+                  onChange={setOwnDriverId}
+                  options={ownDrivers.map((d) => ({ value: d.id, label: d.name }))}
+                />
+              </Field>
+            )}
+            {transportMode === "RENT" && <RentDriverField value={rentDriver} onChange={setRentDriver} drivers={rentDrivers} />}
+            <DestinationField value={destination} onChange={setDestination} destinations={destinations} />
           </div>
           {charged && pricing && (
             <div className="grid grid-cols-2 gap-3">
@@ -532,17 +504,7 @@ export function NewSaleForm({
             />
           </Field>
           {needsReason && (
-            <Field
-              label={
-                rateChanged && needsApproval
-                  ? "Reason for the override and rate change"
-                  : rateChanged
-                    ? "Reason for the rate change"
-                    : "Reason for the override"
-              }
-              htmlFor={`${id}-reason`}
-              hint="Saved with the bill in the audit history."
-            >
+            <Field label="Reason for the override" htmlFor={`${id}-reason`} hint="Saved with the bill in the audit history.">
               <input
                 id={`${id}-reason`}
                 className={inputClass}
@@ -560,12 +522,12 @@ export function NewSaleForm({
 
       <aside className="hidden lg:sticky lg:top-20 lg:block">
         <section className="surface p-6">
-          <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{pricing ? "Bill summary" : "Request summary"}</h2>
+          <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">{pricing ? "Bill summary" : "Sale summary"}</h2>
           <p className="mt-1 text-[13px] text-ink-secondary">From {firm.name}</p>
           {!pricing && (
             <div className="mt-4">
               <p className="text-[15px] text-ink">{quantityLine || "No items yet"}</p>
-              <p className="mt-2 text-[13px] text-ink-secondary">The owner sets the rates, discount and charges and confirms the sale.</p>
+              <p className="mt-2 text-[13px] text-ink-secondary">No prices here: the owner adds the bill no., rates and charges and approves the sale.</p>
             </div>
           )}
           {pricing && (

@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { BackLink, ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getParties, getProducts } from "@/lib/data";
+import { getMyGodowns, getParties, getProducts } from "@/lib/data";
 import { todayISO } from "@/lib/format";
 import { OrderForm } from "./order-form";
 
@@ -22,11 +22,12 @@ export default function NewOrderPage() {
 
 async function FormForToday() {
   await connection();
-  const [parties, products] = await Promise.all([getParties(), getProducts()]);
+  const [parties, products, godowns] = await Promise.all([getParties(), getProducts(), getMyGodowns()]);
   return (
     <OrderForm
       parties={parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ id: p.id, name: p.name, place: p.place, kind: p.kind }))}
       products={products.filter((p) => p.active)}
+      godowns={godowns.map((g) => ({ id: g.id, name: g.name }))}
       today={todayISO()}
     />
   );

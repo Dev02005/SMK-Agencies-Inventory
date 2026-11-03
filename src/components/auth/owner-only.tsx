@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { ListSkeleton } from "@/components/ui/blocks";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getCurrentUser } from "@/lib/data";
 
@@ -14,5 +15,14 @@ export async function OwnerOnly({ what, children }: { what: string; children: Re
     <RoleGuard roles={["owner"]} fallback={denied}>
       {children}
     </RoleGuard>
+  );
+}
+
+/** A whole page for the owner only: for anyone else nothing of the page is rendered or sent, only the notice. */
+export function OwnerPage({ what, children }: { what: string; children: ReactNode }) {
+  return (
+    <Suspense fallback={<ListSkeleton />}>
+      <OwnerOnly what={what}>{children}</OwnerOnly>
+    </Suspense>
   );
 }

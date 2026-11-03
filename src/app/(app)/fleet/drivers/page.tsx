@@ -8,10 +8,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getDrivers } from "@/lib/data";
 import { formatBalance, formatDate, formatINR, formatShortDate } from "@/lib/format";
+import { OwnerPage } from "@/components/auth/owner-only";
 
 export const metadata: Metadata = { title: "Drivers" };
 
-export default function DriversPage() {
+function DriversPageContent() {
   return (
     <>
       <PageHeader
@@ -102,5 +103,13 @@ async function Drivers() {
         </ul>
       </SectionCard>
     </div>
+  );
+}
+
+export default function DriversPage() {
+  return (
+    <OwnerPage what="vehicles">
+      <DriversPageContent />
+    </OwnerPage>
   );
 }

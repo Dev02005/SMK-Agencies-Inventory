@@ -30,11 +30,11 @@ export const godowns: Godown[] = withLocalGodowns([
 
 /** Sample products; the real list (local-data/products.json) replaces those with the same id and adds the rest. */
 export const products: Product[] = withLocalProducts([
-  { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", variant: "OPC", category: "cement", unit: "bag", listRate: 360, active: true },
-  { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", variant: "PPC", category: "cement", unit: "bag", listRate: 340, active: true },
-  { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", variant: "MS iron", category: "steel", unit: "kg", listRate: 70, active: true },
-  { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", variant: "TMT 8 mm", category: "steel", unit: "kg", listRate: 72, active: true },
-  { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", variant: "TMT 12 mm", category: "steel", unit: "kg", listRate: 71, active: true },
+  { id: "p-deccan-opc", name: "Deccan OPC", brand: "Deccan", variant: "OPC", category: "cement", unit: "bag", active: true },
+  { id: "p-deccan-ppc", name: "Deccan PPC", brand: "Deccan", variant: "PPC", category: "cement", unit: "bag", active: true },
+  { id: "p-ms-vishaka", name: "MS iron Vishaka", brand: "Vishaka", variant: "MS iron", category: "steel", unit: "kg", active: true },
+  { id: "p-tmt-8", name: "TMT 8 mm", brand: "Vishaka", variant: "TMT 8 mm", category: "steel", unit: "kg", active: true },
+  { id: "p-tmt-12", name: "TMT 12 mm", brand: "Vishaka", variant: "TMT 12 mm", category: "steel", unit: "kg", active: true },
 ]);
 
 /** The owner and staff. The real staff list (local-data/staff.json, not in git) replaces the sample staff when present. */
@@ -186,8 +186,9 @@ export function buildSample(SAMPLE_TODAY: string) {
     // Came in today: its bags are already in the godown's stock.
     [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320], ["p-deccan-ppc", 200, 300]]],
   ];
-  purchasePlan.forEach(([invoiceDate, companyId, lines], i) => {
-    const freight = companyId === "deccan" ? 0 : 6000;
+  // Only companies still in the party list (a real supplier list drops the sample ones it doesn't name).
+  const plan = purchasePlan.filter(([, companyId]) => parties.some((p) => p.id === companyId));
+  plan.forEach(([invoiceDate, companyId, lines], i) => {
     purchases.push({
       id: `pur-${i + 1}`,
       purchaseNo: 301 + i,
@@ -197,29 +198,27 @@ export function buildSample(SAMPLE_TODAY: string) {
       receivedDate: addDays(invoiceDate, companyId === "deccan" ? 1 : 0),
       lorryNo: companyId === "deccan" ? "AP 39 T 7781" : "AP 31 TB 2204",
       // Today's lorry comes to Polaki, where today's bills are loaded; earlier ones are spread over both godowns.
-      godownId: i === purchasePlan.length - 1 || i % 3 !== 2 ? "g-polaki" : "g-srikakulam",
+      godownId: i === plan.length - 1 || i % 3 !== 2 ? "g-polaki" : "g-srikakulam",
       lines: lines.map(([productId, qty, rate]) => ({ productId, qty, rate })),
-      freight,
-      total: lines.reduce((s, [, qty, rate]) => s + qty * rate, 0) + freight,
+      total: lines.reduce((s, [, qty, rate]) => s + qty * rate, 0),
     });
   });
-  // A Deccan lorry selling straight off the truck instead of unloading into a godown.
-  const LORRY_ON_SALE = "AP 39 T 9902";
+  // A Deccan lorry sold straight off the truck instead of unloading into a godown; it has sold out.
   purchases.push({
     id: "pur-lorry-1",
-    purchaseNo: 301 + purchasePlan.length,
+    purchaseNo: 301 + plan.length,
     companyId: "deccan",
     invoiceNo: "DCL/26/4199",
     invoiceDate: at("2026-10-24"),
     receivedDate: at("2026-10-25"),
-    lorryNo: LORRY_ON_SALE,
+    lorryNo: "AP 39 T 9902",
     godownId: "",
     onLorry: true,
     driverName: "Ramesh",
     invoicePaperKept: true,
     sellOutDays: 3,
+    soldOut: { on: at("2026-10-26"), value: 207000, notes: "Sold off the truck at Polaki" },
     lines: [{ productId: "p-deccan-opc", qty: 600, rate: 320 }],
-    freight: 0,
     total: 192000,
   });
 
@@ -261,6 +260,8 @@ export function buildSample(SAMPLE_TODAY: string) {
   const productById = (id: string) => products.find((p) => p.id === id)!;
   const customers = parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer");
   const billers = ["u-owner", "u-office", "u-office", "u-ramana", "u-venkatesh"];
+  // The rates the owner usually put on the sample bills. Products themselves carry no rate: each bill is priced by the owner.
+  const usualRate: Record<string, number> = { "p-deccan-opc": 360, "p-deccan-ppc": 340, "p-ms-vishaka": 70, "p-tmt-8": 72, "p-tmt-12": 71 };
 
   const sales: Sale[] = [];
   let billNo = 1201;
@@ -291,9 +292,11 @@ export function buildSample(SAMPLE_TODAY: string) {
       otherCharge: 0,
     });
     const party = parties.find((p) => p.id === input.partyId)!;
+    // A staff sale waiting for approval gets its bill no. from the owner, so it doesn't use one up yet.
+    const waiting = input.status === "pending_approval";
     const sale: Sale = {
-      id: `sale-${billNo}`,
-      billNo: billNo++,
+      id: waiting ? `request-${sales.length + 1}` : `sale-${billNo}`,
+      billNo: waiting ? undefined : billNo++,
       partyId: input.partyId,
       billDate: input.billDate,
       receivedDate: input.transportMode === "FOR" && rand() < 0.3 ? addDays(input.billDate, 1) : undefined,
@@ -313,7 +316,7 @@ export function buildSample(SAMPLE_TODAY: string) {
       status: input.status ?? "saved",
       overrideReason: input.overrideReason,
       createdBy: input.createdBy,
-      lines: input.lines.map((l) => ({ ...l, listRate: productById(l.productId).listRate })),
+      lines: input.lines.map((l) => ({ ...l })),
     };
     sales.push(sale);
     // Lorry sales come off the truck, not out of a godown.
@@ -349,19 +352,19 @@ export function buildSample(SAMPLE_TODAY: string) {
       if (wantCement) {
         const product = productById(rand() < 0.7 ? "p-deccan-opc" : "p-deccan-ppc");
         const qty = Math.min(between(20, party.kind === "sub_dealer" ? 300 : 150, 10), sellable(godownId, product.id));
-        const rate = rand() < 0.15 ? product.listRate - 5 : product.listRate;
+        const rate = rand() < 0.15 ? usualRate[product.id] - 5 : usualRate[product.id];
         if (qty >= 10) lines.push({ productId: product.id, qty: Math.floor(qty / 10) * 10, rate });
       }
       if (wantSteel) {
         const product = productById(pick(["p-ms-vishaka", "p-tmt-8", "p-tmt-12"]));
         const qty = Math.min(between(300, 2500, 100), sellable(godownId, product.id));
-        if (qty >= 100) lines.push({ productId: product.id, qty: Math.floor(qty / 100) * 100, rate: product.listRate });
+        if (qty >= 100) lines.push({ productId: product.id, qty: Math.floor(qty / 100) * 100, rate: usualRate[product.id] });
       }
       if (lines.length === 0) continue;
 
       const transportMode: TransportMode = party.kind === "cash" ? "EX" : rand() < 0.6 ? "FOR" : rand() < 0.75 ? "EX" : "RENT";
       const cementBags = lines.filter((l) => productById(l.productId).category === "cement").reduce((s, l) => s + l.qty, 0);
-      const rateChanged = lines.some((l) => l.rate !== productById(l.productId).listRate);
+      const rateChanged = lines.some((l) => l.rate !== usualRate[l.productId]);
       addSale({
         partyId: party.id,
         billDate: day,
@@ -376,24 +379,6 @@ export function buildSample(SAMPLE_TODAY: string) {
       });
     }
   }
-
-  // Bills sold straight off the lorry at a slightly lower rate for lifting from the truck.
-  const lorrySale = (partyId: string, billDate: string, qty: number, createdBy: string) =>
-    addSale({
-      partyId,
-      billDate,
-      godownId: "",
-      source: "lorry",
-      vehicleNo: LORRY_ON_SALE,
-      lines: [{ productId: "p-deccan-opc", qty, rate: 355 }],
-      transportMode: "EX",
-      transportCharge: 0,
-      overrideReason: "Lorry rate for lifting from the truck",
-      createdBy,
-    });
-  lorrySale("rama", at("2026-10-25"), 150, "u-ramana");
-  lorrySale("venk", at("2026-10-25"), 200, "u-venkatesh");
-  lorrySale("lakshmi", SAMPLE_TODAY, 100, "u-venkatesh");
 
   // Today: the lorry that came in, then the quotation bill (over the limit, saved by the owner with a reason),
   // a normal bill and a staff bill waiting for approval.
@@ -424,9 +409,10 @@ export function buildSample(SAMPLE_TODAY: string) {
     partyId: "gayatri",
     billDate: SAMPLE_TODAY,
     godownId: "g-polaki",
-    lines: [{ productId: "p-deccan-opc", qty: 200, rate: 360 }],
+    // Staff send no prices: the owner adds them, with the bill no., when approving.
+    lines: [{ productId: "p-deccan-opc", qty: 200, rate: 0 }],
     transportMode: "FOR",
-    transportCharge: 3000,
+    transportCharge: 0,
     status: "pending_approval",
     createdBy: "u-ramana",
     remarks: "Party asked for delivery tomorrow morning",
@@ -529,7 +515,7 @@ export function buildSample(SAMPLE_TODAY: string) {
   );
   receipts.sort((a, b) => a.date.localeCompare(b.date) || a.receiptNo - b.receiptNo);
 
-  const payments: Payment[] = [
+  const allPayments: Payment[] = [
     { id: "pay-1", paymentNo: 501, partyId: "deccan", date: at("2026-10-03"), amount: 300000, mode: "neft", reference: "UTR55104411" },
     { id: "pay-2", paymentNo: 502, partyId: "vishaka", date: at("2026-10-08"), amount: 250000, mode: "cheque", reference: "CHQ 104552" },
     { id: "pay-3", paymentNo: 503, partyId: "deccan", date: at("2026-10-14"), amount: 450000, mode: "neft", reference: "UTR55109932" },
@@ -537,6 +523,8 @@ export function buildSample(SAMPLE_TODAY: string) {
     { id: "pay-5", paymentNo: 505, partyId: "deccan", date: at("2026-10-22"), amount: 400000, mode: "neft", reference: "UTR55113390" },
     { id: "pay-6", paymentNo: 506, partyId: "vishaka", date: at("2026-10-25"), amount: 300000, mode: "neft", reference: "UTR55114021" },
   ];
+  // Only parties still in the list (a real supplier list drops the sample ones it doesn't name).
+  const payments = allPayments.filter((p) => parties.some((x) => x.id === p.partyId));
 
   return { SAMPLE_TODAY, OPENING_DATE, FIRST_DAY, quotations, purchases, stockMovements, sales, receipts, commitments, payments };
 }

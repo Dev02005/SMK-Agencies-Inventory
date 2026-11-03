@@ -76,7 +76,7 @@ export function bankFromIfsc(ifsc: string) {
 }
 
 /** "23/10/2026", "25/04/25", "01-10-2026 10:32:57", "23 Oct 2026", "23-Oct-26" → "2026-10-23". */
-export function toISODate(text: string): string | undefined {
+function toISODate(text: string): string | undefined {
   const s = text.trim();
   let d: number, m: number, y: number;
   const numeric = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\b/.exec(s);

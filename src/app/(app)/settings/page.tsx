@@ -1,4 +1,4 @@
-import { BellRing, ChevronRight, CircleUserRound, DatabaseBackup, Landmark, Package, ReceiptText, UserCog, Warehouse } from "lucide-react";
+import { BellRing, ChevronRight, CircleUserRound, DatabaseBackup, Landmark, MapPin, Package, ReceiptText, UserCog, Warehouse } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SampleChip } from "@/components/ui/blocks";
@@ -10,13 +10,14 @@ import { InstallRow } from "./install-row";
 
 export const metadata: Metadata = { title: "Settings" };
 
-type Item = { href: string; title: string; description: string; icon: typeof Landmark; live: boolean; tone: Tone };
+type Item = { href: string; title: string; description: string; icon: typeof Landmark; live: boolean; tone: Tone; ownerOnly?: boolean };
 
 const masters: Item[] = [
   { href: "/settings/firm", title: "Firm details", description: "Both firms: name, GSTIN, address and phone on bills", icon: Landmark, live: true, tone: "purple" },
   { href: "/settings/godowns", title: "Godowns", description: "Locations where stock is kept", icon: Warehouse, live: true, tone: "amber" },
-  { href: "/settings/products", title: "Products & rates", description: "Brands, units and list rates", icon: Package, live: true, tone: "teal" },
-  { href: "/settings/users", title: "Users & roles", description: "Who can log in and what they see", icon: UserCog, live: true, tone: "blue" },
+  { href: "/settings/products", title: "Products", description: "Brands, types and units", icon: Package, live: true, tone: "teal" },
+  { href: "/settings/lists", title: "Destinations & rent drivers", description: "The lists offered on New sale: add or delete", icon: MapPin, live: true, tone: "green" },
+  { href: "/settings/users", title: "Users & roles", description: "Who can log in and what they see", icon: UserCog, live: true, tone: "blue", ownerOnly: true },
   { href: "/settings", title: "Expense heads", description: "Rent, driver payments, salaries… · editable once the database is connected", icon: ReceiptText, live: false, tone: "grey" },
   { href: "/settings/reminders", title: "Reminder messages", description: "WhatsApp and SMS messages and when they go", icon: BellRing, live: true, tone: "green" },
   { href: "/settings", title: "Backups", description: "Daily backups and restore checks · set up with the database", icon: DatabaseBackup, live: false, tone: "grey" },
@@ -56,9 +57,15 @@ export default function SettingsPage() {
       <RoleGuard roles={["owner", "office"]} fallback={<></>}>
         <h2 className="mb-2 mt-6 px-1 text-[13px] font-medium text-ink-secondary">Masters</h2>
         <ul className="surface divide-y divide-hairline overflow-hidden">
-          {masters.map((item) => (
-            <ItemRow key={item.title} item={item} />
-          ))}
+          {masters.map((item) =>
+            item.ownerOnly ? (
+              <RoleGuard key={item.title} roles={["owner"]} fallback={<></>}>
+                <ItemRow item={item} />
+              </RoleGuard>
+            ) : (
+              <ItemRow key={item.title} item={item} />
+            ),
+          )}
         </ul>
       </RoleGuard>
     </div>
