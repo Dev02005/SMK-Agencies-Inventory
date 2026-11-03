@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { requireSession } from "@/lib/auth";
 import { getCurrentUser, getFirm, getNow } from "@/lib/data";
 import { roleLabels } from "@/lib/labels";
-import { ChangePasswordForm, SignOutButton } from "./account-forms";
+import { pinIsSet } from "@/lib/personal-lock";
+import { ChangePasswordForm, ChangePinForm, SignOutButton } from "./account-forms";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -26,6 +27,7 @@ const signedInAt = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "nu
 
 async function AccountDetails() {
   const [session, user, firm, now] = await Promise.all([requireSession(), getCurrentUser(), getFirm(), getNow()]);
+  const pinSet = user.role === "owner" && (await pinIsSet());
 
   return (
     <div className="space-y-4">
@@ -67,6 +69,22 @@ async function AccountDetails() {
       <SectionCard title="Change password">
         <ChangePasswordForm mobile={user.mobile} />
       </SectionCard>
+
+      {user.role === "owner" && (
+        <SectionCard title="Personal PIN">
+          {pinSet ? (
+            <ChangePinForm />
+          ) : (
+            <p className="text-[15px] text-ink-secondary">
+              You choose it the first time you open{" "}
+              <Link href="/personal" className="text-link hover:underline">
+                Personal
+              </Link>
+              .
+            </p>
+          )}
+        </SectionCard>
+      )}
 
       {user.role === "owner" && (
         <p className="px-1 text-[13px] text-ink-secondary">

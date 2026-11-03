@@ -1,23 +1,21 @@
 import "server-only";
-import { getDesignations, getProfiles } from "@/lib/data";
-import type { Profile } from "@/lib/data/types";
+import { getSignInPeople } from "@/lib/data";
 import { mobileOf } from "@/lib/mobile";
 import { checkPassword } from "@/lib/passwords";
 
 /** The person a login ID belongs to: their mobile number (with or without +91) or their email. */
-async function personFor(loginId: string): Promise<Profile | undefined> {
+async function personFor(loginId: string) {
   const id = loginId.trim();
-  const profiles = (await getProfiles()).filter((p) => p.active);
   const email = id.includes("@") ? id.toLowerCase() : undefined;
   const mobile = email ? undefined : mobileOf(id);
-  return profiles.find((p) => (email ? p.email?.toLowerCase() === email : mobile && mobile.length === 10 && mobileOf(p.mobile) === mobile));
+  return (await getSignInPeople()).find((p) => (email ? p.email?.toLowerCase() === email : mobile && mobile.length === 10 && mobileOf(p.mobile) === mobile));
 }
 
 /** Sign-in step 1: whose number this is, so the screen can greet them by name before asking for the password. */
 export async function findPerson(loginId: string): Promise<{ name: string; initials: string; designation: string } | null> {
   const person = await personFor(loginId);
   if (!person) return null;
-  return { name: person.fullName, initials: person.initials, designation: (await getDesignations())[person.id] ?? "" };
+  return { name: person.fullName, initials: person.initials, designation: person.designation };
 }
 
 /**

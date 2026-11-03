@@ -1031,8 +1031,19 @@ function loanBalance(loan: (typeof phase3.loans)[number]) {
 /** Each person's designation ("Wholesale manager", "Owner"…), without the day's attendance, so any page can show it. */
 export async function getDesignations(): Promise<Record<string, string>> {
   await live();
+  return designationsNow();
+}
+
+function designationsNow(): Record<string, string> {
   const owner = base.profiles.find((p) => p.role === "owner");
   return { ...(owner ? { [owner.id]: ownerDesignation ?? "Owner" } : {}), ...Object.fromEntries(base3.employees.map((e) => [e.profileId, e.designation])) };
+}
+
+/** Everyone who can sign in, with their designation, from one fetch of the records (the sign-in screen). */
+export async function getSignInPeople(): Promise<(Profile & { designation: string })[]> {
+  await live();
+  const designations = designationsNow();
+  return base.profiles.filter((p) => p.active).map((p) => ({ ...p, designation: designations[p.id] ?? "" }));
 }
 
 export async function getEmployees() {

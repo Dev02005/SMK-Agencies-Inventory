@@ -16,27 +16,29 @@ function savedHashes(): Record<string, string> {
   return Object.fromEntries(Object.entries(saved).filter((e): e is [string, string] => typeof e[1] === "string" && e[1].includes(":")));
 }
 
-function hash(password: string, salt = randomBytes(16).toString("hex")) {
-  return `${salt}:${scryptSync(password, salt, 32).toString("hex")}`;
+/** A salted scrypt hash ("salt:hash") of a password or PIN, so the secret itself is never kept. */
+export function hashSecret(secret: string, salt = randomBytes(16).toString("hex")) {
+  return `${salt}:${scryptSync(secret, salt, 32).toString("hex")}`;
 }
 
-function same(a: string, b: string) {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
+/** Whether `secret` is the one `saved` (from hashSecret) was made from. */
+export function hashMatches(secret: string, saved: string) {
+  const x = Buffer.from(hashSecret(secret, saved.split(":")[0]));
+  const y = Buffer.from(saved);
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
 /** Whether `password` is this person's password: the one they set, or else their mobile number. */
 export function checkPassword(person: Pick<Profile, "id" | "mobile">, password: string): boolean {
   const saved = savedHashes()[person.id];
-  if (saved) return same(hash(password, saved.split(":")[0]), saved);
+  if (saved) return hashMatches(password, saved);
   // Until they set one, the password is their mobile number, typed with or without +91.
   const typed = mobileOf(password);
-  return typed.length === 10 && same(typed, mobileOf(person.mobile));
+  return typed.length === 10 && typed === mobileOf(person.mobile);
 }
 
 export async function setPassword(userId: string, password: string) {
-  const hashed = hash(password);
+  const hashed = hashSecret(password);
   await saving(() =>
     writeRecord(FILE, {
       about: "Passwords people set for themselves, as salted hashes (never the passwords). Delete a line to put that person back on their mobile number.",

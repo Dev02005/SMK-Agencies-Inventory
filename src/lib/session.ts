@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { keyFor } from "./keys";
 import { allRoles } from "./labels";
 import type { Role } from "./data/types";
 import { nextMidnightIST } from "./midnight";
@@ -10,14 +11,11 @@ import { nextMidnightIST } from "./midnight";
  */
 export const SESSION_COOKIE = "ska-session";
 
-/** Set SESSION_SECRET (any long random string) on the live server; the fallback is only for sample mode. */
-function secret() {
-  const set = process.env.SESSION_SECRET?.trim();
-  if (set) return set;
-  // With the records online, a sign-in must never be signed with a key anyone can read in this public code.
-  if (process.env.SKA_DATA_SECRET) throw new Error("Set SESSION_SECRET: the records are online.");
-  return "ska-sample-mode-session-key";
-}
+/**
+ * Online the key comes from SKA_DATA_SECRET (keys.ts). The fixed one is only for the records on this computer; it
+ * stays the same across restarts and between proxy.ts and the app, which each read it.
+ */
+const secret = () => keyFor("session") ?? "ska-sample-mode-session-key";
 const sign = (value: string) => createHmac("sha256", secret()).update(value).digest("hex");
 
 function same(a: string, b: string) {

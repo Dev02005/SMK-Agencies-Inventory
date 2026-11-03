@@ -39,7 +39,7 @@ Every screen runs on sample data from `src/lib/data` and shows a "Sample data" c
 | Ageing & reminders | `/money/ageing` 0–7 / 8–30 / 31–60 / 61–90 / 90+ grid, reminder selection and history |
 | Bad debts, banks | `/money/bad-debts` write-offs (owner only); `/money/banks` with **Add bank** (`/money/banks/add`: the IFSC fills in the bank); `/money/banks/[id]` with every transaction and a running balance, **Add entry** and **Import statement**; `/money/banks/new` |
 | Bank statement import | On a bank's page, choose or drop the statement PDF (`src/lib/statement-pdf.ts` reads it in the browser with pdf.js; nothing is uploaded). `src/lib/statement-parser.ts` finds the transactions table from its column headings, so SBI, HDFC, Union Bank, APGB, KVB and most other Indian banks read the same way, and checks every row against the statement's running balance. The preview shows the bank, account and period, warns if the account number doesn't match, leaves rows already in the account unticked, asks for the password of locked PDFs, and saves the ticked rows. Tested on real SBI, HDFC, Union Bank, APGB and KVB statements: 74 of 74 rows read and balanced |
-| Personal | `/personal` behind a 4-digit PIN (sample PIN 1234), owner only: overview, chits, rents, insurance, personal banks, notes, documents |
+| Personal | `/personal` behind a 4-digit PIN the owner chooses the first time (kept hashed in the records; changed in Settings › Account), owner only: overview, chits, rents, insurance, personal banks, notes, documents |
 | Home by role | `/` shows a different screen per role: owner/office dashboard, field staff (cash, targets, visits, who to collect from), godown (bills to load, lorries arriving, stock, orders), driver (today's deliveries, cash, renewals) |
 | People | `/people` staff with today's attendance, `/people/[id]`, `/people/new`, `/people/mapping` (sub-dealers per staff), `/people/attendance` (check in, today, month), `/people/tours`, `/people/targets`, `/people/salary` (salary sheet, loans and advances) |
 | Orders | `/orders` pending / new / confirmed / dispatched, `/orders/[id]` ordered vs sent with bills, `/orders/new` |
@@ -103,16 +103,16 @@ Original or sample: records read from `local-data/` carry `original: true`. List
 ## Put the records online (Supabase)
 
 1. In Supabase › SQL Editor, run `supabase/migrations/20261103000000_records.sql`, then set the data key's SHA-256 as its first lines say.
-2. In `.env.local` set `SKA_DATA_SECRET` (that key), `SESSION_SECRET` and `PERSONAL_LOCK_SECRET` (long random strings) and `PERSONAL_PIN`, beside the Supabase URL and publishable key.
+2. In `.env.local` set `SKA_DATA_SECRET` (that key) beside the Supabase URL and publishable key. It is the only key: the sign-in and Personal-lock keys are worked out from it (`src/lib/keys.ts`), and passwords and the Personal PIN are kept, hashed, in the records.
 3. `npm run records:upload` copies `local-data/*.json` up (records already online are left alone). From then on the app on this computer uses the online records too; `npm run records:download` saves a backup copy back into `local-data/`.
-4. On Vercel › Settings › Environment Variables, add the same variables (and `NEXT_PUBLIC_SITE_URL`, the site's address), then redeploy. Put the Vercel functions in the region nearest the Supabase project.
+4. On Vercel › Settings › Environment Variables, add the same three (and `NEXT_PUBLIC_SITE_URL`, the site's address), then redeploy. `vercel.json` runs the app in Paris (`cdg1`), next to the Supabase project (eu-west-3), so each page's fetch of the records takes a few milliseconds; change both together if the project moves.
 
 ## Connect Supabase (the full database)
 
 1. Create a Supabase project in the Mumbai region (staging first).
 2. Run `supabase/migrations/20261026000000_phase1_core.sql` in the SQL editor (or `supabase db push` with the CLI), then `supabase/seed.sql`.
 3. Create the owner's login in Authentication, then add their row to `profiles` with `role = 'owner'`.
-4. Copy `.env.example` to `.env.local` and fill in the project URL and publishable key, plus `SESSION_SECRET`, `PERSONAL_PIN`, `PERSONAL_LOCK_SECRET` and `NEXT_PUBLIC_SITE_URL` (the app's public address, used for link previews and the sitemap).
+4. Copy `.env.example` to `.env.local` and fill in the project URL and publishable key, plus `SKA_DATA_SECRET` and `NEXT_PUBLIC_SITE_URL` (the app's public address, used for link previews and the sitemap).
 5. Add `@supabase/ssr` and `@supabase/supabase-js` (`npm install`), create the browser and server clients in `src/lib/supabase`, and switch the functions in `src/lib/data` from the sample and local-data records to queries. Then set `usesSampleData` to false.
 
 ## Where things are
@@ -142,6 +142,7 @@ Original or sample: records read from `local-data/` carry `original: true`. List
 
 - Every page is sent with security headers (`next.config.ts`): no framing by other sites, no MIME sniffing, a strict referrer policy, HSTS, and only location and camera allowed.
 - Database: row-level security on every table; sales, ledger and stock are only written through checked functions. Field staff can only add cash-only parties assigned to themselves and record receipts they collected from their own parties. `npm audit` reports no known vulnerabilities in the app's packages.
-- Sign-in: the session cookie is signed (HMAC) with `SESSION_SECRET`, httpOnly, same-site and secure in production; a wrong login waits 0.6 s before answering, which slows guessing.
-- Before go-live: set `SESSION_SECRET`, `PERSONAL_PIN` and `PERSONAL_LOCK_SECRET` (with the records online the app refuses to run without the two secrets); switch the map to a paid tile provider.
+- Sign-in: the session cookie is signed (HMAC) with a key worked out from `SKA_DATA_SECRET`, httpOnly, same-site and secure in production; a wrong login waits 0.6 s before answering, which slows guessing.
+- Keys: the server has one, `SKA_DATA_SECRET`; nothing else secret is set on Vercel. Passwords and the Personal PIN are salted scrypt hashes in the records, never the secrets themselves.
+- Before go-live: switch the map to a paid tile provider.
 - Records online: the `ska_records` table has row-level security and no grants; only `ska_records_since` and `ska_save_records` open it, and only with `SKA_DATA_SECRET`, which stays on the server (the database keeps only its SHA-256).

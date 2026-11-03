@@ -2,32 +2,23 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { recordsOnline } from "@/lib/data/store";
-import { usesSampleData } from "@/lib/supabase/config";
+import { readRecord, saving, syncRecords, writeRecord } from "@/lib/data/store";
+import { keyFor } from "@/lib/keys";
+import { hashMatches, hashSecret } from "@/lib/passwords";
 
 /**
- * The Personal PIN is checked here on the server, never in the browser. A correct PIN sets a signed, httpOnly
- * cookie for 30 minutes (or until the browser closes); every Personal page checks it before reading any record.
- * With login, unlocking will also require the signed-in user to be the owner, and the PIN moves to a hashed
- * value on the owner's profile.
+ * The Personal PIN is checked here on the server, never in the browser. The owner chooses it the first time they
+ * open Personal; it is kept as a salted hash (never the PIN) in the personal-pin.json record, so online it lives in
+ * Supabase. A correct PIN sets a signed, httpOnly cookie for 30 minutes (or until the browser closes); every Personal
+ * page checks it before reading any record. Deleting the record lets the owner choose a new PIN.
  */
 export const PERSONAL_COOKIE = "ska-personal";
 const UNLOCK_MINUTES = 30;
-
-/** Only used on sample data; with real data set PERSONAL_PIN (and PERSONAL_LOCK_SECRET) in the environment. */
-export const SAMPLE_PIN = "1234";
+const PIN_RECORD = "personal-pin.json";
 
 let generatedSecret: string | undefined;
-/**
- * Without PERSONAL_LOCK_SECRET each server start makes its own, which simply locks Personal again after a restart.
- * Online the site runs on several servers, each of which would make its own, so there it must be set.
- */
-function secret() {
-  const set = process.env.PERSONAL_LOCK_SECRET?.trim();
-  if (set) return set;
-  if (recordsOnline) throw new Error("Set PERSONAL_LOCK_SECRET: the records are online.");
-  return (generatedSecret ??= randomBytes(32).toString("hex"));
-}
+/** Online the key comes from SKA_DATA_SECRET (keys.ts); on a computer each start makes its own, which locks Personal again. */
+const secret = () => keyFor("personal") ?? (generatedSecret ??= randomBytes(32).toString("hex"));
 
 const sign = (value: string) => createHmac("sha256", secret()).update(value).digest("hex");
 
@@ -37,14 +28,33 @@ function same(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-/** The sample PIN while it is the one that opens Personal: no PERSONAL_PIN set, and the records on this computer. */
-export function samplePin() {
-  return !process.env.PERSONAL_PIN && usesSampleData && !recordsOnline ? SAMPLE_PIN : undefined;
+function savedPin(): string | undefined {
+  const saved = (readRecord(PIN_RECORD) as { pin?: unknown } | undefined)?.pin;
+  return typeof saved === "string" && saved.includes(":") ? saved : undefined;
 }
 
-export function pinMatches(pin: string) {
-  const expected = process.env.PERSONAL_PIN || samplePin() || "";
-  return expected.length > 0 && same(pin, expected);
+/** Whether the owner has chosen a PIN yet. */
+export async function pinIsSet() {
+  await syncRecords();
+  return savedPin() !== undefined;
+}
+
+export async function pinMatches(pin: string) {
+  await syncRecords();
+  const saved = savedPin();
+  return saved !== undefined && hashMatches(pin, saved);
+}
+
+/** Saves a PIN: the first one only while none is set, a new one only when `current` is the PIN saved now. */
+export function savePin(pin: string, current?: string): Promise<boolean> {
+  const hashed = hashSecret(pin);
+  return saving(() => {
+    const saved = savedPin();
+    const allowed = current === undefined ? saved === undefined : saved !== undefined && hashMatches(current, saved);
+    if (!allowed) return false;
+    writeRecord(PIN_RECORD, { about: "The owner's Personal PIN, as a salted hash (never the PIN). Delete this record to choose a new PIN.", pin: hashed });
+    return true;
+  });
 }
 
 export function unlockCookie() {

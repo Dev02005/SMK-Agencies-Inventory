@@ -1,6 +1,5 @@
 /**
- * True while the screens read the sample records in src/lib/data (with the firm's own records from local-data/).
- * When Supabase is connected the data functions switch to its queries; until then the "Sample data" label and the
- * sample PIN stay.
+ * True while sales, money and stock are still the sample records in src/lib/data (the firm's own lists, from
+ * store.ts, are already real). Until they move to Supabase the "Sample data" label stays.
  */
 export const usesSampleData = true;
