@@ -18,6 +18,7 @@ export function ConfirmDelete({
   after,
   compact,
   className,
+  label,
 }: {
   /** What is deleted, in the question: "Delete {what}?" */
   what: string;
@@ -26,6 +27,7 @@ export function ConfirmDelete({
   /** Just a bin icon until tapped, for rows in a list. */
   compact?: boolean;
   className?: string;
+  label?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -47,7 +49,7 @@ export function ConfirmDelete({
         )}
       >
         <Trash2 size={compact ? 16 : 15} strokeWidth={1.9} aria-hidden />
-        {!compact && "Delete"}
+        {!compact && (label ?? "Delete")}
       </button>
     );
   }

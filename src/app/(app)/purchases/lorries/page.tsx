@@ -59,8 +59,9 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/purchases/l
       <DataTools title="Lorry purchases" />
       <ExportTable
         title="Lorry purchases"
-        columns={["Invoice date", "Truck received on", "Firm", "Truck number", "Company", "Driver number", "Items", "Invoice value", "Paper copy", "Unloading paid to us", "Sale invoice", "Status"]}
+        columns={["Invoice number", "Invoice date", "Truck received on", "Firm", "Truck number", "Company", "Driver number", "Items", "Invoice value", "Paper copy", "Unloading paid to us", "Sale invoice", "Status"]}
         rows={lorries.map((l) => [
+          l.invoiceNo ?? "",
           formatDate(l.invoiceDate),
           l.receivedOn ? formatDate(l.receivedOn) : "",
           firmName(l.firmId) ?? "",

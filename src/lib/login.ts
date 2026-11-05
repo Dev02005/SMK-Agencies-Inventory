@@ -7,9 +7,24 @@ import { checkPassword } from "@/lib/passwords";
 /** The person a login ID belongs to: their mobile number (with or without +91) or their email. */
 async function personFor(loginId: string) {
   const id = loginId.trim();
-  const email = id.includes("@") ? id.toLowerCase() : undefined;
+  if (!id) return null;
+  const lower = id.toLowerCase();
+  const email = id.includes("@") ? lower : undefined;
   const mobile = email ? undefined : mobileOf(id);
-  return (await getSignInPeople()).find((p) => (email ? p.email?.toLowerCase() === email : mobile && mobile.length === 10 && mobileOf(p.mobile) === mobile));
+  const people = await getSignInPeople();
+  return (
+    people.find((p) => {
+      if (email) return p.email?.toLowerCase() === email;
+      if (mobile && mobile.length === 10) return mobileOf(p.mobile) === mobile;
+      // Flexible matching for names and usernames
+      const pName = p.fullName.toLowerCase();
+      if (pName === lower || p.id.toLowerCase() === lower) return true;
+      if (pName.split(/\s+/).includes(lower)) return true;
+      if (lower.length >= 3 && pName.includes(lower)) return true;
+      if ((lower === "owner" || lower === "admin") && p.role === "owner") return true;
+      return false;
+    }) ?? null
+  );
 }
 
 /** Sign-in step 1: whose number this is, so the screen can greet them by name before asking for their code. */

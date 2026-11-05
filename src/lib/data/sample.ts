@@ -5,7 +5,6 @@
  * Replaced in the Supabase step.
  */
 import { shiftMonth } from "@/lib/format";
-import { computeTotals, type TransportMode } from "@/lib/sales";
 import type {
   Commitment,
   Godown,
@@ -198,56 +197,8 @@ export function buildSample(SAMPLE_TODAY: string) {
   const OPENING_DATE = addDays(SAMPLE_TODAY, -30);
   const FIRST_DAY = addDays(OPENING_DATE, 1);
 
+  // Sample purchases removed: purchases start empty until entered by staff/owner.
   const purchases: Purchase[] = [];
-  const purchasePlan: [string, string, [string, number, number][]][] = [
-    [at("2026-09-28"), "deccan", [["p-deccan-opc", 600, 320], ["p-deccan-ppc", 200, 300]]],
-    [at("2026-10-02"), "vishaka", [["p-ms-vishaka", 6000, 64], ["p-tmt-8", 3000, 66]]],
-    [at("2026-10-05"), "deccan", [["p-deccan-opc", 800, 320]]],
-    [at("2026-10-12"), "deccan", [["p-deccan-opc", 600, 320], ["p-deccan-ppc", 200, 300]]],
-    [at("2026-10-16"), "vishaka", [["p-ms-vishaka", 5000, 64], ["p-tmt-12", 4000, 65]]],
-    [at("2026-10-19"), "deccan", [["p-deccan-opc", 800, 320]]],
-    [at("2026-10-23"), "vishaka", [["p-tmt-8", 3000, 66], ["p-ms-vishaka", 4000, 64]]],
-    [at("2026-10-24"), "deccan", [["p-deccan-opc", 600, 320], ["p-deccan-ppc", 200, 300]]],
-    // Came in today: its bags are already in the godown's stock.
-    [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320], ["p-deccan-ppc", 200, 300]]],
-  ];
-  // Only the sample companies get sample payments and the sample lorry. Godown purchases from Deccan (a real supplier
-  // too) are kept as demo records to try Purchases with: listed and in stock, but not in Deccan's ledger.
-  const sampleCompany = (id: string) => parties.some((p) => p.id === id && p.kind === "company" && !p.original);
-  const plan = purchasePlan.filter(([, companyId]) => companyId === "deccan" ? parties.some((p) => p.id === "deccan") : sampleCompany(companyId));
-  plan.forEach(([invoiceDate, companyId, lines], i) => {
-    purchases.push({
-      demo: !sampleCompany(companyId),
-      id: `pur-${i + 1}`,
-      purchaseNo: 301 + i,
-      companyId,
-      invoiceNo: `${companyId === "deccan" ? "DCL" : "VST"}/26/${4100 + i * 7}`,
-      invoiceDate,
-      receivedDate: addDays(invoiceDate, companyId === "deccan" ? 1 : 0),
-      lorryNo: companyId === "deccan" ? "AP 39 T 7781" : "AP 31 TB 2204",
-      // Today's lorry comes to Polaki, where today's bills are loaded; earlier ones are spread over both godowns.
-      godownId: i === plan.length - 1 || i % 3 !== 2 ? "g-polaki" : "g-srikakulam",
-      lines: lines.map(([productId, qty, rate]) => ({ productId, qty, rate })),
-      total: lines.reduce((s, [, qty, rate]) => s + qty * rate, 0),
-    });
-  });
-  // A Deccan lorry sold straight off the truck instead of unloading into a godown; it has sold out.
-  if (sampleCompany("deccan")) purchases.push({
-    id: "pur-lorry-1",
-    purchaseNo: 301 + plan.length,
-    companyId: "deccan",
-    invoiceNo: "DCL/26/4199",
-    invoiceDate: at("2026-10-24"),
-    receivedDate: at("2026-10-25"),
-    lorryNo: "AP 39 T 9902",
-    godownId: "",
-    onLorry: true,
-    driverMobile: "9000000201",
-    invoicePaperKept: true,
-    soldOut: { on: at("2026-10-26"), value: 207000, notes: "Sold off the truck at Polaki" },
-    lines: [{ productId: "p-deccan-opc", qty: 600, rate: 320 }],
-    total: 192000,
-  });
 
   const stockMovements: StockMovement[] = [];
   const openingStock: [string, string, number][] = [
@@ -262,19 +213,6 @@ export function buildSample(SAMPLE_TODAY: string) {
   ];
   const stockOnHand = new Map<string, number>();
   const stockKey = (godownId: string, productId: string) => `${godownId}|${productId}`;
-  // Held back from the day-to-day bills: what later leaves on godown transfers and van/lorry loads (sample-phase4)
-  // and on today's fixed bills, so no godown's stock ever shows below zero.
-  const keepBack: Record<string, number> = {
-    "g-polaki|p-deccan-opc": 410,
-    "g-polaki|p-deccan-ppc": 100,
-    "g-polaki|p-tmt-8": 1000,
-    "g-polaki|p-ms-vishaka": 2000,
-    "g-srikakulam|p-deccan-opc": 120,
-  };
-  const sellable = (godownId: string, productId: string) => {
-    const key = stockKey(godownId, productId);
-    return Math.max(0, (stockOnHand.get(key) ?? 0) - (keepBack[key] ?? 0));
-  };
   function moveStock(m: Omit<StockMovement, "id">) {
     stockMovements.push({ ...m, id: `sm-${stockMovements.length + 1}` });
     const key = stockKey(m.godownId, m.productId);
@@ -284,175 +222,10 @@ export function buildSample(SAMPLE_TODAY: string) {
     moveStock({ date: OPENING_DATE, godownId, productId, qty, kind: "opening", ref: "Opening stock" }),
   );
 
-  const productById = (id: string) => products.find((p) => p.id === id)!;
   const customers = parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer");
-  const billers = ["u-owner", "u-office", "u-office", "u-ramana", "u-venkatesh"];
-  // The rates the owner usually put on the sample bills. Products themselves carry no rate: each bill is priced by the owner.
-  const usualRate: Record<string, number> = { "p-deccan-opc": 360, "p-deccan-ppc": 340, "p-ms-vishaka": 70, "p-tmt-8": 72, "p-tmt-12": 71 };
 
+  // Sample sales removed: sales start empty until entered by staff/owner.
   const sales: Sale[] = [];
-  let billNo = 1201;
-
-  function addSale(input: {
-    partyId: string;
-    billDate: string;
-    godownId: string;
-    lines: { productId: string; qty: number; rate: number }[];
-    transportMode: TransportMode;
-    transportCharge: number;
-    unloadingCharge?: number;
-    discountAmount?: number;
-    status?: Sale["status"];
-    overrideReason?: string;
-    createdBy: string;
-    remarks?: string;
-    source?: Sale["source"];
-    vehicleNo?: string;
-  }) {
-    const totals = computeTotals({
-      lines: input.lines,
-      discountMode: "amount",
-      discountValue: input.discountAmount ?? 0,
-      transportMode: input.transportMode,
-      transportCharge: input.transportCharge,
-      unloadingCharge: input.unloadingCharge ?? 0,
-      otherCharge: 0,
-    });
-    const party = parties.find((p) => p.id === input.partyId)!;
-    // A staff sale waiting for approval gets its bill no. from the owner, so it doesn't use one up yet.
-    const waiting = input.status === "pending_approval";
-    const sale: Sale = {
-      id: waiting ? `request-${sales.length + 1}` : `sale-${billNo}`,
-      billNo: waiting ? undefined : billNo++,
-      partyId: input.partyId,
-      billDate: input.billDate,
-      receivedDate: input.transportMode === "FOR" && rand() < 0.3 ? addDays(input.billDate, 1) : undefined,
-      source: input.source ?? "godown",
-      godownId: input.godownId || undefined,
-      vehicleNo: input.vehicleNo,
-      transportMode: input.transportMode,
-      transportCharge: totals.transport,
-      unloadingCharge: input.unloadingCharge ?? 0,
-      otherCharge: 0,
-      discountAmount: totals.discount,
-      subtotal: totals.subtotal,
-      total: totals.total,
-      destination: party.place,
-      paperMemo: rand() < 0.4 ? String(between(4400, 4800)) : undefined,
-      remarks: input.remarks,
-      status: input.status ?? "saved",
-      overrideReason: input.overrideReason,
-      createdBy: input.createdBy,
-      lines: input.lines.map((l) => ({ ...l })),
-    };
-    sales.push(sale);
-    // Lorry sales come off the truck, not out of a godown.
-    if (sale.status === "saved" && sale.source === "godown") {
-      sale.lines.forEach((l) =>
-        moveStock({ date: sale.billDate, godownId: input.godownId, productId: l.productId, qty: -l.qty, kind: "sale", ref: `Bill ${sale.billNo}` }),
-      );
-    }
-    return sale;
-  }
-
-  // A purchase is the only way stock comes in: the lorry unloads at the purchase's godown on the day it arrives.
-  const receive = (day: string) =>
-    purchases
-      .filter((p) => p.receivedDate === day && !p.onLorry)
-      .forEach((p) =>
-        p.lines.forEach((l) =>
-          moveStock({ date: day, godownId: p.godownId, productId: l.productId, qty: l.qty, kind: "inward", ref: `Purchase ${p.purchaseNo}` }),
-        ),
-      );
-
-  for (let day = FIRST_DAY; day < SAMPLE_TODAY; day = addDays(day, 1)) {
-    receive(day);
-
-    const isSunday = new Date(`${day}T00:00:00Z`).getUTCDay() === 0;
-    const bills = isSunday ? (rand() < 0.3 ? 1 : 0) : between(1, 3);
-    for (let b = 0; b < bills; b++) {
-      const party = rand() < 0.12 ? parties[0] : pick(customers);
-      const godownId = rand() < 0.75 ? "g-polaki" : "g-srikakulam";
-      const lines: { productId: string; qty: number; rate: number }[] = [];
-      const wantCement = rand() < 0.8;
-      const wantSteel = !wantCement || rand() < 0.35;
-      if (wantCement) {
-        const product = productById(rand() < 0.7 ? "p-deccan-opc" : "p-deccan-ppc");
-        const qty = Math.min(between(20, party.kind === "sub_dealer" ? 300 : 150, 10), sellable(godownId, product.id));
-        const rate = rand() < 0.15 ? usualRate[product.id] - 5 : usualRate[product.id];
-        if (qty >= 10) lines.push({ productId: product.id, qty: Math.floor(qty / 10) * 10, rate });
-      }
-      if (wantSteel) {
-        const product = productById(pick(["p-ms-vishaka", "p-tmt-8", "p-tmt-12"]));
-        const qty = Math.min(between(300, 2500, 100), sellable(godownId, product.id));
-        if (qty >= 100) lines.push({ productId: product.id, qty: Math.floor(qty / 100) * 100, rate: usualRate[product.id] });
-      }
-      if (lines.length === 0) continue;
-
-      const transportMode: TransportMode = party.kind === "cash" ? "EX" : rand() < 0.6 ? "FOR" : rand() < 0.75 ? "EX" : "RENT";
-      const cementBags = lines.filter((l) => productById(l.productId).category === "cement").reduce((s, l) => s + l.qty, 0);
-      const rateChanged = lines.some((l) => l.rate !== usualRate[l.productId]);
-      addSale({
-        partyId: party.id,
-        billDate: day,
-        godownId,
-        lines,
-        transportMode,
-        transportCharge: transportMode === "EX" ? 0 : between(1500, 6000, 500),
-        unloadingCharge: transportMode === "FOR" && rand() < 0.4 ? cementBags * 3 : 0,
-        discountAmount: rand() < 0.15 ? 500 : 0,
-        overrideReason: rateChanged ? "Bulk order rate agreed by owner" : undefined,
-        createdBy: party.assignedTo && rand() < 0.5 ? party.assignedTo : pick(billers),
-      });
-    }
-  }
-
-  // Today: the lorry that came in, then the quotation bill (over the limit, saved by the owner with a reason),
-  // a normal bill and a staff bill waiting for approval.
-  receive(SAMPLE_TODAY);
-  addSale({
-    partyId: "raja",
-    billDate: SAMPLE_TODAY,
-    godownId: "g-polaki",
-    lines: [
-      { productId: "p-deccan-opc", qty: 450, rate: 360 },
-      { productId: "p-ms-vishaka", qty: 2000, rate: 70 },
-    ],
-    transportMode: "FOR",
-    transportCharge: 0,
-    overrideReason: "Long-standing customer; balance promised by month end",
-    createdBy: "u-owner",
-  });
-  addSale({
-    partyId: "sai",
-    billDate: SAMPLE_TODAY,
-    godownId: "g-polaki",
-    lines: [{ productId: "p-deccan-ppc", qty: 120, rate: 340 }],
-    transportMode: "FOR",
-    transportCharge: 2000,
-    createdBy: "u-ramana",
-  });
-  addSale({
-    partyId: "gayatri",
-    billDate: SAMPLE_TODAY,
-    godownId: "g-polaki",
-    // Staff send no prices: the owner adds them, with the bill no., when approving.
-    lines: [{ productId: "p-deccan-opc", qty: 200, rate: 0 }],
-    transportMode: "FOR",
-    transportCharge: 0,
-    status: "pending_approval",
-    createdBy: "u-ramana",
-    remarks: "Party asked for delivery tomorrow morning",
-  });
-  // One cancelled bill so the status shows up in lists; its stock goes back in.
-  {
-    const cancelled = sales[9];
-    cancelled.status = "cancelled";
-    cancelled.remarks = "Party cancelled the order";
-    cancelled.lines.forEach((l) =>
-      moveStock({ date: cancelled.billDate, godownId: cancelled.godownId!, productId: l.productId, qty: l.qty, kind: "sale", ref: `Bill ${cancelled.billNo} cancelled` }),
-    );
-  }
 
   const receipts: Receipt[] = [];
   let receiptNo = 801;

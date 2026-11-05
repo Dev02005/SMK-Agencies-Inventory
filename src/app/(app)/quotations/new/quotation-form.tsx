@@ -3,7 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
 import { ProductPicker } from "@/components/forms/product-picker";
-import { IconButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { sampleSaveMessage, useToast } from "@/components/ui/toast";
@@ -41,15 +41,19 @@ export function QuotationForm({
   const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
   const [date, setDate] = useState(today);
-  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: products[0].id, qty: "", rate: "" }]);
-  const [nextKey, setNextKey] = useState(2);
+  // No item picked for you: "Add item" asks the category, brand and item.
+  const [lines, setLines] = useState<Line[]>([]);
+  const [nextKey, setNextKey] = useState(1);
+  // Items added here, so they can be picked straight away.
+  const [added, setAdded] = useState<Product[]>([]);
+  const allProducts = [...products, ...added.filter((a) => !products.some((p) => p.id === a.id))];
   const [terms, setTerms] = useState(defaultTerms.join("\n"));
 
-  const product = (pid: string) => products.find((p) => p.id === pid) ?? products[0];
+  const product = (pid: string) => allProducts.find((p) => p.id === pid);
   const total = lines.reduce((s, l) => s + num(l.qty) * num(l.rate), 0);
   const missing = !clientName.trim()
     ? "Choose or type the client's name."
-    : !lines.some((l) => num(l.qty) > 0)
+    : !lines.some((l) => l.productId && num(l.qty) > 0)
       ? "Enter a quantity for at least one item."
       : null;
 
@@ -116,62 +120,69 @@ export function QuotationForm({
         <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">Items</h2>
         <ul className="divide-y divide-hairline">
           {lines.map((line, index) => {
-            const p = product(line.productId);
+            const p = (line.productId ? product(line.productId) : null) ?? allProducts[0];
+            const currentPid = line.productId || p?.id || "";
             return (
               <li key={line.key} className="grid grid-cols-2 items-end gap-3 py-4 sm:grid-cols-[150px_150px_minmax(0,1fr)]">
                 <div className="col-span-2 sm:col-span-3">
                   <ProductPicker
                     label={`Item ${index + 1}`}
-                    products={products}
-                    value={line.productId}
+                    products={allProducts}
+                    value={currentPid}
                     onChange={(v) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: v, rate: "" } : l)))}
+                    allowNew
+                    onCreated={(created: Product) => setAdded((list) => [...list, created])}
                   />
                 </div>
-                <Field label="Quantity" htmlFor={`${id}-q-${line.key}`}>
-                  <AffixInput
-                    id={`${id}-q-${line.key}`}
-                    inputMode="decimal"
-                    suffix={unitLabel[p.unit]}
-                    value={line.qty}
-                    onChange={(e) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, qty: e.target.value } : l)))}
-                  />
-                </Field>
-                <Field label="Price" htmlFor={`${id}-r-${line.key}`}>
-                  <AffixInput
-                    id={`${id}-r-${line.key}`}
-                    prefix="₹"
-                    inputMode="decimal"
-                    value={line.rate}
-                    onChange={(e) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, rate: e.target.value } : l)))}
-                  />
-                </Field>
+                {p && (
+                  <>
+                    <Field label="Quantity" htmlFor={`${id}-q-${line.key}`}>
+                      <AffixInput
+                        id={`${id}-q-${line.key}`}
+                        inputMode="decimal"
+                        suffix={unitLabel[p.unit] || p.unit}
+                        value={line.qty}
+                        onChange={(e) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: currentPid, qty: e.target.value } : l)))}
+                      />
+                    </Field>
+                    <Field label="Price" htmlFor={`${id}-r-${line.key}`}>
+                      <AffixInput
+                        id={`${id}-r-${line.key}`}
+                        prefix="₹"
+                        inputMode="decimal"
+                        value={line.rate}
+                        onChange={(e) => setLines((ls) => ls.map((l) => (l.key === line.key ? { ...l, productId: currentPid, rate: e.target.value } : l)))}
+                      />
+                    </Field>
+                  </>
+                )}
                 <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:mb-3 sm:justify-end">
-                  <span className="text-[15px] font-medium tabular-nums text-ink">{formatINR(num(line.qty) * num(line.rate))}</span>
-                  {lines.length > 1 && (
-                    <button
-                      type="button"
-                      aria-label={`Remove item ${index + 1}`}
-                      onClick={() => setLines((ls) => ls.filter((l) => l.key !== line.key))}
-                      className="grid size-9 place-items-center rounded-full text-ink-secondary hover:bg-hairline"
-                    >
-                      <X size={17} strokeWidth={2} aria-hidden />
-                    </button>
-                  )}
+                  <span className="text-[15px] font-medium tabular-nums text-ink">{p ? formatINR(num(line.qty) * num(line.rate)) : ""}</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove item ${index + 1}`}
+                    onClick={() => setLines((ls) => ls.filter((l) => l.key !== line.key))}
+                    className="grid size-9 place-items-center rounded-full text-ink-secondary hover:bg-hairline"
+                  >
+                    <X size={17} strokeWidth={2} aria-hidden />
+                  </button>
                 </div>
               </li>
             );
           })}
         </ul>
-        <IconButton
-          label="Add item"
-          className="mt-1"
+        <Button
+          variant="secondary"
+          className="mt-3 gap-1.5"
           onClick={() => {
-            setLines((ls) => [...ls, { key: nextKey, productId: products[0].id, qty: "", rate: "" }]);
+            const defaultProduct = allProducts[0];
+            setLines((ls) => [...ls, { key: nextKey, productId: defaultProduct?.id ?? "", qty: "", rate: "" }]);
             setNextKey((k) => k + 1);
           }}
         >
-          <Plus size={20} strokeWidth={2} aria-hidden />
-        </IconButton>
+          <Plus size={18} strokeWidth={2.25} aria-hidden />
+          Add item
+        </Button>
         <div className="mt-4 flex items-baseline justify-between border-t border-hairline pt-4">
           <span className="text-[15px] text-ink-secondary">Grand total</span>
           <span className="text-[28px] font-semibold tabular-nums tracking-[-0.4px] text-ink">{formatINR(total)}</span>

@@ -23,7 +23,7 @@ import {
 import { inDateFilter, type DateFilter, type DatePreset } from "@/lib/date-filter";
 import { formatDate } from "@/lib/format";
 import { billName, expenseHeadLabels, paymentModeLabels } from "@/lib/labels";
-import { toMT } from "@/lib/sales";
+import { toMT, unitLabel } from "@/lib/sales";
 
 /** Quick date choices a report offers (lib/date-filter); Pick a day and From – to are always there too. */
 export type Period = DatePreset;
@@ -109,7 +109,7 @@ export const reports: ReportDef[] = [
         const rows = groupRows(lines, (l) => l.productId).map(([id, ls]) => {
           const p = product(id);
           const qty = sumBy(ls, (l) => l.qty);
-          return { name: p.name, qty, unit: p.unit === "bag" ? "bags" : "kg", mt: toMT(qty, p.unit), amount: sumBy(ls, (l) => l.qty * l.rate) };
+          return { name: p.name, qty, unit: unitLabel[p.unit] || (p.unit === "bag" ? "bags" : p.unit === "kg" ? "kg" : p.unit), mt: toMT(qty, p.unit), amount: sumBy(ls, (l) => l.qty * l.rate) };
         });
         return {
           columns: [
@@ -305,7 +305,7 @@ export const reports: ReportDef[] = [
             const sold = -sumBy(during.filter((m) => m.kind === "sale"), (m) => m.qty) || 0;
             const moved = sumBy(during.filter((m) => m.kind === "transfer" || m.kind === "suspense"), (m) => m.qty);
             const closing = before + inward - sold + moved;
-            return { godown: g.name, product: p.name, unit: p.unit === "bag" ? "bags" : "kg", opening: before, inward, sold, moved, closing, mt: toMT(closing, p.unit) };
+            return { godown: g.name, product: p.name, unit: unitLabel[p.unit] || (p.unit === "bag" ? "bags" : p.unit === "kg" ? "kg" : p.unit), opening: before, inward, sold, moved, closing, mt: toMT(closing, p.unit) };
           })
           .filter((r) => r.opening || r.inward || r.sold || r.moved || r.closing),
       );

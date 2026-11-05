@@ -9,6 +9,8 @@ export type LorryInput = {
   firmId: string;
   companyId: string;
   lorryNo: string;
+  /** Company's purchase invoice number. */
+  invoiceNo?: string;
   /** The truck driver's mobile number. */
   driverMobile: string;
   invoiceDate: string;
@@ -39,6 +41,7 @@ async function checkLorry(input: LorryInput, requireDriver = true): Promise<Omit
   if (!company) return "Choose the company that sent the lorry.";
   const lorryNo = text(input.lorryNo, 20).toUpperCase();
   if (!lorryNo) return "Enter the truck number.";
+  const invoiceNo = text(input.invoiceNo, 40);
   const driverMobile = mobileOf(text(input.driverMobile, 20));
   if (driverMobile.length !== 10 && (requireDriver || driverMobile)) return "Enter the driver's 10-digit mobile number.";
   if (!isDate(input.invoiceDate)) return "Enter the invoice date.";
@@ -65,6 +68,7 @@ async function checkLorry(input: LorryInput, requireDriver = true): Promise<Omit
     companyName: company.name,
     lorryNo,
     driverMobile: driverMobile || undefined,
+    invoiceNo: invoiceNo || undefined,
     invoiceDate: input.invoiceDate,
     receivedOn: input.receivedOn || undefined,
     // Ticked when the sale is updated (Sales › Lorry sales).

@@ -34,7 +34,7 @@ export function InstallPrompt() {
       className="surface animate-fade-up fixed inset-x-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md p-4 shadow-raised md:inset-x-auto md:bottom-6 md:right-6 md:w-[360px] print:hidden"
     >
       <div className="flex items-start gap-3">
-        <Image src="/icon.svg" alt="" width={44} height={44} unoptimized className="shrink-0 rounded-[10px]" />
+        <Image src="/icon-512.png" alt="" width={44} height={44} unoptimized className="shrink-0 rounded-[10px] object-contain" />
         <div className="min-w-0 flex-1">
           <h2 id="install-title" className="text-[15px] font-semibold text-ink">
             Install SKA on this {install.kind === "ios" ? install.device : install.kind === "mac-safari" ? "Mac" : "device"}

@@ -27,7 +27,7 @@ async function FormForToday() {
     <OrderForm
       parties={parties.filter((p) => p.kind === "customer" || p.kind === "sub_dealer").map((p) => ({ id: p.id, name: p.name, place: p.place, kind: p.kind }))}
       products={products.filter((p) => p.active)}
-      godowns={godowns.map((g) => ({ id: g.id, name: g.name }))}
+      godowns={godowns.map((g) => ({ id: g.id, name: g.name, own: g.own, productIds: g.productIds, linkAllProducts: g.linkAllProducts }))}
       today={todayISO()}
     />
   );

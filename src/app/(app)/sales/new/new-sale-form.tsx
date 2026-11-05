@@ -1,13 +1,14 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
-import { Button, IconButton } from "@/components/ui/button";
+import { useId, useState, useEffect, useMemo, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { ProductPicker } from "@/components/forms/product-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -21,13 +22,14 @@ import {
   type DiscountMode,
   type TransportMode,
 } from "@/lib/sales";
-import type { Party, Product } from "@/lib/data/types";
+import type { Godown, Party, Product, SaleStatus } from "@/lib/data/types";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
 import { filledCharges, OtherCharges, unnamedCharge, type OtherCharge } from "@/components/forms/other-charges";
 import { DestinationField } from "./destination-field";
 import { NewCustomer } from "./new-customer";
 import { partyOptions } from "@/lib/party-options";
 import { useViewAs } from "@/lib/roles";
+import { createSaleAction } from "../actions";
 
 export type SaleParty = {
   id: string;
@@ -86,7 +88,7 @@ export function NewSaleForm({
   stock: { godownId: string; productId: string; qty: number }[];
   parties: SaleParty[];
   /** The godown the bill's bags come out of. Company lorries are sold as a whole under Sales › Lorry sales, not billed here. */
-  godowns: { id: string; name: string }[];
+  godowns: Godown[];
   /** Our own lorries and vans, for FOR deliveries. */
   ownVehicles: VehicleChoice[];
   /** Rented vehicles, for RENT deliveries. */
@@ -124,14 +126,53 @@ export function NewSaleForm({
   // What the chosen godown has: only its brands and types can be billed from it, never more than it holds.
   const stockAt = (godownId: string, productId: string) => stock.find((s) => s.godownId === godownId && s.productId === productId)?.qty ?? 0;
   const stockedAt = (godownId: string) => allProducts.filter((p) => stockAt(godownId, p.id) > 0);
-  const [lines, setLines] = useState<Line[]>(() => [{ key: 1, productId: (stockedAt(godowns[0]?.id ?? "")[0] ?? allProducts[0]).id, qty: "", rate: "" }]);
+  const [loadFrom, setLoadFrom] = useState(godowns[0]?.id ?? "");
+  const loadFromKnown = godowns.some((g) => g.id === loadFrom);
+  const currentGodown = godowns.find((g) => g.id === loadFrom);
+
+  // Products linked or permitted for this specific godown
+  const godownAllowedProducts = useMemo(() => {
+    if (!currentGodown) return allProducts;
+    if (currentGodown.linkAllProducts) return allProducts;
+    if (currentGodown.productIds && currentGodown.productIds.length > 0) {
+      const allowedSet = new Set(currentGodown.productIds);
+      const matched = allProducts.filter((p) => allowedSet.has(p.id));
+      if (matched.length > 0) return matched;
+    }
+    if (currentGodown.own) return allProducts;
+    // Fallback inference: company godown with brand matching godown name
+    const nameLower = currentGodown.name.toLowerCase();
+    const byBrand = allProducts.filter((p) => nameLower.includes(p.brand.toLowerCase()));
+    return byBrand.length > 0 ? byBrand : allProducts;
+  }, [currentGodown, allProducts]);
+
+  const products = stockedAt(loadFrom).filter((p) => godownAllowedProducts.some((ap) => ap.id === p.id));
+  const godownEmpty = loadFromKnown && godownAllowedProducts.length === 0;
+  const initialProduct = godownAllowedProducts[0] ?? allProducts[0];
+  const [lines, setLines] = useState<Line[]>(() =>
+    initialProduct ? [{ key: 1, productId: initialProduct.id, qty: "", rate: "" }] : []
+  );
+
+  // When godown changes, update any line whose product is not linked to this godown
+  useEffect(() => {
+    if (!godownAllowedProducts.length) return;
+    const allowed = new Set(godownAllowedProducts.map((p) => p.id));
+    setLines((curr) => {
+      let changed = false;
+      const next = curr.map((l) => {
+        if (!l.productId || !allowed.has(l.productId)) {
+          changed = true;
+          return { ...l, productId: godownAllowedProducts[0].id, rate: "" };
+        }
+        return l;
+      });
+      return changed ? next : curr;
+    });
+  }, [godownAllowedProducts]);
+
   const [nextKey, setNextKey] = useState(2);
   const [discountMode, setDiscountMode] = useState<DiscountMode>("amount");
   const [discountValue, setDiscountValue] = useState("");
-  const [loadFrom, setLoadFrom] = useState(godowns[0]?.id ?? "");
-  const loadFromKnown = godowns.some((g) => g.id === loadFrom);
-  const products = stockedAt(loadFrom);
-  const godownEmpty = loadFromKnown && products.length === 0;
   const [transportMode, setTransportMode] = useState<TransportMode>("FOR");
   const [ownVehicleId, setOwnVehicleId] = useState("");
   const [rentedVehicleId, setRentedVehicleId] = useState("");
@@ -150,10 +191,15 @@ export function NewSaleForm({
   const [cashMobile, setCashMobile] = useState("");
   const [remarks, setRemarks] = useState("");
   const [reason, setReason] = useState("");
+  const router = useRouter();
   const toast = useToast();
+  const [saving, setSaving] = useState(false);
 
-  const productById = (productId: string) => allProducts.find((p) => p.id === productId) ?? products[0] ?? allProducts[0];
-  const overStock = lines.find((l) => num(l.qty) > stockAt(loadFrom, l.productId));
+  const productById = (productId: string) => allProducts.find((p) => p.id === productId) ?? godownAllowedProducts[0] ?? allProducts[0];
+  const overStock = lines.find((l) => {
+    const pid = l.productId || (godownAllowedProducts[0] ?? allProducts[0])?.id;
+    return pid && num(l.qty) > stockAt(loadFrom, pid);
+  });
   const party = partyList.find((p) => p.id === partyId);
 
   // EX: the customer's own vehicle, so nothing is charged on top of the items. Only FOR (our vehicle) charges
@@ -173,22 +219,40 @@ export function NewSaleForm({
 
   const quantities = lines.reduce(
     (acc, l) => {
-      const product = productById(l.productId);
+      const pid = l.productId || (products[0] ?? allProducts[0])?.id;
+      const product = pid ? productById(pid) : null;
       const qty = num(l.qty);
-      acc[product.category].qty += qty;
-      acc[product.category].mt += toMT(qty, product.unit);
+      if (product) {
+        if (!acc[product.category]) {
+          acc[product.category] = { qty: 0, mt: 0 };
+        }
+        acc[product.category].qty += qty;
+        acc[product.category].mt += toMT(qty, product.unit);
+      }
       return acc;
     },
-    { cement: { qty: 0, mt: 0 }, steel: { qty: 0, mt: 0 } },
+    { cement: { qty: 0, mt: 0 }, steel: { qty: 0, mt: 0 } } as Record<string, { qty: number; mt: number }>,
   );
   const freight = transportMode === "RENT" ? num(freightPerBag) * quantities.cement.qty : 0;
 
   const isOwner = role === "owner";
-  const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
-  const needsApproval = pricing && (Boolean(credit?.overLimit) || discountOverLimit);
-  const needsReason = isOwner && needsApproval;
   const billNumber = Number(billNo);
-  const hasLines = lines.some((l) => num(l.qty) > 0 && (!pricing || num(l.rate) > 0));
+  const available = products.length > 0 ? products : allProducts;
+  const validLines = lines
+    .map((l) => ({
+      ...l,
+      productId: l.productId || available[0]?.id || "",
+    }))
+    .filter((l) => l.productId && num(l.qty) > 0);
+  const allPriced = isOwner && validLines.length > 0 && validLines.every((l) => num(l.rate) > 0);
+
+  const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
+  const needsApproval = allPriced && (Boolean(credit?.overLimit) || discountOverLimit);
+  const needsReason = isOwner && needsApproval;
+  const hasLines = lines.some((l) => {
+    const pid = l.productId || (products[0] ?? allProducts[0])?.id;
+    return pid && num(l.qty) > 0;
+  });
 
   const missing = !party
     ? "Choose a party to continue."
@@ -198,28 +262,46 @@ export function NewSaleForm({
       ? "Enter the cash customer's 10-digit phone number."
     : charged && unnamedCharge(vehicleCosts)
       ? "Enter a name for each vehicle cost."
-    : pricing && !(Number.isInteger(billNumber) && billNumber > 0)
-      ? "Enter the bill no."
-      : !loadFromKnown
+    : !loadFromKnown
       ? "Choose the godown the bags are loaded from."
-      : godownEmpty
-      ? "This godown has no stock. Choose another godown."
-      : overStock
-      ? `Only ${formatNumber(stockAt(loadFrom, overStock.productId))} ${unitLabel[productById(overStock.productId).unit]} of ${productById(overStock.productId).name} at this godown.`
-      : !hasLines
-      ? pricing
-        ? "Enter a quantity and rate for at least one item."
-        : "Enter the quantity for at least one item."
-      : needsReason && !reason.trim()
-        ? "Enter the reason before saving."
-        : null;
-  const actionLabel = !pricing ? "Save sale" : needsApproval ? (isOwner ? "Save with override" : "Send for approval") : "Save sale";
+    : !hasLines
+      ? "Enter the quantity for at least one item."
+    : isOwner && allPriced && needsReason && !reason.trim()
+      ? "Enter the reason before saving."
+      : null;
+  const actionLabel = allPriced
+    ? needsApproval
+      ? (isOwner ? "Save with override" : "Send for approval")
+      : "Save bill"
+    : "Save sale (price on approval)";
   const quantityLine = [
     quantities.cement.qty > 0 && `${formatNumber(quantities.cement.qty)} bags (${formatNumber(quantities.cement.mt, 3)} MT)`,
     quantities.steel.qty > 0 && `${formatNumber(quantities.steel.qty)} kg (${formatNumber(quantities.steel.mt, 3)} MT)`,
   ]
     .filter(Boolean)
     .join(" · ");
+
+  function resetForm() {
+    setPartyId("");
+    setPartyList(parties);
+    setNewCustomer(null);
+    setBeforeNew("");
+    setDraft({ name: "", mobile: "" });
+    setCashName("");
+    setCashMobile("");
+    setDestination("");
+    setRemarks("");
+    setReason("");
+    setDiscountValue("");
+    const defaultProduct = godownAllowedProducts[0] ?? allProducts[0];
+    setLines(defaultProduct ? [{ key: Date.now(), productId: defaultProduct.id, qty: "", rate: "" }] : []);
+    setNextKey(2);
+    setOwnVehicleId("");
+    setRentedVehicleId("");
+    setCustomerVehicle("");
+    setVehicleCosts([]);
+    setFreightPerBag("");
+  }
 
   /**
    * New customer: the bill leaves the party it was on (so the Cash customer's name and phone don't show beside this
@@ -258,26 +340,73 @@ export function NewSaleForm({
   function chooseGodown(next: string) {
     setLoadFrom(next);
     const there = stockedAt(next);
-    setLines((current) => current.map((l) => (stockAt(next, l.productId) > 0 || !there[0] ? l : { ...l, productId: there[0].id, rate: "" })));
+    const fallback = there[0]?.id ?? allProducts[0]?.id ?? "";
+    setLines((current) =>
+      current.map((l) => (!l.productId || stockAt(next, l.productId) > 0 || !there[0] ? l : { ...l, productId: fallback, qty: "", rate: "" }))
+    );
   }
 
   function addLine() {
-    const product = products[0] ?? allProducts[0];
-    setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: "" }]);
+    const available = products.length > 0 ? products : allProducts;
+    const defaultProduct = available[0];
+    setLines((current) => [...current, { key: nextKey, productId: defaultProduct?.id ?? "", qty: "", rate: "" }]);
     setNextKey((k) => k + 1);
   }
 
-  function save() {
-    if (missing) return;
-    if (!pricing) {
-      toast("Sample mode: the sale was checked but not saved. Once saved, it waits for the owner to add the bill no. and prices.");
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    const available = products.length > 0 ? products : allProducts;
+    const validLines = lines
+      .map((l) => ({
+        ...l,
+        productId: l.productId || available[0]?.id || "",
+      }))
+      .filter((l) => l.productId && num(l.qty) > 0)
+      .map((l) => ({
+        productId: l.productId,
+        qty: num(l.qty),
+        rate: num(l.rate),
+      }));
+
+    const allPriced = isOwner && validLines.length > 0 && validLines.every((l) => l.rate > 0);
+    const status: SaleStatus = allPriced ? "saved" : "pending_approval";
+
+    const result = await createSaleAction({
+      firmId: firm.id,
+      partyId,
+      billDate: invoiceDate,
+      receivedDate: invoiceDate,
+      source: "godown",
+      godownId: loadFrom,
+      billNo: allPriced && billNumber > 0 ? billNumber : undefined,
+      transportMode,
+      transportCharge: totals.transport,
+      unloadingCharge: 0,
+      otherCharge: totals.charges,
+      discountAmount: totals.discount,
+      subtotal: totals.subtotal,
+      total: totals.total,
+      destination: destination || undefined,
+      remarks: remarks || (party?.kind === "cash" ? `Cash: ${cashName} (${cashMobile})` : undefined),
+      status,
+      lines: validLines,
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast(result.error ?? "Failed to save sale");
       return;
     }
-    toast(
-      needsApproval && !isOwner
-        ? "Sample mode: the approval request was checked but not sent. Sending starts once Supabase is connected."
-        : sampleSaveMessage("bill"),
-    );
+
+    if (result.sale.status === "saved" && result.sale.billNo) {
+      toast(`Bill #${result.sale.billNo} saved successfully`);
+    } else {
+      toast("Sale saved successfully · Waiting for owner to enter prices & approve");
+    }
+
+    resetForm();
+    router.push("/sales");
+    router.refresh();
   }
 
   return (
@@ -289,19 +418,28 @@ export function NewSaleForm({
           save();
         }}
       >
-        <p className="px-1 text-[13px] text-ink-secondary">
-          Billed from <span className="font-medium text-ink">{firm.name}</span>
-          {firm.gstin && <span className="tabular-nums"> · GSTIN {firm.gstin}</span>}
-          {firm.id !== primaryFirmId && <span className="font-medium text-warning"> · not the primary firm</span>}
-          {firms.length > 1 && (
-            <>
-              {" · "}
-              <button type="button" onClick={() => setChangingFirm((c) => !c)} aria-expanded={changingFirm} className="font-medium text-link hover:underline">
-                {changingFirm ? "Done" : "Change firm"}
-              </button>
-            </>
-          )}
-        </p>
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[13px] text-ink-secondary">
+            Billed from <span className="font-medium text-ink">{firm.name}</span>
+            {firm.gstin && <span className="tabular-nums"> · GSTIN {firm.gstin}</span>}
+            {firm.id !== primaryFirmId && <span className="font-medium text-warning"> · not the primary firm</span>}
+            {firms.length > 1 && (
+              <>
+                {" · "}
+                <button type="button" onClick={() => setChangingFirm((c) => !c)} aria-expanded={changingFirm} className="font-medium text-link hover:underline">
+                  {changingFirm ? "Done" : "Change firm"}
+                </button>
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="text-[12px] font-medium text-ink-secondary hover:text-ink hover:underline"
+          >
+            Clear form
+          </button>
+        </div>
         {changingFirm && (
           <FirmPicker
             label="Bill this sale from"
@@ -365,9 +503,13 @@ export function NewSaleForm({
           {credit && <CreditPanel credit={credit} billTotal={totals.total} isOwner={isOwner} />}
           <div className={cn("grid gap-4", pricing && "grid-cols-2")}>
             {pricing && (
-              <Field label="Bill no." htmlFor={`${id}-bill`} hint="Next in the series (godown and lorry bills share it)">
-                <output id={`${id}-bill`} className={cn(inputClass, "flex items-center bg-card-subtle tabular-nums")}>
-                  {billNo}
+              <Field
+                label="Sales bill no."
+                htmlFor={`${id}-bill`}
+                hint={allPriced ? "Sales bill series (independent from purchases)" : "Next series no. (assigned on approval if unpriced)"}
+              >
+                <output id={`${id}-bill`} className={cn(inputClass, "flex items-center bg-card-subtle font-semibold tabular-nums text-ink")}>
+                  #{billNo}
                 </output>
               </Field>
             )}
@@ -392,27 +534,30 @@ export function NewSaleForm({
               })}
             />
           </Field>
-          {godownEmpty && <p className="mt-3 rounded-2xl bg-warning-soft px-4 py-3 text-[15px] text-ink">This godown has no stock right now. Choose another godown.</p>}
+          {godownEmpty && <p className="mt-3 rounded-2xl bg-warning-soft px-4 py-3 text-[15px] text-ink">This godown has no linked products. Configure linked products in Settings &gt; Godowns.</p>}
           <ul className="divide-y divide-hairline">
             {lines.map((line, index) => {
-              const product = productById(line.productId);
+              const available = godownAllowedProducts.length > 0 ? godownAllowedProducts : allProducts;
+              const product = (line.productId ? productById(line.productId) : null) ?? available[0] ?? allProducts[0];
+              const currentPid = line.productId || product?.id || "";
               const qty = num(line.qty);
               const rate = num(line.rate);
+              if (!product) return null;
               return (
                 <li key={line.key} className="space-y-3 py-4">
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <ProductPicker
                         label={`Item ${index + 1}`}
-                        products={products.length ? products : allProducts}
-                        value={line.productId}
+                        products={available}
+                        value={currentPid}
                         onChange={(v) => {
                           const next = productById(v);
                           updateLine(line.key, { productId: next.id, rate: "" });
                         }}
                       />
                     </div>
-                    {lines.length > 1 && (
+                    {lines.length > 0 && (
                       <button
                         type="button"
                         aria-label={`Remove item ${index + 1}`}
@@ -423,30 +568,31 @@ export function NewSaleForm({
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={cn("grid gap-3", pricing ? "grid-cols-2" : "grid-cols-1")}>
                     <Field
                       label="Quantity"
                       htmlFor={`${id}-qty-${line.key}`}
-                      hint={`${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit]} in stock${qty > 0 ? ` · ${formatNumber(toMT(qty, product.unit), 3)} MT` : ""}`}
-                      error={qty > stockAt(loadFrom, product.id) ? `Only ${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit]} at this godown` : undefined}
+                      hint={`${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit] || product.unit} in stock${toMT(qty, product.unit) > 0 ? ` · ${formatNumber(toMT(qty, product.unit), 3)} MT` : ""}`}
+                      error={qty > stockAt(loadFrom, product.id) ? `Only ${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit] || product.unit} at this godown` : undefined}
                     >
                       <AffixInput
                         id={`${id}-qty-${line.key}`}
                         inputMode="decimal"
                         placeholder="0"
-                        suffix={unitLabel[product.unit]}
+                        suffix={unitLabel[product.unit] || product.unit}
                         value={line.qty}
-                        onChange={(e) => updateLine(line.key, { qty: e.target.value })}
+                        onChange={(e) => updateLine(line.key, { productId: currentPid, qty: e.target.value })}
                       />
                     </Field>
                     {pricing && (
-                      <Field label={`Rate per ${product.unit}`} htmlFor={`${id}-rate-${line.key}`}>
+                      <Field label={`Rate per ${unitLabel[product.unit] || product.unit}`} htmlFor={`${id}-rate-${line.key}`} hint="Optional · can price on approval">
                         <AffixInput
                           id={`${id}-rate-${line.key}`}
                           inputMode="decimal"
                           prefix="₹"
+                          placeholder="0 (optional)"
                           value={line.rate}
-                          onChange={(e) => updateLine(line.key, { rate: e.target.value })}
+                          onChange={(e) => updateLine(line.key, { productId: currentPid, rate: e.target.value })}
                         />
                       </Field>
                     )}
@@ -454,16 +600,21 @@ export function NewSaleForm({
                   {pricing && (
                     <div className="flex justify-between text-[15px]">
                       <span className="text-ink-secondary">Amount</span>
-                      <span className="font-semibold tabular-nums text-ink">{formatINR(qty * rate)}</span>
+                      {rate > 0 ? (
+                        <span className="font-semibold tabular-nums text-ink">{formatINR(qty * rate)}</span>
+                      ) : (
+                        <span className="text-[13px] text-ink-secondary">Price on approval</span>
+                      )}
                     </div>
                   )}
                 </li>
               );
             })}
           </ul>
-          <IconButton label="Add item" onClick={addLine} className="mt-1">
-            <Plus size={20} strokeWidth={2} aria-hidden />
-          </IconButton>
+          <Button variant="secondary" onClick={addLine} disabled={godownEmpty && allProducts.length === 0} className="mt-3 gap-1.5">
+            <Plus size={18} strokeWidth={2.25} aria-hidden />
+            Add item
+          </Button>
         </section>
 
         <section className="surface space-y-4 p-5">
@@ -660,8 +811,13 @@ export function NewSaleForm({
             </>
           )}
           {missing && <p className="mt-4 text-[13px] text-ink-secondary">{missing}</p>}
-          <Button className="mt-5 w-full" disabled={Boolean(missing)} onClick={save}>
-            {actionLabel}
+          {overStock && !missing && (
+            <p className="mt-2 text-[12px] text-warning">
+              Note: Qty exceeds recorded godown stock ({formatNumber(stockAt(loadFrom, overStock.productId))} on hand).
+            </p>
+          )}
+          <Button className="mt-5 w-full" disabled={Boolean(missing) || saving} onClick={save}>
+            {saving ? "Saving…" : actionLabel}
           </Button>
         </section>
       </aside>
@@ -674,8 +830,8 @@ export function NewSaleForm({
               {pricing ? formatINR(totals.total) : quantityLine || "None yet"}
             </p>
           </div>
-          <Button disabled={Boolean(missing)} onClick={save}>
-            {actionLabel}
+          <Button disabled={Boolean(missing) || saving} onClick={save}>
+            {saving ? "Saving…" : actionLabel}
           </Button>
         </div>
       </div>

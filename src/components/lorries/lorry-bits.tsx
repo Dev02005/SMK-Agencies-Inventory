@@ -25,7 +25,7 @@ export function LorryStateChip({ lorry }: { lorry: Lorry }) {
 
 /** Company · driver's number · our sale invoice (or the company's, on an older lorry) · date, and which firm bought it. */
 export function LorryMeta({ lorry, firmName }: { lorry: Lorry; firmName?: string }) {
-  const invoiceNo = lorry.sale?.invoiceNo ?? lorry.invoiceNo;
+  const invoiceNo = lorry.invoiceNo ?? lorry.sale?.invoiceNo;
   return (
     <>
       <p className="-mt-2 text-[13px] text-ink-secondary">
@@ -59,6 +59,12 @@ export function LorryItems({ lorry, products }: { lorry: Lorry; products: Produc
 export function LorryCost({ lorry }: { lorry: Lorry }) {
   return (
     <dl className="mt-2 space-y-1 border-t border-hairline pt-2 text-[15px]">
+      {lorry.invoiceNo && (
+        <div className="flex justify-between">
+          <dt className="text-ink-secondary">Company invoice number</dt>
+          <dd className="font-medium text-ink">{lorry.invoiceNo}</dd>
+        </div>
+      )}
       <div className="flex justify-between">
         <dt className="text-ink-secondary">Bought for (company invoice)</dt>
         <dd className="font-semibold tabular-nums text-ink">{lorry.invoiceValue ? formatINR(lorry.invoiceValue) : "Not entered"}</dd>

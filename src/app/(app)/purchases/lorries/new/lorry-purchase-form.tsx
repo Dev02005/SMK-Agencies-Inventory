@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
-import { ItemLines, newLine, toNumber, type ItemLine } from "@/components/forms/item-lines";
+import { filledLines, ItemLines, toNumber, type ItemLine } from "@/components/forms/item-lines";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -41,6 +41,7 @@ export function LorryPurchaseForm({
   // With more than one firm nothing is picked, so the firm is always chosen on purpose.
   const [firmId, setFirmId] = useState(firms.length === 1 ? firms[0].id : "");
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
+  const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [receivedDate, setReceivedDate] = useState(today);
   const [lorryNo, setLorryNo] = useState("");
@@ -53,9 +54,10 @@ export function LorryPurchaseForm({
     return theirs.length ? theirs : products;
   };
   const offered = offeredBy(companyId);
-  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0])]);
+  // No item picked for you: "Add item" asks the category, brand and item.
+  const [lines, setLines] = useState<ItemLine[]>([]);
 
-  const loaded = lines.map((l) => ({ productId: l.productId, qty: toNumber(l.qty) })).filter((l) => l.qty > 0);
+  const loaded = filledLines(lines).map((l: ItemLine) => ({ productId: l.productId, qty: toNumber(l.qty) }));
   const total = toNumber(invoiceValue);
 
   const missing = !firmId
@@ -76,6 +78,7 @@ export function LorryPurchaseForm({
       const result = await saveLorryPurchase({
         firmId,
         companyId,
+        invoiceNo: invoiceNo.trim() || undefined,
         lorryNo,
         driverMobile,
         invoiceDate,
@@ -115,18 +118,24 @@ export function LorryPurchaseForm({
             value={companyId}
             onChange={(next) => {
               setCompanyId(next);
-              // Start the items again with what the new company sells.
-              setLines([newLine(1, offeredBy(next)[0])]);
+              // Start the items again for the new company.
+              setLines([]);
             }}
             options={companies.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Invoice number" htmlFor={`${id}-invno`} hint="From the company's invoice">
+            <input
+              id={`${id}-invno`}
+              className={inputClass}
+              value={invoiceNo}
+              onChange={(e) => setInvoiceNo(e.target.value)}
+              placeholder="e.g. INV-10492"
+            />
+          </Field>
           <Field label="Invoice date" htmlFor={`${id}-invdate`} hint="Selling starts from this day">
             <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
-          </Field>
-          <Field label="Truck received on" htmlFor={`${id}-recv`}>
-            <DatePicker id={`${id}-recv`} label="Truck received on" value={receivedDate} onChange={setReceivedDate} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -140,6 +149,11 @@ export function LorryPurchaseForm({
               autoCapitalize="characters"
             />
           </Field>
+          <Field label="Truck received on" htmlFor={`${id}-recv`}>
+            <DatePicker id={`${id}-recv`} label="Truck received on" value={receivedDate} onChange={setReceivedDate} />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Driver number" htmlFor={`${id}-driver`}>
             <AffixInput
               id={`${id}-driver`}

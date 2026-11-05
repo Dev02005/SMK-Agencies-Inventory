@@ -1,7 +1,7 @@
 import "server-only";
 import { mobileOf } from "@/lib/mobile";
 import { readRecord, writeRecord } from "./store";
-import type { BankAccount, Chit, EmployeeDetails, Godown, Lorry, Party, Product, Profile, Rental, Role, VehicleKind } from "./types";
+import type { BankAccount, Chit, EmployeeDetails, Godown, Lorry, Party, Product, Profile, Purchase, Rental, Role, Sale, StockMovement, VehicleKind } from "./types";
 
 /**
  * The firm's own records (staff, godowns, suppliers, products, banks and vehicles, and the parties, lorries, chits,
@@ -177,7 +177,7 @@ export function withLocalEmployees(sample: EmployeeDetails[], sampleProfiles: Pr
   });
 }
 
-// ── Godowns: local-data/godowns.json, with in-charges from staff.json ─────────────────────────────────────────────
+// ── Godowns: local-data/godowns.json, with in-charges and linked products ─────────────────────────────
 
 function isGodown(g: unknown): g is Godown {
   const x = g as Partial<Godown> | null;
@@ -186,12 +186,77 @@ function isGodown(g: unknown): g is Godown {
 
 let godowns: Godown[] = [];
 
-/** The real godowns (sample ones when there is no file), each with who looks after it. */
+/** The real godowns (sample ones when there is no file), each with who looks after it and linked products. */
 export function withLocalGodowns(sample: Godown[]): Godown[] {
-  const list = godowns.length > 0 ? godowns.map((g) => ({ id: g.id, name: g.name.trim(), place: g.place.trim(), own: Boolean(g.own), original: true })) : sample;
   const assigned = staff.filter((p) => Array.isArray(p.godowns) && p.godowns.length > 0);
-  if (assigned.length === 0) return list;
-  return list.map((g) => ({ ...g, inCharge: assigned.filter((p) => p.godowns!.includes(g.id)).map(personId) }));
+  if (godowns.length > 0) {
+    return godowns.map((g) => {
+      const staffInCharge = assigned.filter((p) => p.godowns!.includes(g.id)).map(personId);
+      const combinedInCharge = Array.isArray(g.inCharge) && g.inCharge.length > 0
+        ? Array.from(new Set(g.inCharge.filter(isText)))
+        : staffInCharge;
+      return {
+        id: g.id,
+        name: g.name.trim(),
+        place: g.place.trim(),
+        own: Boolean(g.own),
+        inCharge: combinedInCharge,
+        productIds: Array.isArray(g.productIds) ? g.productIds.filter(isText) : undefined,
+        linkAllProducts: typeof g.linkAllProducts === "boolean" ? g.linkAllProducts : (g.own ?? false),
+        original: true,
+      };
+    });
+  }
+  return sample.map((g) => {
+    const staffInCharge = assigned.filter((p) => p.godowns!.includes(g.id)).map(personId);
+    return {
+      ...g,
+      inCharge: g.inCharge?.length ? g.inCharge : staffInCharge,
+      linkAllProducts: typeof g.linkAllProducts === "boolean" ? g.linkAllProducts : (g.own ?? false),
+    };
+  });
+}
+
+/** Saves a godown into godowns.json and into the memory list, so new bills/sales offer it immediately. */
+export function saveLocalGodown(godownsList: Godown[], godown: Godown): Godown {
+  const entry: Godown = {
+    id: godown.id,
+    name: godown.name.trim(),
+    place: godown.place.trim(),
+    own: Boolean(godown.own),
+    inCharge: Array.isArray(godown.inCharge) ? godown.inCharge.filter(isText) : [],
+    productIds: Array.isArray(godown.productIds) ? godown.productIds.filter(isText) : [],
+    linkAllProducts: typeof godown.linkAllProducts === "boolean" ? godown.linkAllProducts : Boolean(godown.own),
+    original: true,
+  };
+  const at = godowns.findIndex((g) => g.id === godown.id);
+  if (at >= 0) {
+    godowns[at] = entry;
+  } else {
+    godowns.push(entry);
+  }
+  const liveAt = godownsList.findIndex((g) => g.id === godown.id);
+  if (liveAt >= 0) {
+    godownsList[liveAt] = entry;
+  } else {
+    godownsList.push(entry);
+  }
+  writeRecord("godowns.json", {
+    about: "Our own godowns and the cement companies' godowns where our stock is kept. In-charges and linked products configured per godown.",
+    godowns,
+  });
+  return entry;
+}
+
+/** Deletes a godown from godowns.json and from memory lists. */
+export function removeLocalGodown(godownsList: Godown[], id: string): boolean {
+  removeFrom(godowns, (g) => g.id === id);
+  removeFrom(godownsList, (g) => g.id === id);
+  writeRecord("godowns.json", {
+    about: "Our own godowns and the cement companies' godowns where our stock is kept. In-charges and linked products configured per godown.",
+    godowns,
+  });
+  return true;
 }
 
 // ── Suppliers: local-data/suppliers.json ──────────────────────────────────────────────────────────────────────────
@@ -226,11 +291,11 @@ export function withLocalSuppliers(sample: Party[]): Party[] {
 
 // ── Products: local-data/products.json (added from Settings › Products; no rates: the owner prices each bill) ──────
 
-type LocalProduct = { id: string; name?: string; brand: string; variant: string; category: Product["category"]; unit: Product["unit"]; active?: boolean };
+type LocalProduct = { id: string; name?: string; brand: string; variant: string; category: string; unit: string; active?: boolean; image?: string; original?: boolean };
 
 function isProduct(p: unknown): p is LocalProduct {
   const x = p as Partial<LocalProduct> | null;
-  return Boolean(x && isText(x.id) && isText(x.brand) && isText(x.variant) && (x.category === "cement" || x.category === "steel") && (x.unit === "bag" || x.unit === "kg"));
+  return Boolean(x && isText(x.id) && isText(x.brand) && isText(x.variant) && isText(x.category) && isText(x.unit));
 }
 
 let productEntries: LocalProduct[] = [];
@@ -243,19 +308,31 @@ const toProduct = (p: LocalProduct, sample?: Product): Product => ({
   category: p.category,
   unit: p.unit,
   active: p.active ?? sample?.active ?? true,
+  image: typeof p.image === "string" ? p.image : sample?.image,
   original: true,
 });
 
+let deletedProductIds: string[] = [];
+let standardProductsCleared = false;
+
 /** The real products in place of sample ones with the same id, then the others; sample products nobody replaced stay. */
 export function withLocalProducts(sample: Product[]): Product[] {
-  if (productEntries.length === 0) return sample;
-  const real = productEntries.map((p) => toProduct(p, sample.find((s) => s.id === p.id)));
-  return [...real, ...sample.filter((s) => !productEntries.some((p) => p.id === s.id))];
+  if (standardProductsCleared) {
+    return productEntries
+      .filter((p) => !deletedProductIds.includes(p.id))
+      .map((p) => toProduct(p));
+  }
+  const sampleAllowed = sample.filter((s) => !deletedProductIds.includes(s.id));
+  const real = productEntries
+    .filter((p) => !deletedProductIds.includes(p.id))
+    .map((p) => toProduct(p, sample.find((s) => s.id === p.id)));
+  return [...real, ...sampleAllowed.filter((s) => !productEntries.some((p) => p.id === s.id))];
 }
 
 /** Saves a product into products.json and into `products`, the list every screen reads, so new bills offer it straight away. */
 export function saveLocalProduct(products: Product[], product: Product) {
-  const entry: LocalProduct = { id: product.id, brand: product.brand, variant: product.variant ?? product.name, category: product.category, unit: product.unit, active: product.active };
+  const entry: LocalProduct = { id: product.id, brand: product.brand, variant: product.variant ?? product.name, category: product.category, unit: product.unit, active: product.active, image: product.image };
+  deletedProductIds = deletedProductIds.filter((id) => id !== product.id);
   const at = productEntries.findIndex((p) => p.id === product.id);
   if (at >= 0) productEntries[at] = { ...productEntries[at], ...entry };
   else productEntries.push(entry);
@@ -264,14 +341,41 @@ export function saveLocalProduct(products: Product[], product: Product) {
   const live = products.findIndex((p) => p.id === product.id);
   if (live >= 0) products[live] = saved;
   else products.push(saved);
-  writeRecord("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill.", products: productEntries });
+  writeRecord("products.json", {
+    about: "What we sell, by company and type. No rates: the owner prices each bill.",
+    products: productEntries,
+    deleted: deletedProductIds,
+    standardCleared: standardProductsCleared,
+  });
 }
 
-/** Deletes a product from products.json and from `products`; false for a sample product. */
+/** Deletes any product (user-added or sample) from products.json and from `products`. */
 export function removeLocalProduct(products: Product[], id: string): boolean {
-  if (!removeFrom(productEntries, (p) => p.id === id)) return false;
+  if (!deletedProductIds.includes(id)) deletedProductIds.push(id);
+  removeFrom(productEntries, (p) => p.id === id);
   removeFrom(products, (p) => p.id === id);
-  writeRecord("products.json", { about: "What we sell, by company and type. No rates: the owner prices each bill.", products: productEntries });
+  writeRecord("products.json", {
+    about: "What we sell, by company and type. No rates: the owner prices each bill.",
+    products: productEntries,
+    deleted: deletedProductIds,
+    standardCleared: standardProductsCleared,
+  });
+  return true;
+}
+
+/** Clears all standard/sample products so only products added by the user remain. */
+export function clearStandardProducts(products: Product[]): boolean {
+  standardProductsCleared = true;
+  productEntries = productEntries.filter((p) => p.original);
+  writeRecord("products.json", {
+    about: "What we sell, by company and type. No rates: the owner prices each bill.",
+    products: productEntries,
+    deleted: deletedProductIds,
+    standardCleared: true,
+  });
+  const userProducts = products.filter((p) => p.original);
+  products.length = 0;
+  products.push(...userProducts);
   return true;
 }
 
@@ -408,6 +512,75 @@ export function removeLocalLorry(id: string): boolean {
   if (!removeFrom(lorries, (l) => l.id === id)) return false;
   writeLorries();
   return true;
+}
+
+// ── Purchases: local-data/purchases.json ──────────────────────────────────────────────────────────────────────────
+let purchases: Purchase[] = [];
+
+export const localPurchases = () => purchases;
+
+function writePurchases() {
+  writeRecord("purchases.json", {
+    about: "Purchases recorded in the app.",
+    purchases,
+  });
+}
+
+export function saveLocalPurchase(purchase: Purchase): Purchase {
+  const at = purchases.findIndex((p) => p.id === purchase.id);
+  if (at >= 0) purchases[at] = purchase;
+  else purchases.unshift(purchase);
+  writePurchases();
+  return purchase;
+}
+
+// ── Sales: local-data/sales.json ──────────────────────────────────────────────────────────────────────────────────
+let sales: Sale[] = [];
+
+export const localSales = () => sales;
+
+function writeSales() {
+  writeRecord("sales.json", {
+    about: "Sales bills recorded in the app.",
+    sales,
+  });
+}
+
+export function saveLocalSale(sale: Sale): Sale {
+  const at = sales.findIndex((s) => s.id === sale.id);
+  if (at >= 0) sales[at] = sale;
+  else sales.unshift(sale);
+  writeSales();
+  return sale;
+}
+
+// ── Stock movements: local-data/stock-movements.json ─────────────────────────────────────────────────────────────
+let stockMovements: StockMovement[] = [];
+
+export const localStockMovements = () => stockMovements;
+
+function writeStockMovements() {
+  writeRecord("stock-movements.json", {
+    about: "Stock movements recorded in the app.",
+    movements: stockMovements,
+  });
+}
+
+export function saveLocalStockMovement(movement: StockMovement): StockMovement {
+  stockMovements.push(movement);
+  writeStockMovements();
+  return movement;
+}
+
+export function saveLocalStockMovements(movements: StockMovement[]): StockMovement[] {
+  stockMovements.push(...movements);
+  writeStockMovements();
+  return movements;
+}
+
+export function updateLocalStockMovements(fn: (movements: StockMovement[]) => void): void {
+  fn(stockMovements);
+  writeStockMovements();
 }
 
 // ── The owner's chits and rents (Personal): local-data/chits.json, local-data/rents.json ───────────────────────────
@@ -724,7 +897,10 @@ export function loadLocal() {
   ownerDesignation = isText(ownerEntry?.designation) ? ownerEntry.designation.trim() : undefined;
   godowns = listIn("godowns.json", "godowns").filter(isGodown);
   suppliers = listIn("suppliers.json", "suppliers").filter(isSupplier);
-  productEntries = listIn("products.json", "products").filter(isProduct);
+  const prodDoc = readRecord("products.json") as { products?: unknown[]; deleted?: unknown[]; standardCleared?: boolean } | undefined;
+  productEntries = (Array.isArray(prodDoc?.products) ? prodDoc.products : []).filter(isProduct);
+  deletedProductIds = (Array.isArray(prodDoc?.deleted) ? prodDoc.deleted : []).filter(isText);
+  standardProductsCleared = Boolean(prodDoc?.standardCleared);
   accounts = listIn("banks.json", "accounts").filter(isAccount);
   customers = listIn("customers.json", "customers")
     .filter(isCustomer)
@@ -747,6 +923,14 @@ export function loadLocal() {
   notes = listIn("notes.json", "notes").filter(isNote);
   vehicles = listIn("vehicles.json", "vehicles").filter(isVehicle);
   profileEdits = readProfileEdits();
+  purchases = (listIn("purchases.json", "purchases") as Purchase[])
+    .filter((p) => p && isText(p.id))
+    .map((p) => ({ ...p, original: true }));
+  sales = (listIn("sales.json", "sales") as Sale[])
+    .filter((s) => s && isText(s.id))
+    .map((s) => ({ ...s, original: true }));
+  stockMovements = (listIn("stock-movements.json", "movements") as StockMovement[])
+    .filter((m) => m && isText(m.id));
 }
 
 loadLocal();

@@ -109,6 +109,12 @@ button {
   outline-offset: 2px;
 }
 
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+
 /* Grid children may shrink below their content, so long names truncate instead of pushing phone pages sideways.
    In the base layer so any min-w-* utility still wins. */
 @layer base {

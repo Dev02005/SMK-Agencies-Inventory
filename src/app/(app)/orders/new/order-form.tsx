@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
-import { ItemLines, newLine, toNumber, type ItemLine } from "@/components/forms/item-lines";
+import { useId, useState, useMemo } from "react";
+import { filledLines, ItemLines, type ItemLine } from "@/components/forms/item-lines";
 import { Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
@@ -21,7 +21,7 @@ export function OrderForm({
   parties: Pick<Party, "id" | "name" | "place" | "kind">[];
   products: Product[];
   /** Where it can be loaded from; that godown's in-charges see the order. */
-  godowns: { id: string; name: string }[];
+  godowns: { id: string; name: string; own?: boolean; productIds?: string[]; linkAllProducts?: boolean }[];
   today: string;
 }) {
   const id = useId();
@@ -31,14 +31,31 @@ export function OrderForm({
   const [deliverBy, setDeliverBy] = useState(today);
   const [destination, setDestination] = useState("");
   const [godownId, setGodownId] = useState(godowns.length === 1 ? godowns[0].id : "");
-  const [lines, setLines] = useState<ItemLine[]>([newLine(1, products[0])]);
+
+  const selectedGodown = godowns.find((g) => g.id === godownId);
+  const allowedProducts = useMemo(() => {
+    if (!selectedGodown) return products;
+    if (selectedGodown.linkAllProducts) return products;
+    if (selectedGodown.productIds && selectedGodown.productIds.length > 0) {
+      const set = new Set(selectedGodown.productIds);
+      const matched = products.filter((p) => set.has(p.id));
+      if (matched.length > 0) return matched;
+    }
+    if (selectedGodown.own) return products;
+    const nameLower = selectedGodown.name.toLowerCase();
+    const matched = products.filter((p) => nameLower.includes(p.brand.toLowerCase()));
+    return matched.length > 0 ? matched : products;
+  }, [selectedGodown, products]);
+
+  // No item picked for you: "Add item" asks the category, brand and item.
+  const [lines, setLines] = useState<ItemLine[]>([]);
   const [remarks, setRemarks] = useState("");
 
   const missing = !partyId
     ? "Choose the party."
     : !godownId
       ? "Choose the godown it is loaded from."
-      : !lines.some((l) => toNumber(l.qty) > 0)
+      : filledLines(lines).length === 0
         ? "Enter a quantity."
         : null;
   const save = () => !missing && toast(sampleSaveMessage("order"));
@@ -90,7 +107,7 @@ export function OrderForm({
 
       <section className="surface p-5">
         <h2 className="text-[17px] font-semibold tracking-[-0.3px] text-ink">Items</h2>
-        <ItemLines lines={lines} onChange={setLines} products={products} withRate={false} />
+        <ItemLines lines={lines} onChange={setLines} products={allowedProducts} withRate={false} />
       </section>
 
       <section className="surface p-5">

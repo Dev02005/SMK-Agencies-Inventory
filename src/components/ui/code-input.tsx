@@ -79,7 +79,8 @@ export function CodeInput({ value, onValueChange, onComplete, invalid, className
             setFocused(false);
             onBlur?.(e);
           }}
-          className="absolute inset-0 h-full w-full cursor-text bg-transparent text-transparent caret-transparent opacity-0 outline-none"
+          className="absolute inset-0 h-full w-full cursor-text bg-transparent text-transparent caret-transparent opacity-0 outline-none focus:outline-none focus-visible:outline-none"
+          style={{ outline: "none" }}
         />
       </div>
       <button

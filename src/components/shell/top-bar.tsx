@@ -22,8 +22,7 @@ export function TopBar({
     <header className="frosted sticky top-0 z-30 border-b border-black/[0.05] pt-[env(safe-area-inset-top)] print:hidden">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4 md:px-8">
         <Link href="/" className="flex items-center gap-2 md:hidden">
-          <Image src="/icon.svg" alt="" width={28} height={28} unoptimized className="rounded-[7px]" />
-          <span className="text-[17px] font-semibold tracking-[-0.3px] text-ink">SKA</span>
+          <Image src="/logo.png" alt="Sri Kameswari Agencies" width={110} height={46} priority className="h-7 w-auto object-contain" />
         </Link>
 
         <SearchBox role={role} className="hidden md:block" />

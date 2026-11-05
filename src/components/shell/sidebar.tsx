@@ -16,7 +16,7 @@ export function Sidebar({ pathname, role, firmName }: { pathname: string; role: 
   return (
     <aside aria-label="Sidebar" className="fixed inset-y-0 left-[env(safe-area-inset-left)] z-20 hidden print:!hidden w-[72px] flex-col overflow-y-auto border-r border-hairline bg-page px-3 py-4 md:flex lg:w-60">
       <Link href="/" aria-label={`${firmName}, home`} className="mb-4 flex items-center gap-3 rounded-xl px-1.5 py-1.5">
-        <Image src="/icon.svg" alt="" width={34} height={34} unoptimized className="rounded-[9px]" />
+        <Image src="/icon-512.png" alt="" width={36} height={36} unoptimized className="rounded-[9px] object-contain shrink-0" />
         <span className="hidden min-w-0 lg:block">
           <span className="line-clamp-2 text-[14px] font-semibold leading-[18px] tracking-[-0.2px] text-ink">{firmName}</span>
         </span>

@@ -33,8 +33,8 @@ export const transportLabels: Record<TransportMode, string> = {
   RENT: "Rent · hired vehicle",
 };
 
-/** "Bill 1234", or "Sale request" while the sale waits for the owner to give it a bill no. and prices. */
-export const billName = (sale: { billNo?: number }) => (sale.billNo ? `Bill ${sale.billNo}` : "Sale request");
+/** "Bill #1234", or "Sale request" while the sale waits for the owner to give it a bill no. and prices. */
+export const billName = (sale: { billNo?: number }) => (sale.billNo ? `Bill #${sale.billNo}` : "Sale request");
 
 export const saleStatus: Record<SaleStatus, { label: string; tone: ChipTone }> = {
   saved: { label: "Saved", tone: "good" },

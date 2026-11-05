@@ -78,7 +78,7 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
           meta: s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>,
         })}
         columns={[
-          { key: "bill", header: "Bill", cell: (s) => (s.billNo ? `#${s.billNo}` : "No bill no. yet"), className: "whitespace-nowrap" },
+          { key: "bill", header: "Bill no.", cell: (s) => (s.billNo ? `#${s.billNo}` : "No bill no. yet"), className: "whitespace-nowrap font-medium text-ink" },
           { key: "date", header: "Date", cell: (s) => formatDate(s.billDate), className: "whitespace-nowrap text-ink-secondary" },
           { key: "party", header: "Party", cell: (s) => (s.demo ? <>{s.partyName}<Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip></> : s.partyName) },
           {

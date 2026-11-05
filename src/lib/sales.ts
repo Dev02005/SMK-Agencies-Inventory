@@ -3,17 +3,41 @@
  * Pure functions, shared by the New sale screen and (later) the server.
  */
 
-export type Unit = "bag" | "kg";
+export type Unit = "bag" | "kg" | "piece" | "unit" | "box" | "bundle" | "metre" | "litre" | string;
 export type DiscountMode = "amount" | "percent";
 /** FOR = our own vehicle (transport charged), EX = the customer's own vehicle (no charges), RENT = a rented vehicle (rent charged). */
 export type TransportMode = "FOR" | "EX" | "RENT";
 
-/** 20 bags of cement = 1 MT; 1000 kg of steel = 1 MT. */
+/** 20 bags of cement = 1 MT; 1000 kg of steel = 1 MT. 0 if MT does not apply. */
 export function toMT(qty: number, unit: Unit): number {
-  return unit === "bag" ? qty / 20 : qty / 1000;
+  if (unit === "bag") return qty / 20;
+  if (unit === "kg") return qty / 1000;
+  if (unit === "ton" || unit === "mt") return qty;
+  if (unit === "qtl") return qty / 10;
+  return 0;
 }
 
-export const unitLabel: Record<Unit, string> = { bag: "bags", kg: "kg" };
+export const unitLabel: Record<string, string> = {
+  bag: "bags",
+  kg: "kg",
+  bar: "bars",
+  rod: "rods",
+  piece: "pieces",
+  unit: "units",
+  box: "boxes",
+  bundle: "bundles",
+  metre: "metres",
+  meter: "meters",
+  litre: "litres",
+  liter: "liters",
+  ton: "tonnes",
+  mt: "MT",
+  qtl: "quintals",
+  sqft: "sq.ft",
+  load: "loads",
+  packet: "packets",
+  drum: "drums",
+};
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 

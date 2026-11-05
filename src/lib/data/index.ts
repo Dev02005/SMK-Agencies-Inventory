@@ -14,11 +14,11 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, clearStandardProducts, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalGodown, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalGodown, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank, localPurchases, saveLocalPurchase, localSales, saveLocalSale, localStockMovements, saveLocalStockMovements, updateLocalStockMovements } from "./local-data";
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
-import type { Ageing, BankEntry, CashHolder, Chit, LedgerEntry, Lorry, Party, Product, Profile, Rental, Sale } from "./types";
+import type { Ageing, BankEntry, CashHolder, Chit, Godown, LedgerEntry, Lorry, Party, Product, Profile, Purchase, Rental, Sale, SaleLine, SaleStatus, StockMovement, StockSource, TransportMode } from "./types";
 
 export type * from "./types";
 
@@ -288,34 +288,83 @@ export async function getMyGodowns() {
   return base.godowns.filter((g) => canSee(visible, g.id));
 }
 
+/** Settings › Godowns: saves a godown (new or edited), with in-charges and linked products. */
+export async function saveGodown(godown: Godown): Promise<Godown> {
+  return saving(() => {
+    return saveLocalGodown(base.godowns, godown);
+  });
+}
+
+/** Settings › Godowns: deletes a godown. Returns an error message if it cannot be deleted. */
+export async function deleteGodown(id: string): Promise<string | null> {
+  return saving(() => {
+    const usedInPurchases = [...localPurchases(), ...sample.purchases].some((p) => p.godownId === id);
+    const usedInSales = [...localSales(), ...sample.sales].some((s) => s.godownId === id);
+    if (usedInPurchases || usedInSales) {
+      return "This godown has recorded purchases or sales, so it cannot be deleted.";
+    }
+    removeLocalGodown(base.godowns, id);
+    return null;
+  });
+}
+
+/** What products can be stored and billed from a godown. */
+export async function getProductsForGodown(godownId: string): Promise<Product[]> {
+  await live();
+  const godown = base.godowns.find((g) => g.id === godownId);
+  if (!godown) return base.products;
+  if (godown.linkAllProducts) return base.products;
+  if (godown.productIds && godown.productIds.length > 0) {
+    const set = new Set(godown.productIds);
+    const matched = base.products.filter((p) => set.has(p.id));
+    if (matched.length > 0) return matched;
+  }
+  if (godown.own) return base.products;
+  // Fallback for company godowns without explicit settings: match brand in godown name
+  const nameLower = godown.name.toLowerCase();
+  const matched = base.products.filter((p) => nameLower.includes(p.brand.toLowerCase()));
+  return matched.length > 0 ? matched : base.products;
+}
+
 export async function getProducts() {
   await live();
   return base.products;
 }
 
-/** Settings › Products: deletes a product; a reason when it can't be (a sample product, or one on a saved lorry). */
+/** Settings › Products: deletes a product; a reason when it can't be (e.g. one on a saved lorry). */
 export async function deleteProduct(id: string): Promise<string | null> {
   return saving(() => {
     if (localLorries().some((l) => l.lines.some((x) => x.productId === id))) return "A saved lorry has this product, so it can't be deleted.";
-    if (!removeLocalProduct(base.products, id)) return "Only products you added can be deleted.";
+    removeLocalProduct(base.products, id);
     return null;
   });
 }
 
-/** Settings › Products: adds a product (a company's cement type, or a steel item). It has no rate; the owner prices each bill. */
-export async function addProduct(input: { brand: string; variant: string; category: Product["category"] }): Promise<Product> {
+/** Settings › Products: clears all standard/sample products from the catalog. */
+export async function clearAllStandardProducts(): Promise<void> {
+  return saving(() => {
+    clearStandardProducts(base.products);
+  });
+}
+
+/** Settings › Products: adds a product (a company's cement type, a steel item, or a custom product). It has no rate; the owner prices each bill. */
+export async function addProduct(input: { brand: string; variant: string; category: string; unit?: string; image?: string }): Promise<Product> {
   const slug = `${input.brand}-${input.variant}`.toLowerCase().replace(/\+/g, "-plus").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return saving(() => {
     let id = `p-${slug}`;
     for (let n = 2; base.products.some((p) => p.id === id); n++) id = `p-${slug}-${n}`;
+    const category = input.category.trim().toLowerCase();
+    const defaultUnit = category === "cement" ? "bag" : category === "steel" ? "kg" : "unit";
+    const unit = (input.unit?.trim().toLowerCase() || defaultUnit) as Product["unit"];
     const product: Product = {
       id,
-      name: `${input.brand} ${input.variant}`,
-      brand: input.brand,
-      variant: input.variant,
-      category: input.category,
-      unit: input.category === "cement" ? "bag" : "kg",
+      name: `${input.brand} ${input.variant}`.trim(),
+      brand: input.brand.trim(),
+      variant: input.variant.trim(),
+      category: input.category.trim(),
+      unit,
       active: true,
+      image: typeof input.image === "string" && input.image.trim() ? input.image : undefined,
     };
     saveLocalProduct(base.products, product);
     return product;
@@ -338,7 +387,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
       credit: Math.max(-party.openingBalance, 0),
     });
   }
-  sample.sales
+  [...localSales(), ...sample.sales]
     .filter((s) => s.partyId === partyId && s.status === "saved" && !s.demo)
     .forEach((s) =>
       rows.push({
@@ -363,15 +412,15 @@ function ledgerFor(partyId: string): LedgerEntry[] {
         credit: r.amount,
       }),
     );
-  sample.purchases
+  [...localPurchases(), ...sample.purchases]
     .filter((p) => p.companyId === partyId && !p.demo)
     .forEach((p) =>
       rows.push({
         date: p.invoiceDate,
         kind: "purchase",
-        ref: `Purchase ${p.purchaseNo}`,
+        ref: `Purchase Receipt #${p.purchaseNo}`,
         href: `/purchases/${p.id}`,
-        narration: `Invoice ${p.invoiceNo} · lorry ${p.lorryNo}`,
+        narration: `Company Invoice ${p.invoiceNo} · lorry ${p.lorryNo}`,
         debit: 0,
         credit: p.total,
       }),
@@ -507,7 +556,8 @@ function nextBillNumberNow(): number {
   const lorry = localLorries()
     .flatMap((l) => l.sale?.bills ?? [])
     .reduce((max, b) => (/^\d+$/.test(b.billNo) ? Math.max(max, Number(b.billNo)) : max), 0);
-  return lorry + 1;
+  const salesMax = localSales().reduce((max, s) => (s.billNo ? Math.max(max, s.billNo) : max), 0);
+  return Math.max(lorry, salesMax) + 1;
 }
 
 /**
@@ -537,10 +587,150 @@ export async function updateLorryBills(
   });
 }
 
+export type AddSaleInput = {
+  firmId?: string;
+  billNo?: number;
+  partyId: string;
+  billDate: string;
+  receivedDate?: string;
+  source: StockSource;
+  godownId?: string;
+  vehicleNo?: string;
+  transportMode: TransportMode;
+  transportCharge: number;
+  unloadingCharge: number;
+  otherCharge: number;
+  discountAmount: number;
+  subtotal: number;
+  total: number;
+  destination?: string;
+  remarks?: string;
+  status: SaleStatus;
+  lines: SaleLine[];
+};
+
+export type ApproveSaleInput = {
+  saleId: string;
+  billNo: number;
+  rates: { productId: string; rate: number }[];
+  discountAmount?: number;
+  vehicleCosts?: { name: string; amount: number }[];
+};
+
+export async function addSale(input: AddSaleInput): Promise<Sale> {
+  const user = await getCurrentUser();
+  return saving(() => {
+    let billNo = input.billNo;
+    if (input.status === "saved" && !billNo) {
+      billNo = nextBillNumberNow();
+    }
+    const id = `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const sale: Sale = {
+      ...input,
+      id,
+      billNo: input.status === "saved" ? (billNo ?? nextBillNumberNow()) : undefined,
+      createdBy: user?.id ?? "u-office",
+    };
+
+    saveLocalSale(sale);
+
+    // If billed from a godown, deduct inventory via stock movement
+    if (sale.godownId && sale.lines?.length) {
+      const movements: StockMovement[] = sale.lines.map((l, i) => ({
+        id: `sm-sale-${Date.now()}-${i}`,
+        date: sale.receivedDate || sale.billDate,
+        godownId: sale.godownId!,
+        productId: l.productId,
+        qty: -Math.abs(l.qty),
+        kind: "sale",
+        ref: sale.billNo ? `Sale Bill #${sale.billNo}` : `Sale Request (${partyName(sale.partyId) || "Customer"})`,
+      }));
+      saveLocalStockMovements(movements);
+    }
+
+    return sale;
+  });
+}
+
+export async function approveSale(input: ApproveSaleInput): Promise<Sale> {
+  return saving(() => {
+    const all = localSales();
+    const sale = all.find((s) => s.id === input.saleId);
+    if (!sale) throw new Error("Sale not found");
+
+    const rateMap = new Map(input.rates.map((r) => [r.productId, r.rate]));
+    const updatedLines = sale.lines.map((l) => ({
+      ...l,
+      rate: rateMap.get(l.productId) ?? l.rate ?? 0,
+    }));
+
+    const subtotal = updatedLines.reduce((acc, l) => acc + l.qty * l.rate, 0);
+    const discountAmount = input.discountAmount ?? sale.discountAmount ?? 0;
+    const total = Math.max(0, subtotal - discountAmount + (sale.transportCharge ?? 0) + (sale.otherCharge ?? 0));
+
+    const updatedSale: Sale = {
+      ...sale,
+      billNo: input.billNo,
+      lines: updatedLines,
+      subtotal,
+      discountAmount,
+      total,
+      status: "saved",
+    };
+
+    saveLocalSale(updatedSale);
+
+    // Update stock movement ref to reference the approved bill
+    updateLocalStockMovements((movements) => {
+      for (const m of movements) {
+        if (m.kind === "sale" && m.ref?.includes("Sale Request") && m.godownId === sale.godownId) {
+          m.ref = `Sale Bill #${input.billNo}`;
+        }
+      }
+    });
+
+    return updatedSale;
+  });
+}
+
+export async function rejectSale(saleId: string, reason?: string): Promise<Sale> {
+  return saving(() => {
+    const all = localSales();
+    const sale = all.find((s) => s.id === saleId);
+    if (!sale) throw new Error("Sale not found");
+
+    const updatedSale: Sale = {
+      ...sale,
+      status: "cancelled",
+      overrideReason: reason || "Rejected by owner",
+    };
+
+    saveLocalSale(updatedSale);
+
+    // Restore stock if cancelled
+    if (sale.godownId && sale.lines?.length) {
+      const movements: StockMovement[] = sale.lines.map((l, i) => ({
+        id: `sm-cancel-${Date.now()}-${i}`,
+        date: todayISO(),
+        godownId: sale.godownId!,
+        productId: l.productId,
+        qty: Math.abs(l.qty),
+        kind: "transfer",
+        ref: `Cancelled Sale Request`,
+      }));
+      saveLocalStockMovements(movements);
+    }
+
+    return updatedSale;
+  });
+}
+
 export async function getSales(): Promise<SaleWithParty[]> {
   await live();
   const visible = await visibleGodowns();
-  return sample.sales
+  const combined = [...localSales(), ...sample.sales];
+  return combined
     .filter((s) => canSee(visible, s.godownId))
     .map((s) => ({ ...s, partyName: partyName(s.partyId) }))
     .sort((a, b) => newestFirst(a, b) || billOrder(b) - billOrder(a));
@@ -549,7 +739,8 @@ export async function getSales(): Promise<SaleWithParty[]> {
 export async function getSale(id: string): Promise<SaleWithParty | undefined> {
   await live();
   const visible = await visibleGodowns();
-  const sale = sample.sales.find((s) => s.id === id && canSee(visible, s.godownId));
+  const combined = [...localSales(), ...sample.sales];
+  const sale = combined.find((s) => s.id === id && canSee(visible, s.godownId));
   return sale && { ...sale, partyName: partyName(sale.partyId) };
 }
 
@@ -568,10 +759,83 @@ export async function getQuotationTerms() {
   return base.defaultTerms();
 }
 
+export type AddPurchaseInput = {
+  firmId?: string;
+  companyId: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  receivedDate: string;
+  lorryNo: string;
+  driverMobile?: string;
+  godownId: string;
+  onLorry?: boolean;
+  lines: { productId: string; qty: number; rate?: number }[];
+  total: number;
+};
+
+export async function addPurchase(input: AddPurchaseInput): Promise<Purchase> {
+  return saving(() => {
+    const all = [...localPurchases(), ...sample.purchases];
+    const maxNo = all.reduce((max, p) => Math.max(max, p.purchaseNo || 0), 0);
+    const purchaseNo = maxNo + 1;
+    const id = `pur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const totalQty = input.lines.reduce((s, l) => s + (l.qty || 0), 0);
+    const avgRate = totalQty > 0 ? Math.round(input.total / totalQty) : 0;
+    const lines = input.lines.map((l) => ({
+      productId: l.productId,
+      qty: l.qty,
+      rate: l.rate ?? avgRate,
+    }));
+
+    const purchase: Purchase = {
+      id,
+      firmId: input.firmId,
+      purchaseNo,
+      companyId: input.companyId,
+      invoiceNo: input.invoiceNo,
+      invoiceDate: input.invoiceDate,
+      receivedDate: input.receivedDate,
+      lorryNo: input.lorryNo,
+      driverMobile: input.driverMobile,
+      godownId: input.godownId,
+      onLorry: input.onLorry,
+      lines,
+      total: input.total,
+    };
+
+    saveLocalPurchase(purchase);
+
+    if (input.godownId && !input.onLorry) {
+      const movements: StockMovement[] = lines.map((l, i) => ({
+        id: `sm-pur-${Date.now()}-${i}`,
+        date: input.receivedDate || input.invoiceDate,
+        godownId: input.godownId,
+        productId: l.productId,
+        qty: Math.abs(l.qty),
+        kind: "inward",
+        ref: `Purchase Receipt #${purchaseNo} (${input.invoiceNo})`,
+      }));
+      saveLocalStockMovements(movements);
+    }
+
+    return purchase;
+  });
+}
+
+/** The next purchase receipt number in our internal inward sequence (independent from sales bills). */
+export async function getNextPurchaseReceiptNo(): Promise<number> {
+  await live();
+  const all = [...localPurchases(), ...sample.purchases];
+  const maxNo = all.reduce((max, p) => Math.max(max, p.purchaseNo || 0), 0);
+  return maxNo + 1;
+}
+
 export async function getPurchases() {
   await live();
   const visible = await visibleGodowns();
-  return sample.purchases
+  const combined = [...localPurchases(), ...sample.purchases];
+  return combined
     .filter((p) => canSee(visible, p.godownId))
     .map((p) => ({ ...p, companyName: partyName(p.companyId) }))
     .sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
@@ -580,7 +844,8 @@ export async function getPurchases() {
 export async function getPurchase(id: string) {
   await live();
   const visible = await visibleGodowns();
-  const purchase = sample.purchases.find((p) => p.id === id && canSee(visible, p.godownId));
+  const combined = [...localPurchases(), ...sample.purchases];
+  const purchase = combined.find((p) => p.id === id && canSee(visible, p.godownId));
   return purchase && { ...purchase, companyName: partyName(purchase.companyId) };
 }
 
@@ -604,7 +869,8 @@ export async function getStockBalances() {
   await live();
   const visible = await visibleGodowns();
   const totals = new Map<string, { godownId: string; productId: string; qty: number }>();
-  for (const m of sample.stockMovements.filter((x) => canSee(visible, x.godownId))) {
+  const movements = [...sample.stockMovements, ...localStockMovements()];
+  for (const m of movements.filter((x) => canSee(visible, x.godownId))) {
     const key = `${m.godownId}|${m.productId}`;
     const row = totals.get(key) ?? { godownId: m.godownId, productId: m.productId, qty: 0 };
     row.qty += m.qty;
@@ -617,13 +883,15 @@ export async function getStockBalances() {
 export async function getAllStockMovements() {
   await live();
   const visible = await visibleGodowns();
-  return sample.stockMovements.filter((m) => canSee(visible, m.godownId));
+  const movements = [...sample.stockMovements, ...localStockMovements()];
+  return movements.filter((m) => canSee(visible, m.godownId));
 }
 
 export async function getStockMovements() {
   await live();
   const visible = await visibleGodowns();
-  return sample.stockMovements.filter((m) => m.kind !== "opening" && canSee(visible, m.godownId)).sort((a, b) => b.date.localeCompare(a.date));
+  const movements = [...sample.stockMovements, ...localStockMovements()];
+  return movements.filter((m) => m.kind !== "opening" && canSee(visible, m.godownId)).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -631,7 +899,8 @@ export async function getStockMovements() {
 export async function getDashboard() {
   await live();
   const today = sample.SAMPLE_TODAY;
-  const todays = sample.sales.filter((s) => s.billDate === today && s.status === "saved");
+  const allSales = [...localSales(), ...sample.sales];
+  const todays = allSales.filter((s) => s.billDate === today && s.status === "saved");
   const lineQty = (category: "cement" | "steel") =>
     todays
       .flatMap((s) => s.lines)
@@ -641,7 +910,7 @@ export async function getDashboard() {
   const parties = await getParties();
   const customers = parties.filter((p) => p.kind !== "company" && p.kind !== "lorry_owner");
 
-  const pending = sample.sales.filter((s) => s.status === "pending_approval");
+  const pending = allSales.filter((s) => s.status === "pending_approval");
   const approvals = pending.map((s) => {
     const party = parties.find((p) => p.id === s.partyId)!;
     const credit = checkCredit(party.creditLimit, party.balance, s.total);
@@ -836,7 +1105,7 @@ export async function getExpenses() {
 export async function getCommitments() {
   await live();
   return sample.commitments.map((c) => {
-    const partySales = sample.sales
+    const partySales = [...localSales(), ...sample.sales]
       .filter((s) => s.partyId === c.partyId && s.status === "saved" && s.billDate >= c.date)
       .sort((a, b) => a.billDate.localeCompare(b.billDate));
     const supplies: { saleId: string; billNo?: number; date: string; bags: number; amount: number }[] = [];
@@ -1249,16 +1518,17 @@ export async function getOrder(id: string) {
 
 export async function getDeliveries() {
   await live();
-  return phase3.deliveries.map((d) => {
-    const sale = sample.sales.find((s) => s.id === d.saleId)!;
-    return {
+  return phase3.deliveries.flatMap((d) => {
+    const sale = sample.sales.find((s) => s.id === d.saleId);
+    if (!sale) return [];
+    return [{
       ...d,
       billNo: sale.billNo,
       partyName: partyName(sale.partyId),
       destination: sale.destination,
       lines: sale.lines,
       driverName: staffName(d.driverId),
-    };
+    }];
   });
 }
 
@@ -1430,7 +1700,7 @@ export async function getTrips() {
   return phase4.trips.map((t) => {
     const vehicle = phase4.vehicles.find((v) => v.id === t.vehicleId)!;
     const label = phase4.vehicleLabel(vehicle);
-    const stops = t.saleIds.map((id) => sample.sales.find((s) => s.id === id)!);
+    const stops = t.saleIds.map((id) => sample.sales.find((s) => s.id === id)).filter((s): s is Sale => Boolean(s));
     return {
       ...t,
       vehicleLabel: label,

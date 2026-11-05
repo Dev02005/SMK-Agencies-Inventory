@@ -171,7 +171,7 @@ export function buildPhase4(book: SampleBook) {
       productId: "p-deccan-ppc",
       qty: 40,
       note: "Kotabommali market",
-      assigned: { partyId: assignedSale?.partyId ?? "rama", saleId: assignedSale?.id, date: assignedSale?.billDate ?? at("2026-10-22") },
+      assigned: assignedSale ? { partyId: assignedSale.partyId, saleId: assignedSale.id, date: assignedSale.billDate } : undefined,
     },
   ];
 

@@ -62,15 +62,15 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
               {p.demo && <Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip>}
             </>
           ),
-          subtitle: `#${p.purchaseNo} · ${formatShortDate(p.invoiceDate)} · ${describeQuantities(p.lines, products)}`,
+          subtitle: `Receipt #${p.purchaseNo} · ${formatShortDate(p.invoiceDate)} · ${describeQuantities(p.lines, products)}`,
           value: formatINR(p.total),
         })}
         columns={[
-          { key: "no", header: "No.", cell: (p) => `#${p.purchaseNo}` },
+          { key: "no", header: "Receipt no.", cell: (p) => `#${p.purchaseNo}`, className: "font-semibold text-ink whitespace-nowrap" },
           { key: "date", header: "Invoice date", cell: (p) => formatDate(p.invoiceDate), className: "whitespace-nowrap text-ink-secondary" },
           { key: "company", header: "Company", cell: (p) => (p.demo ? <>{p.companyName}<Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip></> : p.companyName) },
           ...(firms.length > 1 ? [{ key: "firm", header: "For firm", cell: (p: (typeof purchases)[number]) => firmName(p.firmId), className: "hidden text-ink-secondary lg:table-cell" }] : []),
-          { key: "invoice", header: "Invoice no.", cell: (p) => p.invoiceNo, className: "hidden text-ink-secondary lg:table-cell" },
+          { key: "invoice", header: "Company invoice no.", cell: (p) => p.invoiceNo, className: "hidden text-ink-secondary lg:table-cell" },
           { key: "lorry", header: "Truck number", cell: (p) => p.lorryNo, className: "hidden whitespace-nowrap text-ink-secondary lg:table-cell" },
           { key: "godown", header: "Godown", cell: (p) => godownName(p.godownId), className: "hidden text-ink-secondary xl:table-cell" },
           { key: "qty", header: "Quantity", cell: (p) => describeQuantities(p.lines, products), className: "whitespace-nowrap text-ink-secondary" },

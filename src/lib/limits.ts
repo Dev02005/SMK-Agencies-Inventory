@@ -4,10 +4,11 @@
  */
 
 /** Below this a godown item shows "Low" and raises a notification. */
-const LOW_STOCK = { bag: 150, kg: 2000 } as const;
+const LOW_STOCK: Record<string, number> = { bag: 150, kg: 2000 };
 
-export function isLowStock(qty: number, unit: keyof typeof LOW_STOCK) {
-  return qty < LOW_STOCK[unit];
+export function isLowStock(qty: number, unit: string) {
+  const threshold = LOW_STOCK[unit] ?? 10;
+  return qty < threshold;
 }
 
 /** Cash a field staff member should not carry overnight. */

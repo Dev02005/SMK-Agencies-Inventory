@@ -1,17 +1,20 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
-import { ItemLines, newLine, toNumber, type ItemLine } from "@/components/forms/item-lines";
+import { filledLines, ItemLines, toNumber, type ItemLine } from "@/components/forms/item-lines";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import type { Godown, Product } from "@/lib/data/types";
+import { cn } from "@/lib/cn";
 import { formatINR } from "@/lib/format";
 import { mobileOf } from "@/lib/mobile";
 import { NewSupplier, type Supplier } from "./new-supplier";
+import { createPurchaseAction } from "../actions";
 
 /** Purchase invoice from a company, for one of the owner's firms; saving also brings the stock into the chosen godown. */
 export function PurchaseForm({
@@ -19,6 +22,7 @@ export function PurchaseForm({
   companies,
   products,
   godowns,
+  nextPurchaseNo,
   today,
 }: {
   /** The owner's firms: the purchase is booked in the one picked first. */
@@ -27,10 +31,13 @@ export function PurchaseForm({
   companies: { id: string; name: string; brands?: string[] }[];
   products: Product[];
   godowns: Godown[];
+  nextPurchaseNo?: number;
   today: string;
 }) {
   const id = useId();
+  const router = useRouter();
   const toast = useToast();
+  const [saving, setSaving] = useState(false);
   // With more than one firm nothing is picked, so the firm is always chosen on purpose.
   const [firmId, setFirmId] = useState(firms.length === 1 ? firms[0].id : "");
   // Suppliers added here join the list straight away.
@@ -49,7 +56,8 @@ export function PurchaseForm({
     return theirs.length ? theirs : products;
   };
   const offered = offeredBy(companyId);
-  const [lines, setLines] = useState<ItemLine[]>([newLine(1, offered[0])]);
+  // No item picked for you: "Add item" asks the category, brand and item.
+  const [lines, setLines] = useState<ItemLine[]>([]);
   // One total from the company's invoice instead of a rate per bag.
   const [invoiceValue, setInvoiceValue] = useState("");
   const total = toNumber(invoiceValue);
@@ -59,13 +67,46 @@ export function PurchaseForm({
     ? "Enter the company's invoice number."
     : mobileOf(driverMobile).length !== 10
     ? "Enter the driver's 10-digit mobile number."
-    : !lines.some((l) => toNumber(l.qty) > 0)
+    : filledLines(lines).length === 0
       ? "Enter the quantity for at least one item."
       : !(total > 0)
         ? "Enter the total invoice value."
         : null;
 
-  const save = () => !missing && toast(sampleSaveMessage("purchase"));
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    const validLines = filledLines(lines);
+    const result = await createPurchaseAction({
+      firmId,
+      companyId,
+      invoiceNo: invoiceNo.trim(),
+      invoiceDate,
+      receivedDate: invoiceDate,
+      lorryNo: lorryNo.trim(),
+      driverMobile: mobileOf(driverMobile),
+      godownId,
+      lines: validLines.map((l) => ({
+        productId: l.productId,
+        qty: toNumber(l.qty),
+        rate: l.rate ? toNumber(l.rate) : undefined,
+      })),
+      total,
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast(result.error ?? "Failed to save purchase");
+      return;
+    }
+    toast(`Purchase Receipt #${result.purchase.purchaseNo} saved successfully`);
+    setInvoiceNo("");
+    setLorryNo("");
+    setDriverMobile("");
+    setLines([]);
+    setInvoiceValue("");
+    router.push("/purchases");
+    router.refresh();
+  }
 
   return (
     <form
@@ -89,8 +130,8 @@ export function PurchaseForm({
             value={companyId}
             onChange={(next) => {
               setCompanyId(next);
-              // Start the items again with what the new company sells.
-              setLines([newLine(1, offeredBy(next)[0])]);
+              // Start the items again for the new company.
+              setLines([]);
             }}
             options={companyList.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
             searchable
@@ -105,20 +146,29 @@ export function PurchaseForm({
             onDone={(s) => {
               setCompanyList((list) => (list.some((c) => c.id === s.id) ? list : [...list, s]));
               setCompanyId(s.id);
-              const brands = s.brands;
-              const theirs = brands?.length ? products.filter((p) => brands.includes(p.brand)) : [];
-              setLines([newLine(1, (theirs.length ? theirs : products)[0])]);
+              setLines([]);
               setNewSupplier(null);
               toast(`${s.name} added as a supplier`);
             }}
           />
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Invoice no." htmlFor={`${id}-inv`}>
-            <input id={`${id}-inv`} className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Purchase receipt no." hint="Internal inward receipt">
+            <output className={cn(inputClass, "flex items-center bg-card-subtle font-semibold tabular-nums text-ink")}>
+              #{nextPurchaseNo ?? 1}
+            </output>
           </Field>
-          <Field label="Invoice date" htmlFor={`${id}-invdate`}>
-            <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
+          <Field label="Company invoice no." htmlFor={`${id}-inv`} hint="Supplier's bill/invoice no.">
+            <input
+              id={`${id}-inv`}
+              className={inputClass}
+              placeholder="e.g. INV-10492"
+              value={invoiceNo}
+              onChange={(e) => setInvoiceNo(e.target.value)}
+            />
+          </Field>
+          <Field label="Company invoice date" htmlFor={`${id}-invdate`}>
+            <DatePicker id={`${id}-invdate`} label="Company invoice date" value={invoiceDate} onChange={setInvoiceDate} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -157,7 +207,13 @@ export function PurchaseForm({
         </div>
       </section>
 
-      <SubmitBar label="Save purchase" disabled={Boolean(missing)} hint={missing} summary={{ label: "Invoice value", value: formatINR(total) }} onSubmit={save} />
+      <SubmitBar
+        label={saving ? "Saving…" : "Save purchase"}
+        disabled={Boolean(missing) || saving}
+        hint={missing}
+        summary={{ label: "Invoice value", value: formatINR(total) }}
+        onSubmit={save}
+      />
     </form>
   );
 }

@@ -40,7 +40,15 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
   const requestLines: RequestLine[] = sale.lines.map((l) => {
     const product = products.find((p) => p.id === l.productId);
     const unit = product?.unit ?? "bag";
-    return { name: product?.name ?? "Item", unit, unitLabel: unitLabel[unit], qty: l.qty, mt: toMT(l.qty, unit) };
+    return {
+      productId: l.productId,
+      name: product?.name ?? "Item",
+      unit,
+      unitLabel: unitLabel[unit] || unit,
+      qty: l.qty,
+      mt: toMT(l.qty, unit),
+      initialRate: l.rate > 0 ? l.rate : undefined,
+    };
   });
   const godown = godowns.find((g) => g.id === sale.godownId);
 
@@ -79,7 +87,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
                     <li key={i} className="flex justify-between gap-4 py-3 text-[15px]">
                       <span className="text-ink">{l.name}</span>
                       <span className="tabular-nums text-ink-secondary">
-                        {formatNumber(l.qty)} {l.unitLabel} · {formatNumber(l.mt, 3)} MT
+                        {formatNumber(l.qty)} {l.unitLabel}{l.mt > 0 ? ` · ${formatNumber(l.mt, 3)} MT` : ""}
                       </span>
                     </li>
                   ))}
@@ -88,7 +96,13 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
               </SectionCard>
             }
           >
-            <ConfirmRequest lines={requestLines} requestedBy={createdBy?.fullName} transportMode={sale.transportMode} nextBillNo={nextBillNo} />
+            <ConfirmRequest
+              saleId={sale.id}
+              lines={requestLines}
+              requestedBy={createdBy?.fullName}
+              transportMode={sale.transportMode}
+              nextBillNo={sale.billNo ?? nextBillNo}
+            />
           </RoleGuard>
         ) : (
           <SectionCard title="Items" className="lg:col-span-2">
@@ -100,7 +114,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
                     <div className="min-w-0">
                       <p className="text-[15px] font-medium text-ink">{product?.name}</p>
                       <p className="text-[13px] text-ink-secondary">
-                        {lineQty(l.qty, product)} · {product && formatNumber(toMT(l.qty, product.unit), 3)} MT × {formatINR(l.rate)}
+                        {lineQty(l.qty, product)}{product && toMT(l.qty, product.unit) > 0 ? ` · ${formatNumber(toMT(l.qty, product.unit), 3)} MT` : ""} × {formatINR(l.rate)}
                       </p>
                     </div>
                     <p className="shrink-0 text-[15px] font-medium tabular-nums text-ink">{formatINR(l.qty * l.rate)}</p>
@@ -139,6 +153,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
           <SectionCard title="Record">
             <DetailList
               items={[
+                { label: "Sales bill no.", value: sale.billNo ? `#${sale.billNo}` : "Pending assignment" },
                 { label: "Entered by", value: createdBy?.fullName },
                 { label: "Paper memo", value: sale.paperMemo },
                 { label: "Remarks", value: sale.remarks },

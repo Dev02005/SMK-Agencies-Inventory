@@ -3,6 +3,7 @@
  * Screens only ever see these types, so swapping sample data for Supabase queries changes src/lib/data only.
  */
 import type { TransportMode, Unit } from "@/lib/sales";
+export type { TransportMode, Unit };
 
 export type Role = "owner" | "office" | "godown" | "field" | "driver";
 export type PartyKind = "cash" | "customer" | "sub_dealer" | "company" | "lorry_owner";
@@ -25,8 +26,12 @@ export type Godown = {
   place: string;
   /** Our own godown; the others are the cement companies' godowns where our stock is kept. */
   own?: boolean;
-  /** Profile ids of the staff who look after it. */
+  /** Profile ids of the staff who look after it (supports multiple in-charges). */
   inCharge?: string[];
+  /** Specific product IDs linked to this godown. */
+  productIds?: string[];
+  /** When true, all products in catalog are allowed (standard for own godowns). */
+  linkAllProducts?: boolean;
   /** One of the firm's own records (from local-data/), not sample data. */
   original?: boolean;
 };
@@ -37,9 +42,11 @@ export type Product = {
   brand: string;
   /** The type within the brand, e.g. OPC, PPC, TMT 8 mm. */
   variant?: string;
-  category: "cement" | "steel";
+  category: "cement" | "steel" | string;
   unit: Unit;
   active: boolean;
+  /** Optional picture of the product (data URL or image URL). */
+  image?: string;
   /** One of the firm's own records (from local-data/), not sample data. */
   original?: boolean;
 };

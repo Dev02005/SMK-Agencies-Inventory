@@ -9,7 +9,7 @@ import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { lineQty } from "@/lib/quantities";
 import { toMT } from "@/lib/sales";
 
-export const metadata: Metadata = { title: "Purchase" };
+export const metadata: Metadata = { title: "Purchase receipt" };
 
 export default function PurchasePage({ params }: PageProps<"/purchases/[id]">) {
   return (
@@ -32,7 +32,7 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
   return (
     <>
       <PageHeader
-        title={`Purchase #${purchase.purchaseNo}`}
+        title={`Purchase Receipt #${purchase.purchaseNo}`}
         subtitle={
           <>
             {formatDate(purchase.invoiceDate)} ·{" "}
@@ -67,9 +67,10 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
         <SectionCard title="Invoice and truck">
           <DetailList
             items={[
+              { label: "Purchase receipt no.", value: `#${purchase.purchaseNo}` },
+              { label: "Company invoice no.", value: purchase.invoiceNo },
               { label: "For firm", value: firm?.name },
-              { label: "Invoice no.", value: purchase.invoiceNo },
-              { label: "Invoice date", value: formatDate(purchase.invoiceDate) },
+              { label: "Company invoice date", value: formatDate(purchase.invoiceDate) },
               { label: "Truck received", value: formatDate(purchase.receivedDate) },
               { label: "Truck number", value: purchase.lorryNo },
               { label: "Driver number", value: purchase.driverMobile && `+91 ${purchase.driverMobile}` },

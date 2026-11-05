@@ -77,7 +77,7 @@ async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["
                       {low && <Chip tone="warning">Low</Chip>}
                       <span className="text-right">
                         <span className={cn("block text-[15px] font-medium tabular-nums", low ? "text-warning" : "text-ink")}>{lineQty(r.qty, p)}</span>
-                        <span className="block text-[12px] text-ink-secondary">{p && formatNumber(toMT(r.qty, p.unit), 2)} MT</span>
+                        {p && toMT(r.qty, p.unit) > 0 ? <span className="block text-[12px] text-ink-secondary">{formatNumber(toMT(r.qty, p.unit), 2)} MT</span> : null}
                       </span>
                     </li>
                   );
@@ -97,7 +97,7 @@ async function StockData({ searchParams }: { searchParams: PageProps<"/stock">["
             .sort((a, b) => a.productId.localeCompare(b.productId))
             .map((b) => {
               const p = product(b.productId);
-              return [g.name, p?.name, lineQty(b.qty, p), p ? formatNumber(toMT(b.qty, p.unit), 2) : ""];
+              return [g.name, p?.name, lineQty(b.qty, p), p && toMT(b.qty, p.unit) > 0 ? formatNumber(toMT(b.qty, p.unit), 2) : "—"];
             }),
         )}
       />

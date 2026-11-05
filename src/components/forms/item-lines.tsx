@@ -3,7 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useId } from "react";
 import { ProductPicker } from "@/components/forms/product-picker";
-import { IconButton } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { AffixInput, Field } from "@/components/ui/field";
 import type { Product } from "@/lib/data/types";
 import { formatINR, formatNumber } from "@/lib/format";
@@ -13,9 +13,12 @@ export type ItemLine = { key: number; productId: string; qty: string; rate: stri
 
 export const toNumber = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
 
+/** Only lines with a positive quantity entered. */
+export const filledLines = (lines: ItemLine[]): ItemLine[] => lines.filter((l) => toNumber(l.qty) > 0);
+
 /** A new row; products have no fixed rate, so the rate starts empty. */
 export function newLine(key: number, product: Product): ItemLine {
-  return { key, productId: product.id, qty: "", rate: "" };
+  return { key, productId: product?.id ?? "", qty: "", rate: "" };
 }
 
 /** Item (cement or steel, brand, type) / quantity (/ rate) rows used by purchases and orders. */
@@ -63,12 +66,12 @@ export function ItemLines({
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Quantity" htmlFor={`${id}-q-${line.key}`} hint={qty > 0 ? `${formatNumber(toMT(qty, p.unit), 3)} MT` : undefined}>
+                <Field label="Quantity" htmlFor={`${id}-q-${line.key}`} hint={qty > 0 && toMT(qty, p.unit) > 0 ? `${formatNumber(toMT(qty, p.unit), 3)} MT` : undefined}>
                   <AffixInput
                     id={`${id}-q-${line.key}`}
                     inputMode="decimal"
                     placeholder="0"
-                    suffix={unitLabel[p.unit]}
+                    suffix={unitLabel[p.unit] || p.unit}
                     value={line.qty}
                     onChange={(e) => update(line.key, { qty: e.target.value })}
                   />
@@ -89,9 +92,25 @@ export function ItemLines({
           );
         })}
       </ul>
-      <IconButton label="Add item" className="mt-1" onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0])])}>
-        <Plus size={20} strokeWidth={2} aria-hidden />
-      </IconButton>
+      {lines.length === 0 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-2 gap-1.5"
+          onClick={() => onChange([newLine(1, products[0])])}
+        >
+          <Plus size={18} strokeWidth={2.25} aria-hidden />
+          Add item
+        </Button>
+      ) : (
+        <IconButton
+          label="Add item"
+          className="mt-1"
+          onClick={() => onChange([...lines, newLine(Math.max(0, ...lines.map((l) => l.key)) + 1, products[0])])}
+        >
+          <Plus size={20} strokeWidth={2} aria-hidden />
+        </IconButton>
+      )}
     </>
   );
 }

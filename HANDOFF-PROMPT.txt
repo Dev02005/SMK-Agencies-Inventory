@@ -1,0 +1,6 @@
+Paste this as the first message when starting with ANY new AI agent or chat:
+
+"Before doing anything, read AGENTS.md, PROGRESS.md, TODO.md and DECISIONS.md
+in this project. Summarize where the project stands in 5 lines, then continue
+with the top item in TODO.md. At the end of the session, update PROGRESS.md
+and TODO.md."

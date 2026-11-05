@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { BackLink, ListSkeleton, OriginChip, SectionCard } from "@/components/ui/blocks";
+import { BackLink, ListSkeleton, OriginChip } from "@/components/ui/blocks";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProducts } from "@/lib/data";
-import { AddProduct, ProductList } from "./product-list";
+import { unitLabel } from "@/lib/sales";
+import { ProductList } from "./product-list";
 
 export const metadata: Metadata = { title: "Products" };
 
@@ -37,13 +38,15 @@ async function Products() {
         }
       />
       <ExportTable
-        columns={["Brand", "Type", "Sold by"]}
-        rows={products.map((p) => [p.brand, p.variant ?? p.name, p.unit === "bag" ? "Bag" : "Kg"])}
+        columns={["Brand", "Type", "Category", "Sold by"]}
+        rows={products.map((p) => [
+          p.brand,
+          p.variant ?? p.name,
+          p.category,
+          p.unit === "bag" ? "Bag" : p.unit === "kg" ? "Kg" : (unitLabel[p.unit] || p.unit),
+        ])}
       />
       <ProductList products={products} />
-      <SectionCard title="Add a product">
-        <AddProduct brands={[...new Set(products.map((p) => p.brand))]} />
-      </SectionCard>
     </>
   );
 }
