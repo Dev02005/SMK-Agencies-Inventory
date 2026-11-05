@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Chip } from "@/components/ui/chip";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, StatCard, StatRow } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
@@ -55,14 +56,19 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
         rowKey={(p) => p.id}
         rowHref={(p) => `/purchases/${p.id}`}
         mobile={(p) => ({
-          title: p.companyName,
+          title: (
+            <>
+              {p.companyName}
+              {p.demo && <Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip>}
+            </>
+          ),
           subtitle: `#${p.purchaseNo} · ${formatShortDate(p.invoiceDate)} · ${describeQuantities(p.lines, products)}`,
           value: formatINR(p.total),
         })}
         columns={[
           { key: "no", header: "No.", cell: (p) => `#${p.purchaseNo}` },
           { key: "date", header: "Invoice date", cell: (p) => formatDate(p.invoiceDate), className: "whitespace-nowrap text-ink-secondary" },
-          { key: "company", header: "Company", cell: (p) => p.companyName },
+          { key: "company", header: "Company", cell: (p) => (p.demo ? <>{p.companyName}<Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip></> : p.companyName) },
           ...(firms.length > 1 ? [{ key: "firm", header: "For firm", cell: (p: (typeof purchases)[number]) => firmName(p.firmId), className: "hidden text-ink-secondary lg:table-cell" }] : []),
           { key: "invoice", header: "Invoice no.", cell: (p) => p.invoiceNo, className: "hidden text-ink-secondary lg:table-cell" },
           { key: "lorry", header: "Truck number", cell: (p) => p.lorryNo, className: "hidden whitespace-nowrap text-ink-secondary lg:table-cell" },

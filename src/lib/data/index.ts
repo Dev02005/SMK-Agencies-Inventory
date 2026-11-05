@@ -58,7 +58,15 @@ const shownParty = (shown: Set<string>, x: unknown) => {
 function withoutSampleParties(book: ReturnType<typeof base.buildSample>) {
   const shown = new Set(base.parties.map((p) => p.id));
   const names = new Set(base.parties.map((p) => p.name.toLowerCase()));
-  const sales = book.sales.filter((s) => shownParty(shown, s));
+  // The last week's bills of sample customers stay as demo bills, to try the sales screens with: billed to Cash
+  // customer (with the sample buyer's name in the remarks), never in any party's ledger. Older ones go.
+  const weekAgo = base.addDays(book.SAMPLE_TODAY, -6);
+  const bookName = (id: string) => base.bookParties.find((p) => p.id === id)?.name ?? "Walk-in buyer";
+  const sales = book.sales.flatMap((s) => {
+    if (shownParty(shown, s)) return [s];
+    if (s.billDate < weekAgo) return [];
+    return [{ ...s, partyId: "cash", demo: true, remarks: [`Sample bill · ${bookName(s.partyId)}`, s.remarks].filter(Boolean).join(" · ") }];
+  });
   const dropped = new Set(book.sales.filter((s) => !sales.includes(s)).map((s) => s.billNo).filter((n) => n !== undefined).map(String));
   const fromDroppedBill = (ref: string) => {
     const m = /^Bill (\d+)( cancelled)?$/.exec(ref);
@@ -331,7 +339,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
     });
   }
   sample.sales
-    .filter((s) => s.partyId === partyId && s.status === "saved")
+    .filter((s) => s.partyId === partyId && s.status === "saved" && !s.demo)
     .forEach((s) =>
       rows.push({
         date: s.billDate,
@@ -356,7 +364,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
       }),
     );
   sample.purchases
-    .filter((p) => p.companyId === partyId)
+    .filter((p) => p.companyId === partyId && !p.demo)
     .forEach((p) =>
       rows.push({
         date: p.invoiceDate,

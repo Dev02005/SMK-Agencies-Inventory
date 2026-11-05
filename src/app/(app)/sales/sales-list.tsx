@@ -67,7 +67,12 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
         rowHref={(s) => `/sales/${s.id}`}
         empty="No bills for these dates."
         mobile={(s) => ({
-          title: s.partyName,
+          title: (
+            <>
+              {s.partyName}
+              {s.demo && <Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip>}
+            </>
+          ),
           subtitle: `${billName(s)} · ${formatShortDate(s.billDate)} · ${describeQuantities(s.lines, products)}`,
           value: <SaleTotal sale={s} />,
           meta: s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>,
@@ -75,7 +80,7 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
         columns={[
           { key: "bill", header: "Bill", cell: (s) => (s.billNo ? `#${s.billNo}` : "No bill no. yet"), className: "whitespace-nowrap" },
           { key: "date", header: "Date", cell: (s) => formatDate(s.billDate), className: "whitespace-nowrap text-ink-secondary" },
-          { key: "party", header: "Party", cell: (s) => s.partyName },
+          { key: "party", header: "Party", cell: (s) => (s.demo ? <>{s.partyName}<Chip tone="warning" className="ml-2 h-5 px-2 align-middle text-[11px]">Sample</Chip></> : s.partyName) },
           {
             key: "items",
             header: "Quantity",

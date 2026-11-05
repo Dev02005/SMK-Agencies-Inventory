@@ -82,6 +82,8 @@ export type SaleLine = { productId: string; qty: number; rate: number };
 
 export type Sale = {
   id: string;
+  /** A sample bill kept to try the screens (Sample tag): in lists, stock and reports, never in a party's ledger. */
+  demo?: boolean;
   /** Which of the owner's firms the bill is under; the main (first) firm when missing. */
   firmId?: string;
   /** Given by the owner when the sale is approved (with the prices); a sale waiting for approval has none. */
@@ -134,6 +136,8 @@ export type Payment = {
 
 export type Purchase = {
   id: string;
+  /** A sample purchase kept to try the screens (Sample tag): in lists and stock, never in the supplier's ledger. */
+  demo?: boolean;
   /** Which of the owner's firms bought it; the primary firm when missing. */
   firmId?: string;
   purchaseNo: number;

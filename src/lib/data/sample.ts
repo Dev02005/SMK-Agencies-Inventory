@@ -211,11 +211,13 @@ export function buildSample(SAMPLE_TODAY: string) {
     // Came in today: its bags are already in the godown's stock.
     [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320], ["p-deccan-ppc", 200, 300]]],
   ];
-  // Only the sample companies: the firm's own suppliers (local-data/suppliers.json) get no sample purchases.
+  // Only the sample companies get sample payments and the sample lorry. Godown purchases from Deccan (a real supplier
+  // too) are kept as demo records to try Purchases with: listed and in stock, but not in Deccan's ledger.
   const sampleCompany = (id: string) => parties.some((p) => p.id === id && p.kind === "company" && !p.original);
-  const plan = purchasePlan.filter(([, companyId]) => sampleCompany(companyId));
+  const plan = purchasePlan.filter(([, companyId]) => companyId === "deccan" ? parties.some((p) => p.id === "deccan") : sampleCompany(companyId));
   plan.forEach(([invoiceDate, companyId, lines], i) => {
     purchases.push({
+      demo: !sampleCompany(companyId),
       id: `pur-${i + 1}`,
       purchaseNo: 301 + i,
       companyId,
