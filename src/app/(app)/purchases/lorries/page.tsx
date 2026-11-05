@@ -9,10 +9,10 @@ import { DataOrigin } from "@/components/ui/data-origin";
 import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { getFirms, getLorries, getProducts, getToday } from "@/lib/data";
+import { getFirms, getLorries, getProducts } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR } from "@/lib/format";
-import { lorryState, lorryStateChip } from "@/lib/lorries";
+import { isSavedLorry, lorryState, lorryStateChip } from "@/lib/lorries";
 import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities } from "@/lib/quantities";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
@@ -51,7 +51,7 @@ export default function LorryPurchasesPage({ searchParams }: PageProps<"/purchas
 }
 
 async function Lorries({ searchParams }: { searchParams: PageProps<"/purchases/lorries">["searchParams"] }) {
-  const [all, products, dates, firms, today] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams), getFirms(), getToday()]);
+  const [all, products, dates, firms] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams), getFirms()]);
   const lorries = all.filter((l) => inDateFilter(l.invoiceDate, dates));
   const firmName = (id?: string) => firms.find((f) => f.id === id)?.name;
   return (
@@ -59,24 +59,25 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/purchases/l
       <DataTools title="Lorry purchases" />
       <ExportTable
         title="Lorry purchases"
-        columns={["Invoice date", "Firm", "Lorry", "Company", "Driver", "Invoice", "Items", "Invoice value", "Paper copy", "Unloading paid to us", "Status"]}
+        columns={["Invoice date", "Truck received on", "Firm", "Truck number", "Company", "Driver number", "Items", "Invoice value", "Paper copy", "Unloading paid to us", "Sale invoice", "Status"]}
         rows={lorries.map((l) => [
           formatDate(l.invoiceDate),
+          l.receivedOn ? formatDate(l.receivedOn) : "",
           firmName(l.firmId) ?? "",
           l.lorryNo,
           l.companyName,
-          l.driverName,
-          l.invoiceNo,
+          l.driverMobile ?? "",
           describeQuantities(l.lines, products),
           l.invoiceValue ? formatINR(l.invoiceValue) : "",
           l.invoicePaperKept ? "Yes" : "No",
           l.unloadingCharges ? "Yes" : "No",
-          lorryStateChip[lorryState(l, today)].label,
+          l.sale?.invoiceNo ?? "",
+          lorryStateChip[lorryState(l)].label,
         ])}
       />
       {lorries.length === 0 && <SectionCard>{dates.kind === "all" ? "No lorry purchases yet." : "No lorry purchases for these dates."}</SectionCard>}
       {lorries.map((l) => (
-        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} today={today} />}>
+        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} />}>
           <LorryMeta lorry={l} firmName={firmName(l.firmId)} />
           <LorryItems lorry={l} products={products} />
           <LorryCost lorry={l} />
@@ -90,7 +91,7 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/purchases/l
               </Link>
             )}
           </p>
-          {l.original && <ConfirmDelete what={`lorry ${l.lorryNo}`} onDelete={removeLorry.bind(null, l.id)} className="mt-3" />}
+          {isSavedLorry(l) && <ConfirmDelete what={`lorry ${l.lorryNo}`} onDelete={removeLorry.bind(null, l.id)} className="mt-3" />}
         </SectionCard>
       ))}
     </div>

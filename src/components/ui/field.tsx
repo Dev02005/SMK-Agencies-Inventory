@@ -49,7 +49,8 @@ export function AffixInput({
           {prefix}
         </span>
       )}
-      <input className={cn(inputClass, "tabular-nums", prefix && "pl-8", suffix && "pr-14", className)} {...props} />
+      {/* Room for the prefix: one sign ("₹") or a longer one ("+91"), so typed digits never run under it. */}
+      <input className={cn(inputClass, "tabular-nums", prefix && (prefix.length > 1 ? "pl-[3.25rem]" : "pl-8"), suffix && "pr-14", className)} {...props} />
       {suffix && (
         <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[15px] text-ink-secondary">
           {suffix}

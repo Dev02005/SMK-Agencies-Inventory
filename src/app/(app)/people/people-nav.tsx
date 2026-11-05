@@ -6,7 +6,6 @@ export function PeopleNav() {
       label="People"
       items={[
         { href: "/people", label: "Staff" },
-        { href: "/people/attendance", label: "Attendance" },
         { href: "/people/tours", label: "Tours" },
         { href: "/people/targets", label: "Targets", roles: ["owner", "office", "field"] },
         { href: "/people/mapping", label: "Sub-dealer mapping", roles: ["owner", "office"] },

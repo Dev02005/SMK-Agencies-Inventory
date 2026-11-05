@@ -107,10 +107,20 @@ function PickOrAddField({
 }
 
 /** Where the bill is delivered: the saved villages and towns, with "Add destination" for a new one. */
-export function DestinationField({ value, onChange, destinations }: { value: string; onChange: (value: string) => void; destinations: string[] }) {
+export function DestinationField({
+  value,
+  onChange,
+  destinations,
+  label = "Destination",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  destinations: string[];
+  label?: string;
+}) {
   return (
     <PickOrAddField
-      label="Destination"
+      label={label}
       placeholder="Choose a village or town"
       value={value}
       onChange={onChange}

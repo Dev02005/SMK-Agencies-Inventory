@@ -11,14 +11,14 @@ import { formatDate, formatINR, formatMonth } from "@/lib/format";
 
 type Row = SalarySlip & { name: string };
 
-/** Month salary sheet: gross − absences − loan instalments = net. */
+/** Month salary sheet: gross − loan instalments = net. */
 export function SalarySheet({ sheets }: { sheets: Record<string, Row[]> }) {
   const months = Object.keys(sheets);
   const [month, setMonth] = useState(months[0]);
   const toast = useToast();
   const rows = sheets[month];
   const unpaid = rows.filter((r) => !r.paidOn);
-  const total = (key: "gross" | "absenceDeduction" | "loanDeduction" | "net") => rows.reduce((s, r) => s + r[key], 0);
+  const total = (key: "gross" | "loanDeduction" | "net") => rows.reduce((s, r) => s + r[key], 0);
 
   return (
     <section className="space-y-3">
@@ -36,14 +36,13 @@ export function SalarySheet({ sheets }: { sheets: Record<string, Row[]> }) {
         rowHref={(r) => `/people/${r.profileId}`}
         mobile={(r) => ({
           title: r.name,
-          subtitle: `${formatINR(r.gross)} − ${formatINR(r.absenceDeduction)} absences − ${formatINR(r.loanDeduction)} loan`,
+          subtitle: `${formatINR(r.gross)} − ${formatINR(r.loanDeduction)} loan`,
           value: formatINR(r.net),
           meta: r.paidOn ? <Chip tone="good">Paid</Chip> : <Chip tone="warning">To pay</Chip>,
         })}
         columns={[
           { key: "name", header: "Staff", cell: (r) => r.name },
           { key: "gross", header: "Salary", align: "right", cell: (r) => formatINR(r.gross) },
-          { key: "abs", header: "Absences", align: "right", cell: (r) => (r.absenceDeduction ? `− ${formatINR(r.absenceDeduction)}` : "") },
           { key: "loan", header: "Loan instalment", align: "right", cell: (r) => (r.loanDeduction ? `− ${formatINR(r.loanDeduction)}` : "") },
           { key: "net", header: "Net pay", align: "right", cell: (r) => <span className="font-semibold">{formatINR(r.net)}</span> },
           { key: "status", header: "", cell: (r) => (r.paidOn ? <Chip tone="good">Paid {formatDate(r.paidOn)}</Chip> : <Chip tone="warning">To pay</Chip>) },
@@ -52,14 +51,12 @@ export function SalarySheet({ sheets }: { sheets: Record<string, Row[]> }) {
           <tr className="h-12 font-medium">
             <td className="px-4 pl-6 text-ink">Total</td>
             <td className="px-4 text-right tabular-nums">{formatINR(total("gross"))}</td>
-            <td className="px-4 text-right tabular-nums">{total("absenceDeduction") ? `− ${formatINR(total("absenceDeduction"))}` : ""}</td>
             <td className="px-4 text-right tabular-nums">{total("loanDeduction") ? `− ${formatINR(total("loanDeduction"))}` : ""}</td>
             <td className="px-4 text-right tabular-nums">{formatINR(total("net"))}</td>
             <td />
           </tr>
         }
       />
-      <p className="px-1 text-[13px] text-ink-secondary">Absences are worked out from attendance at salary ÷ 26 a day; half days count as half.</p>
     </section>
   );
 }

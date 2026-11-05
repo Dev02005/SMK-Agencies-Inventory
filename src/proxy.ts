@@ -10,7 +10,9 @@ import { readSession, SESSION_COOKIE } from "@/lib/session";
 export function proxy(request: NextRequest) {
   const { pathname, search, searchParams } = request.nextUrl;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = readSession(token);
+  const read = readSession(token);
+  // Drivers no longer sign in; a session one still has from before ends here.
+  const session = read && read.role !== "driver" ? read : null;
   const to = (path: string) => NextResponse.redirect(new URL(path, request.url));
 
   if (pathname === "/login") {

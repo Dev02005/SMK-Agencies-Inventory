@@ -61,7 +61,7 @@ async function MapData() {
             );
           })}
         </ul>
-        <p className="mt-2 text-[12px] text-ink-tertiary">Cars and bikes have no GPS; staff location comes only from attendance check-in.</p>
+        <p className="mt-2 text-[12px] text-ink-tertiary">Cars and bikes have no GPS.</p>
       </SectionCard>
     </div>
   );

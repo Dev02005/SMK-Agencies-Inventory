@@ -65,7 +65,7 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
           { key: "company", header: "Company", cell: (p) => p.companyName },
           ...(firms.length > 1 ? [{ key: "firm", header: "For firm", cell: (p: (typeof purchases)[number]) => firmName(p.firmId), className: "hidden text-ink-secondary lg:table-cell" }] : []),
           { key: "invoice", header: "Invoice no.", cell: (p) => p.invoiceNo, className: "hidden text-ink-secondary lg:table-cell" },
-          { key: "lorry", header: "Lorry", cell: (p) => p.lorryNo, className: "hidden whitespace-nowrap text-ink-secondary lg:table-cell" },
+          { key: "lorry", header: "Truck number", cell: (p) => p.lorryNo, className: "hidden whitespace-nowrap text-ink-secondary lg:table-cell" },
           { key: "godown", header: "Godown", cell: (p) => godownName(p.godownId), className: "hidden text-ink-secondary xl:table-cell" },
           { key: "qty", header: "Quantity", cell: (p) => describeQuantities(p.lines, products), className: "whitespace-nowrap text-ink-secondary" },
           { key: "total", header: "Amount", align: "right", cell: (p) => formatINR(p.total) },

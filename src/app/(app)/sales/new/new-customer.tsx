@@ -17,11 +17,17 @@ const kindLabel = { customer: "Customer", sub_dealer: "Sub-dealer" } as const;
 export function NewCustomer({
   parties,
   typed,
+  typedMobile,
+  onDraft,
   onDone,
   onCancel,
 }: {
   parties: SaleParty[];
   typed: string;
+  /** A mobile number already typed elsewhere (a cash customer's), to start the form with. */
+  typedMobile?: string;
+  /** What is typed so far, so switching to Cash customer can keep the name and number. */
+  onDraft?: (draft: { name: string; mobile: string }) => void;
   /** The party to bill: the one just added, or an existing one picked from the matches. */
   onDone: (party: SaleParty, added: boolean) => void;
   onCancel: () => void;
@@ -30,7 +36,7 @@ export function NewCustomer({
   const typedDigits = typed.replace(/\D/g, "");
   const typedIsNumber = typedDigits.length >= 4 && typedDigits.length === typed.replace(/[\s+-]/g, "").length;
   const [name, setName] = useState(typedIsNumber ? "" : typed);
-  const [mobile, setMobile] = useState(typedIsNumber ? typedDigits.slice(-10) : "");
+  const [mobile, setMobile] = useState(typedIsNumber ? typedDigits.slice(-10) : (typedMobile ?? ""));
   const [place, setPlace] = useState("");
   const [kind, setKind] = useState<"customer" | "sub_dealer">("customer");
   const [problem, setProblem] = useState<string | null>(null);
@@ -58,7 +64,7 @@ export function NewCustomer({
       />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Name" htmlFor={`${id}-name`}>
-          <input id={`${id}-name`} className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoCapitalize="words" autoFocus={!typedIsNumber} />
+          <input id={`${id}-name`} className={inputClass} value={name} onChange={(e) => (setName(e.target.value), onDraft?.({ name: e.target.value, mobile }))} maxLength={80} autoCapitalize="words" autoFocus={!typedIsNumber} />
         </Field>
         <Field label="Mobile number" htmlFor={`${id}-mobile`}>
           <AffixInput
@@ -66,7 +72,11 @@ export function NewCustomer({
             prefix="+91"
             inputMode="numeric"
             value={mobile}
-            onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            onChange={(e) => {
+              const next = e.target.value.replace(/\D/g, "").slice(0, 10);
+              setMobile(next);
+              onDraft?.({ name, mobile: next });
+            }}
             autoFocus={typedIsNumber}
           />
         </Field>

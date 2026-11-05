@@ -1,15 +1,14 @@
 /**
- * Sample data for phase 3 screens: employees, attendance, tour visits, targets, salary and loans,
+ * Sample data for phase 3 screens: employees, tour visits, targets, salary and loans,
  * orders and today's deliveries. Built on sample.ts so orders point at real sample bills.
  */
 import { withLocalEmployees } from "./local-data";
-import { addDays, dateShifter, mulberry32, parties, salaryPayday, sampleProfiles, type SampleBook } from "./sample";
+import { addDays, dateShifter, mulberry32, bookParties as parties, salaryPayday, sampleProfiles, type SampleBook } from "./sample";
 import { shiftMonth } from "@/lib/format";
 import { vehicleNames } from "./sample-phase2";
-import type { AttendanceRecord, Delivery, EmployeeDetails, Loan, Order, SalarySlip, StaffTarget, TourVisit } from "./types";
+import type { Delivery, EmployeeDetails, Loan, Order, SalarySlip, StaffTarget, TourVisit } from "./types";
 
 const isSunday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay() === 0;
-const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
 const sampleEmployees = (): EmployeeDetails[] => [
   { profileId: "u-office", designation: "Accounts and billing", joinedOn: "2021-06-01", monthlySalary: 18000, areas: ["Office"] },
@@ -29,7 +28,7 @@ export function loadPhase3() {
 
 loadPhase3();
 
-/** Attendance, tour visits, targets, loans, salary, orders and today's deliveries, for the same today as `book`. */
+/** Tour visits, targets, loans, salary, orders and today's deliveries, for the same today as `book`. */
 export function buildPhase3(book: SampleBook) {
   const { SAMPLE_TODAY, sales } = book;
   const at = dateShifter(SAMPLE_TODAY);
@@ -38,56 +37,6 @@ export function buildPhase3(book: SampleBook) {
   const rand = mulberry32(303);
   const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)];
   const between = (min: number, max: number, step = 1) => min + Math.floor((rand() * (max - min)) / step + 0.5) * step;
-
-  // ── Attendance: from the first unpaid month to today. Sundays are the weekly off. ─
-
-  const attendance: AttendanceRecord[] = [];
-  const workplace: Record<string, string[]> = {
-    "u-office": ["Polaki office"],
-    "u-godown": ["Polaki godown"],
-    "u-ramana": ["Tekkali", "Kotabommali", "Ponduru"],
-    "u-venkatesh": ["Narasannapeta", "Amadalavalasa", "Palasa"],
-    "u-driver": ["Polaki godown"],
-  };
-  for (let day = `${shiftMonth(payday.month, 1)}-01`; day <= SAMPLE_TODAY; day = addDays(day, 1)) {
-    for (const e of employees) {
-      if (isSunday(day)) {
-        attendance.push({ profileId: e.profileId, date: day, status: "holiday" });
-        continue;
-      }
-      const roll = rand();
-      const status = day === SAMPLE_TODAY ? "present" : roll < 0.86 ? "present" : roll < 0.91 ? "half_day" : roll < 0.96 ? "leave" : "absent";
-      if (status === "leave" || status === "absent") {
-        attendance.push({ profileId: e.profileId, date: day, status });
-        continue;
-      }
-      const start = e.profileId === "u-driver" ? 8 * 60 + 30 : 9 * 60;
-      const inAt = start + between(-12, 32);
-      const outAt = status === "half_day" ? 13 * 60 + between(0, 40) : 18 * 60 + between(0, 90);
-      attendance.push({
-        profileId: e.profileId,
-        date: day,
-        status,
-        checkIn: time(inAt),
-        // Nobody has checked out yet today.
-        checkOut: day === SAMPLE_TODAY ? undefined : time(outAt),
-        location: pick(workplace[e.profileId] ?? e.areas),
-        late: inAt > start + 15,
-      });
-    }
-  }
-  // One corrected record, so the audit note shows up.
-  {
-    const r = attendance.find((a) => a.profileId === "u-godown" && a.status === "absent") ?? attendance.find((a) => a.profileId === "u-godown" && a.status === "leave");
-    if (r) {
-      r.status = "present";
-      r.checkIn = "09:05";
-      r.checkOut = "18:20";
-      r.location = "Polaki godown";
-      r.correctedBy = "u-owner";
-      r.correctionReason = "Phone battery died; was at the godown all day";
-    }
-  }
 
   // ── Tour visits: last week, this week and next week for field staff ────────
 
@@ -107,7 +56,7 @@ export function buildPhase3(book: SampleBook) {
       for (let i = 0; i < count; i++) {
         const purpose = rand() < 0.45 ? "collection" : rand() < 0.7 ? "order" : rand() < 0.85 ? "new_party" : "complaint";
         const party = purpose === "new_party" ? undefined : pick(mine);
-        const place = party?.place ?? pick(workplace[staff] ?? ["Polaki"]);
+        const place = party?.place ?? pick(employees.find((e) => e.profileId === staff)?.areas ?? ["Polaki"]);
         const past = day < SAMPLE_TODAY || (day === SAMPLE_TODAY && i === 0);
         const roll = rand();
         const status = past ? (roll < 0.78 ? "completed" : roll < 0.9 ? "postponed" : "cancelled") : "planned";
@@ -169,24 +118,19 @@ export function buildPhase3(book: SampleBook) {
     },
   ];
 
-  /** The last paid month (paid on the 5th, matching the salary expenses); later months are worked out from attendance. */
+  /** The last paid month (paid on the 5th, matching the salary expenses), then each later month: salary less loan instalments. */
   function salarySlips(): SalarySlip[] {
     const slips: SalarySlip[] = [];
     for (const e of employees) {
-      slips.push({ profileId: e.profileId, month: payday.month, gross: e.monthlySalary, absenceDeduction: 0, loanDeduction: 0, net: e.monthlySalary, paidOn: payday.on });
+      slips.push({ profileId: e.profileId, month: payday.month, gross: e.monthlySalary, loanDeduction: 0, net: e.monthlySalary, paidOn: payday.on });
       for (let month = shiftMonth(payday.month, 1); month <= thisMonth; month = shiftMonth(month, 1)) {
-        const days = attendance.filter((a) => a.profileId === e.profileId && a.date.startsWith(month));
-        const unpaidDays = days.filter((a) => a.status === "absent").length + days.filter((a) => a.status === "half_day").length * 0.5;
-        const perDay = e.monthlySalary / 26;
-        const absenceDeduction = Math.round(unpaidDays * perDay);
         const loanDeduction = loans.filter((l) => l.profileId === e.profileId && l.amount > l.repayments.reduce((s, r) => s + r.amount, 0)).reduce((s, l) => s + l.emi, 0);
         slips.push({
           profileId: e.profileId,
           month,
           gross: e.monthlySalary,
-          absenceDeduction,
           loanDeduction,
-          net: e.monthlySalary - absenceDeduction - loanDeduction,
+          net: e.monthlySalary - loanDeduction,
         });
       }
     }
@@ -266,5 +210,5 @@ export function buildPhase3(book: SampleBook) {
       time: i === 0 ? "10:40" : i === 1 ? "12:15" : undefined,
     }));
 
-  return { attendance, visits, targets, loans, salarySlips, orders, deliveries };
+  return { visits, targets, loans, salarySlips, orders, deliveries };
 }

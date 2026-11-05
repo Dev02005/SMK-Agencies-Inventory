@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { OwnerPage } from "@/components/auth/owner-only";
-import { LorryCost, LorryDue, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { LorryCost, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
 import { BackLink, ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getFirms, getLorries, getProducts, getToday } from "@/lib/data";
+import { getFirms, getLorries, getNextBillNo, getProducts, getToday } from "@/lib/data";
+import { isSavedLorry } from "@/lib/lorries";
 import { LorrySaleForm } from "./lorry-sale-form";
 
 export const metadata: Metadata = { title: "Update lorry sale" };
@@ -26,21 +27,20 @@ export default function LorrySalePage({ params }: PageProps<"/sales/lorries/[id]
 
 async function Lorry({ params }: { params: PageProps<"/sales/lorries/[id]">["params"] }) {
   const { id } = await params;
-  const [lorries, products, firms, today] = await Promise.all([getLorries(), getProducts(), getFirms(), getToday()]);
+  const [lorries, products, firms, today, nextBillNo] = await Promise.all([getLorries(), getProducts(), getFirms(), getToday(), getNextBillNo()]);
   const lorry = lorries.find((l) => l.id === id);
   if (!lorry) notFound();
   return (
     <>
-      <PageHeader title={<LorryTitle lorry={lorry} />} subtitle="Update what is sold from this lorry" actions={<LorryStateChip lorry={lorry} today={today} />} />
+      <PageHeader title={<LorryTitle lorry={lorry} />} subtitle="Update what is sold from this lorry" actions={<LorryStateChip lorry={lorry} />} />
       <div className="space-y-4">
         <SectionCard title="The lorry">
           <LorryMeta lorry={lorry} firmName={firms.find((f) => f.id === lorry.firmId)?.name} />
           <LorryItems lorry={lorry} products={products} />
           <LorryCost lorry={lorry} />
-          <LorryDue lorry={lorry} today={today} />
         </SectionCard>
-        {lorry.original ? (
-          <LorrySaleForm lorry={lorry} products={products} today={today} />
+        {isSavedLorry(lorry) ? (
+          <LorrySaleForm lorry={lorry} products={products} today={today} nextBillNo={nextBillNo} />
         ) : (
           <SectionCard>Sample lorry: only lorries you enter can be updated.</SectionCard>
         )}

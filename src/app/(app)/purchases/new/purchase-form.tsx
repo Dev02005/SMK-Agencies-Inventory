@@ -10,6 +10,8 @@ import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import type { Godown, Product } from "@/lib/data/types";
 import { formatINR } from "@/lib/format";
+import { mobileOf } from "@/lib/mobile";
+import { NewSupplier, type Supplier } from "./new-supplier";
 
 /** Purchase invoice from a company, for one of the owner's firms; saving also brings the stock into the chosen godown. */
 export function PurchaseForm({
@@ -31,14 +33,18 @@ export function PurchaseForm({
   const toast = useToast();
   // With more than one firm nothing is picked, so the firm is always chosen on purpose.
   const [firmId, setFirmId] = useState(firms.length === 1 ? firms[0].id : "");
+  // Suppliers added here join the list straight away.
+  const [companyList, setCompanyList] = useState<Supplier[]>(companies);
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
+  // What was typed in the company search when "New supplier" was picked; null while that form is closed.
+  const [newSupplier, setNewSupplier] = useState<string | null>(null);
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [receivedDate, setReceivedDate] = useState(today);
   const [lorryNo, setLorryNo] = useState("");
+  const [driverMobile, setDriverMobile] = useState("");
   const [godownId, setGodownId] = useState(godowns[0]?.id ?? "");
   const offeredBy = (supplierId: string) => {
-    const brands = companies.find((c) => c.id === supplierId)?.brands;
+    const brands = companyList.find((c) => c.id === supplierId)?.brands;
     const theirs = brands?.length ? products.filter((p) => brands.includes(p.brand)) : [];
     return theirs.length ? theirs : products;
   };
@@ -51,12 +57,12 @@ export function PurchaseForm({
     ? "Choose which firm this purchase is for."
     : !invoiceNo.trim()
     ? "Enter the company's invoice number."
+    : mobileOf(driverMobile).length !== 10
+    ? "Enter the driver's 10-digit mobile number."
     : !lines.some((l) => toNumber(l.qty) > 0)
       ? "Enter the quantity for at least one item."
       : !(total > 0)
         ? "Enter the total invoice value."
-      : receivedDate < invoiceDate
-        ? "The truck can't arrive before the invoice date."
         : null;
 
   const save = () => !missing && toast(sampleSaveMessage("purchase"));
@@ -86,28 +92,53 @@ export function PurchaseForm({
               // Start the items again with what the new company sells.
               setLines([newLine(1, offeredBy(next)[0])]);
             }}
-            options={companies.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
+            options={companyList.map((c) => ({ value: c.id, label: c.name, hint: c.brands?.join(", ") }))}
+            searchable
+            action={{ label: "New supplier", onPick: setNewSupplier }}
           />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-3">
+        {newSupplier !== null && (
+          <NewSupplier
+            typed={newSupplier}
+            brands={[...new Set(products.map((p) => p.brand))].sort((a, b) => a.localeCompare(b))}
+            onCancel={() => setNewSupplier(null)}
+            onDone={(s) => {
+              setCompanyList((list) => (list.some((c) => c.id === s.id) ? list : [...list, s]));
+              setCompanyId(s.id);
+              const brands = s.brands;
+              const theirs = brands?.length ? products.filter((p) => brands.includes(p.brand)) : [];
+              setLines([newLine(1, (theirs.length ? theirs : products)[0])]);
+              setNewSupplier(null);
+              toast(`${s.name} added as a supplier`);
+            }}
+          />
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Invoice no." htmlFor={`${id}-inv`}>
             <input id={`${id}-inv`} className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
           </Field>
           <Field label="Invoice date" htmlFor={`${id}-invdate`}>
             <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
           </Field>
-          <Field label="Truck received on" htmlFor={`${id}-recv`}>
-            <DatePicker id={`${id}-recv`} label="Truck arrived on" value={receivedDate} onChange={setReceivedDate} />
-          </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Lorry number" htmlFor={`${id}-lorry`}>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Truck number" htmlFor={`${id}-lorry`}>
             <input
               id={`${id}-lorry`}
               className={inputClass}
               placeholder="AP 39 T 7781"
               value={lorryNo}
               onChange={(e) => setLorryNo(e.target.value.toUpperCase())}
+            />
+          </Field>
+          <Field label="Driver number" htmlFor={`${id}-driver`}>
+            <AffixInput
+              id={`${id}-driver`}
+              prefix="+91"
+              inputMode="numeric"
+              autoComplete="off"
+              value={driverMobile}
+              onChange={(e) => setDriverMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
             />
           </Field>
           <Field label="Unload at" htmlFor={`${id}-godown`} hint="Its items go into this godown's stock">

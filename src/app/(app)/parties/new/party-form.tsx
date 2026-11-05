@@ -79,7 +79,6 @@ export function PartyForm({ staff }: { staff: { id: string; name: string }[] }) 
             { value: "customer", label: "Customer" },
             { value: "sub_dealer", label: "Sub-dealer" },
             { value: "company", label: "Supplier" },
-            { value: "lorry_owner", label: "Lorry" },
           ]}
         />
         <Field label="Party name" htmlFor={`${id}-name`}>

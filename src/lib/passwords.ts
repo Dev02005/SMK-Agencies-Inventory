@@ -2,14 +2,15 @@ import "server-only";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { Profile } from "@/lib/data/types";
 import { readRecord, saving, writeRecord } from "@/lib/data/store";
-import { mobileOf } from "@/lib/mobile";
+import { DEFAULT_CODE } from "@/lib/password-rules";
 
 /**
- * Passwords people set for themselves (Settings › Account). Everyone starts with their mobile number. The ones they
- * set are kept as salted scrypt hashes, never the passwords, in the passwords.json record (store.ts: local-data/ on a
- * computer, Supabase online); deleting someone's line there puts them back on their mobile number.
+ * 6-digit sign-in codes people set for themselves (Settings › Account). Everyone starts with 000000. The ones they set
+ * are kept as salted scrypt hashes, never the codes, in the login-codes.json record (store.ts: local-data/ on a
+ * computer, Supabase online); deleting someone's line there puts them back on 000000. (The older passwords.json
+ * record, from when these were free-text passwords, is no longer read.)
  */
-const FILE = "passwords.json";
+const FILE = "login-codes.json";
 
 function savedHashes(): Record<string, string> {
   const saved = (readRecord(FILE) as { passwords?: Record<string, unknown> } | undefined)?.passwords ?? {};
@@ -28,20 +29,18 @@ export function hashMatches(secret: string, saved: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-/** Whether `password` is this person's password: the one they set, or else their mobile number. */
-export function checkPassword(person: Pick<Profile, "id" | "mobile">, password: string): boolean {
+/** Whether `code` is this person's sign-in code: the one they set, or else 000000. */
+export function checkPassword(person: Pick<Profile, "id">, code: string): boolean {
   const saved = savedHashes()[person.id];
-  if (saved) return hashMatches(password, saved);
-  // Until they set one, the password is their mobile number, typed with or without +91.
-  const typed = mobileOf(password);
-  return typed.length === 10 && typed === mobileOf(person.mobile);
+  if (saved) return hashMatches(code, saved);
+  return code === DEFAULT_CODE;
 }
 
 export async function setPassword(userId: string, password: string) {
   const hashed = hashSecret(password);
   await saving(() =>
     writeRecord(FILE, {
-      about: "Passwords people set for themselves, as salted hashes (never the passwords). Delete a line to put that person back on their mobile number.",
+      about: "6-digit sign-in codes people set for themselves, as salted hashes (never the codes). Delete a line to put that person back on 000000.",
       passwords: { ...savedHashes(), [userId]: hashed },
     }),
   );

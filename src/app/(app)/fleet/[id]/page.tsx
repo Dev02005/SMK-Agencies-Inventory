@@ -8,7 +8,8 @@ import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/c
 import { DataTable } from "@/components/ui/data-table";
 import { ExportMenu } from "@/components/ui/export-menu";
 import { PageHeader } from "@/components/ui/page-header";
-import { getVehicle } from "@/lib/data";
+import { getProfiles, getVehicle, getVehicles } from "@/lib/data";
+import { VehicleEditor } from "./vehicle-editor";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { expenseHeadLabels } from "@/lib/labels";
 import { OwnerPage } from "@/components/auth/owner-only";
@@ -32,6 +33,15 @@ async function VehicleDetail({ params }: { params: PageProps<"/fleet/[id]">["par
   const { id } = await params;
   const v = await getVehicle(id);
   if (!v) notFound();
+  const [profiles, vehicles] = await Promise.all([getProfiles(), getVehicles()]);
+  // Our drivers, each with the vehicle they drive now, for the editor's Driver list.
+  const drivers = profiles
+    .filter((p) => p.role === "driver" && p.active)
+    .map((p) => {
+      const on = vehicles.find((x) => x.driverId === p.id && x.id !== v.id);
+      return { id: p.id, name: p.fullName, hint: on ? `drives ${on.number}` : undefined };
+    });
+  const group = v.category === "rented" ? "rented" : v.kind === "car" || v.kind === "bike" ? "personal" : "commercial";
 
   return (
     <>
@@ -41,6 +51,24 @@ async function VehicleDetail({ params }: { params: PageProps<"/fleet/[id]">["par
             <ExportMenu title={`Vehicle ${v.number}`} />
           </>
         } />
+      {v.original && (
+        <div className="mb-4">
+          <VehicleEditor
+            key={`${v.id}|${v.number}|${v.model}|${v.kind}|${v.category}|${v.driverId ?? ""}|${v.rentDriver?.name ?? ""}|${v.rentDriver?.mobile ?? ""}`}
+            vehicle={{
+              id: v.id,
+              number: v.number,
+              group,
+              kind: v.kind,
+              model: v.model,
+              driverId: v.driverId,
+              driverName: v.driverName,
+              driverMobile: v.rentDriver?.mobile,
+            }}
+            drivers={drivers}
+          />
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Papers">
           {v.renewals.length === 0 ? (

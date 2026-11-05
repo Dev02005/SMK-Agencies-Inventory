@@ -1,7 +1,6 @@
 import { ClipboardList, FileText, HandCoins, Route, Wallet } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { AttendanceChip } from "@/components/people/attendance-chip";
 import { TargetBar } from "@/components/people/target-bar";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
@@ -46,7 +45,7 @@ async function FieldDay({ profileId }: { profileId: string }) {
   const d = await getFieldHome(me.role === "field" ? me.id : profileId);
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <SectionCard title={`Hello, ${d.name}`} action={<AttendanceChip record={d.attendance} />}>
+      <SectionCard title={`Hello, ${d.name}`}>
         <p className="text-[13px] text-ink-secondary">Cash with you</p>
         <p className="text-[34px] font-semibold leading-[41px] tracking-[-0.4px] tabular-nums text-ink">{formatINR(d.cash?.closing ?? 0)}</p>
         <p className="text-[13px] text-ink-secondary">Collected today {formatINR(d.cash?.collections ?? 0)}</p>

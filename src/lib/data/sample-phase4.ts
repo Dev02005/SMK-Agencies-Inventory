@@ -1,27 +1,29 @@
 /**
- * Sample data for phase 4 screens: vehicles, documents and service log, freight chart, trips, godown transfers,
+ * Sample data for phase 4 screens: vehicles, documents and service log, delivery places, trips, godown transfers,
  * suspense loads and GPS positions. Town positions are approximate and only for the sample map.
  */
 import type { FleetEntry } from "./local-data";
 import { addDays, dateShifter, type SampleBook } from "./sample";
-import { fleet, fleetLabel } from "./sample-fleet";
-import type { FreightRate, ServiceRecord, StockTransfer, SuspenseLoad, Trip, Vehicle } from "./types";
+import { fleet, fleetLabel, hasRealFleet } from "./sample-fleet";
+import type { ServiceRecord, StockTransfer, SuspenseLoad, Trip, Vehicle } from "./types";
 
-// ── Freight chart (from Polaki) ──────────────────────────────────────────────
+// ── Places we deliver to (from Polaki): shown on the vehicle map. No freight rates: the owner gives freight per bag on each sale. ──
 
-export const freightRates: FreightRate[] = [
-  { id: "fr-polaki", place: "Polaki", distanceKm: 2, perBag: 3, perMT: 55, minimum: 300, lat: 18.395, lng: 84.105 },
-  { id: "fr-narasannapeta", place: "Narasannapeta", distanceKm: 9, perBag: 5, perMT: 90, minimum: 600, lat: 18.415, lng: 84.044 },
-  { id: "fr-kotabommali", place: "Kotabommali", distanceKm: 12, perBag: 6, perMT: 110, minimum: 700, lat: 18.464, lng: 84.17 },
-  { id: "fr-srikurmam", place: "Srikurmam", distanceKm: 18, perBag: 7, perMT: 130, minimum: 900, lat: 18.272, lng: 84.007 },
-  { id: "fr-srikakulam", place: "Srikakulam", distanceKm: 25, perBag: 8, perMT: 150, minimum: 1000, lat: 18.298, lng: 83.897 },
-  { id: "fr-amadalavalasa", place: "Amadalavalasa", distanceKm: 28, perBag: 9, perMT: 165, minimum: 1100, lat: 18.41, lng: 83.902 },
-  { id: "fr-etcherla", place: "Etcherla", distanceKm: 32, perBag: 10, perMT: 180, minimum: 1200, lat: 18.27, lng: 83.83 },
-  { id: "fr-tekkali", place: "Tekkali", distanceKm: 38, perBag: 11, perMT: 200, minimum: 1400, lat: 18.606, lng: 84.231 },
-  { id: "fr-ponduru", place: "Ponduru", distanceKm: 42, perBag: 12, perMT: 220, minimum: 1500, lat: 18.351, lng: 83.761 },
-  { id: "fr-palasa", place: "Palasa", distanceKm: 65, perBag: 16, perMT: 290, minimum: 2200, lat: 18.773, lng: 84.41 },
+export type Place = { name: string; distanceKm: number; lat: number; lng: number };
+
+export const places: Place[] = [
+  { name: "Polaki", distanceKm: 2, lat: 18.395, lng: 84.105 },
+  { name: "Narasannapeta", distanceKm: 9, lat: 18.415, lng: 84.044 },
+  { name: "Kotabommali", distanceKm: 12, lat: 18.464, lng: 84.17 },
+  { name: "Srikurmam", distanceKm: 18, lat: 18.272, lng: 84.007 },
+  { name: "Srikakulam", distanceKm: 25, lat: 18.298, lng: 83.897 },
+  { name: "Amadalavalasa", distanceKm: 28, lat: 18.41, lng: 83.902 },
+  { name: "Etcherla", distanceKm: 32, lat: 18.27, lng: 83.83 },
+  { name: "Tekkali", distanceKm: 38, lat: 18.606, lng: 84.231 },
+  { name: "Ponduru", distanceKm: 42, lat: 18.351, lng: 83.761 },
+  { name: "Palasa", distanceKm: 65, lat: 18.773, lng: 84.41 },
 ];
-const placeByName = (name?: string) => freightRates.find((f) => f.place === name);
+const placeByName = (name?: string) => places.find((f) => f.name === name);
 
 /** Same wording the expense screens use when an expense is charged to a vehicle. */
 export { vehicleLabel } from "./sample-fleet";
@@ -47,7 +49,7 @@ export function buildPhase4(book: SampleBook) {
 
   // Papers, service and GPS for the sample vehicles. A real vehicle that replaced one (local-data/vehicles.json) keeps
   // them until its own are entered; a real vehicle added new starts with none.
-  const details: Record<string, Omit<Vehicle, keyof FleetEntry>> = {
+  const details: Record<string, Omit<Vehicle, Exclude<keyof FleetEntry, "driverId">>> = {
     "v-lorry": {
       capacityMT: 25,
       driverId: "u-driver",
@@ -69,9 +71,12 @@ export function buildPhase4(book: SampleBook) {
     "v-bike-2": { driverId: "u-venkatesh", odometer: 18900, nextServiceKm: 21000, documents: { insurance: at("2027-05-19"), pollution: at("2027-01-09") } },
     "v-rent": { capacityMT: 15, ownerPartyId: "ganesh", odometer: 0, nextServiceKm: 0, documents: {} },
   };
-  const vehicles: Vehicle[] = fleet.map((v) => ({ ...v, ...(details[v.id] ?? { odometer: 0, nextServiceKm: 0, documents: {} }) }));
+  // The firm's own vehicles start with nothing filled in: the sample papers, service, GPS and drivers stay on the sample ones.
+  const blank = { odometer: 0, nextServiceKm: 0, documents: {} };
+  const vehicles: Vehicle[] = fleet.map((v) => ({ ...v, ...(v.original ? blank : (details[v.id] ?? blank)), ...(v.original ? { driverId: v.driverId } : {}) }));
+  const sampleVehicle = (id: string) => vehicles.some((v) => v.id === id && !v.original);
 
-  const serviceLog: ServiceRecord[] = [
+  const allServiceLog: ServiceRecord[] = [
     { id: "sr-1", vehicleId: "v-lorry", date: at("2026-10-14"), kind: "brakes", odometer: 111620, cost: 6200, garage: "Sai Auto Works, Narasannapeta", notes: "Brake lining and labour" },
     { id: "sr-2", vehicleId: "v-lorry", date: at("2026-07-22"), kind: "service", odometer: 105010, cost: 14800, garage: "Ashok Leyland service, Srikakulam", notes: "10,000 km service; engine oil and filters" },
     { id: "sr-3", vehicleId: "v-lorry", date: at("2026-03-12"), kind: "tyres", odometer: 92300, cost: 86000, garage: "MRF tyre shop, Srikakulam", notes: "Six rear tyres" },
@@ -81,11 +86,13 @@ export function buildPhase4(book: SampleBook) {
     { id: "sr-7", vehicleId: "v-bike-1", date: at("2026-09-10"), kind: "oil", odometer: 19050, cost: 650, garage: "Local mechanic, Tekkali" },
     { id: "sr-8", vehicleId: "v-bike-2", date: at("2026-08-02"), kind: "service", odometer: 16100, cost: 1100, garage: "Honda service, Narasannapeta" },
   ];
+  const serviceLog = allServiceLog.filter((r) => sampleVehicle(r.vehicleId));
 
   // ── Trips: our lorry's delivery runs, made from the FOR bills of the last two weeks ─────
 
   const trips: Trip[] = [];
-  {
+  // Sample trips only on the sample lorry, never on one of the firm's own.
+  if (vehicles[0] && !vehicles[0].original) {
     const lorry = vehicles[0];
     let km = lorry.odometer;
     const days = [...new Set(sales.filter((s) => s.transportMode === "FOR" && s.status === "saved" && s.billDate >= addDays(SAMPLE_TODAY, -13)).map((s) => s.billDate))].sort().reverse();
@@ -155,7 +162,7 @@ export function buildPhase4(book: SampleBook) {
   const assignedSale = sales.find((s) => s.partyId === "sai" && s.status === "saved" && s.billDate >= at("2026-10-22"));
   const suspenseLoads: SuspenseLoad[] = [
     { id: "sl-1", date: SAMPLE_TODAY, godownId: "g-polaki", vehicle: fleetLabel("v-van"), productId: "p-deccan-opc", qty: 60, note: "Tekkali route; staff to find the buyer on the way" },
-    { id: "sl-2", date: addDays(SAMPLE_TODAY, -2), godownId: "g-srikakulam", vehicle: "Lorry AP 39 TA 6610 (rented)", productId: "p-deccan-opc", qty: 120, note: "Palasa site; contractor to confirm who pays" },
+    { id: "sl-2", date: addDays(SAMPLE_TODAY, -2), godownId: "g-srikakulam", vehicle: hasRealFleet() ? "" : "Lorry AP 39 TA 6610 (rented)", productId: "p-deccan-opc", qty: 120, note: "Palasa site; contractor to confirm who pays" },
     {
       id: "sl-3",
       date: at("2026-10-21"),

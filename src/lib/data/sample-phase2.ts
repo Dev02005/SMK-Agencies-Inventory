@@ -2,7 +2,7 @@
  * Sample data for phase 2 screens: staff cash, expenses, banks, bad debts, reminders and the owner's
  * personal records. Built on top of sample.ts so the cash book agrees with the receipts already there.
  */
-import { addDays, dateShifter, dayMonth, monthName, mulberry32, parties, profiles, salaryPayday, type SampleBook } from "./sample";
+import { addDays, dateShifter, dayMonth, monthName, mulberry32, bookParties as parties, profiles, salaryPayday, type SampleBook } from "./sample";
 import { fleetLabel } from "./sample-fleet";
 import { withLocalBanks } from "./local-data";
 import { shiftMonth } from "@/lib/format";
@@ -72,6 +72,8 @@ export function buildPhase2(book: SampleBook) {
   const expenses: Expense[] = [];
   let expenseNo = 601;
   function addExpense(e: Omit<Expense, "id" | "expenseNo" | "hasPhoto"> & { hasPhoto?: boolean }) {
+    // Fuel and repairs for a sample vehicle the firm's own have replaced: left out, not pinned on a real vehicle.
+    if (e.tag?.kind === "vehicle" && !e.tag.label) return;
     expenses.push({ ...e, id: `exp-${expenseNo}`, expenseNo: expenseNo++, hasPhoto: e.hasPhoto ?? rand() < 0.5 });
   }
 
@@ -249,13 +251,15 @@ export function buildPhase2(book: SampleBook) {
     },
   ];
 
-  const policies: InsurancePolicy[] = [
+  const allPolicies: InsurancePolicy[] = [
     { id: "ins-1", kind: "vehicle", title: VAN, insurer: "New India Assurance", policyNo: "•••• 7712", premium: 18500, frequency: "yearly", nextDue: at("2026-10-29"), sumAssured: 650000 },
     { id: "ins-2", kind: "life", title: `Life policy, ${profiles.find((p) => p.role === "owner")?.fullName ?? "owner"}`, insurer: "LIC", policyNo: "•••• 4410", premium: 48000, frequency: "yearly", nextDue: at("2027-02-14"), sumAssured: 2500000 },
     { id: "ins-3", kind: "health", title: "Family health cover", insurer: "Health insurer (sample)", policyNo: "•••• 9035", premium: 32400, frequency: "yearly", nextDue: at("2026-12-20"), sumAssured: 1000000 },
     { id: "ins-4", kind: "property", title: "Polaki godown stock and building", insurer: "New India Assurance", policyNo: "•••• 2261", premium: 21800, frequency: "yearly", nextDue: at("2027-01-08"), sumAssured: 4000000 },
     { id: "ins-5", kind: "vehicle", title: LORRY, insurer: "New India Assurance", policyNo: "•••• 5590", premium: 41200, frequency: "yearly", nextDue: at("2026-11-18"), sumAssured: 1400000 },
   ];
+  // A vehicle policy only while its sample vehicle is still in the fleet.
+  const policies = allPolicies.filter((p) => p.kind !== "vehicle" || p.title);
 
   const notes: Note[] = [
     { id: "n-1", title: `Call Deccan rep about ${monthName(shiftMonth(thisMonth, 1))} rates`, body: "Ask about the dealer discount on lots above 2,000 bags.", pinned: true, remindOn: at("2026-10-28") },
@@ -264,13 +268,14 @@ export function buildPhase2(book: SampleBook) {
     { id: "n-4", title: "Shop 2 agreement renewal", body: "Current agreement ends 31 March; discuss 8% increase.", pinned: false },
   ];
 
-  const documents: VaultDocument[] = [
+  const allDocuments: VaultDocument[] = [
     { id: "doc-1", title: "Shop 2 rent agreement", kind: "Agreement", fileName: "shop2-agreement-2024.pdf", expires: at("2027-03-31"), addedOn: "2024-04-02" },
     { id: "doc-2", title: `RC, ${VAN}`, kind: "Vehicle", fileName: "van-rc.jpg", addedOn: "2023-08-11" },
     { id: "doc-3", title: "LIC policy bond", kind: "Insurance", fileName: "lic-bond.pdf", addedOn: "2019-02-14" },
     { id: "doc-4", title: "Property tax receipt 2026–27", kind: "Property", fileName: "property-tax-2026.pdf", addedOn: at("2026-05-20") },
     { id: "doc-5", title: "Trade licence", kind: "Licence", fileName: "trade-licence.pdf", expires: at("2026-12-31"), addedOn: at("2026-01-04") },
   ];
+  const documents = allDocuments.filter((d) => d.kind !== "Vehicle" || VAN);
 
   /** Entries in the personal bank account (the business accounts are worked out from receipts and payments). */
   const personalBankEntries: BankEntry[] = [

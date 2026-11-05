@@ -1,24 +1,24 @@
 "use server";
 
-import { addLorryPurchase, deleteLorry, getCurrentUser, getFirms, getLorries, getParties, getProducts, getToday, updateLorry } from "@/lib/data";
+import { addLorryPurchase, deleteLorry, getCurrentUser, getFirms, getLorries, getParties, getProducts, getToday, updateLorry, updateLorryBills } from "@/lib/data";
 import type { Lorry } from "@/lib/data/types";
-import { lorrySaleValue, type DeviceLorry } from "@/lib/lorries";
+import { mobileOf } from "@/lib/mobile";
+import { isSavedLorry, lorrySaleValue, type DeviceLorry } from "@/lib/lorries";
 
 export type LorryInput = {
   firmId: string;
   companyId: string;
   lorryNo: string;
-  driverName: string;
-  invoiceNo: string;
+  /** The truck driver's mobile number. */
+  driverMobile: string;
   invoiceDate: string;
-  invoicePaperKept: boolean;
-  unloadingCharges: boolean;
-  sellOutDays: number;
+  /** The day the truck arrived. */
+  receivedOn?: string;
   lines: { productId: string; qty: number }[];
   invoiceValue: number;
 };
 
-export type LorryResult = { ok: true } | { ok: false; problem: string };
+export type LorryResult = { ok: true; billNumbers?: string[] } | { ok: false; problem: string };
 
 const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ").slice(0, max) : "");
@@ -27,20 +27,23 @@ const money = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v 
 
 const isOwner = async () => (await getCurrentUser()).role === "owner";
 
-/** Checks a lorry purchase against the saved firms, companies and products; returns it ready to save, or the problem. */
-async function checkLorry(input: LorryInput): Promise<Omit<Lorry, "id" | "original"> | string> {
+/**
+ * Checks a lorry purchase against the saved firms, companies and products; returns it ready to save, or the problem.
+ * `requireDriver` is off only for lorries an older version kept, which may have no driver's number.
+ */
+async function checkLorry(input: LorryInput, requireDriver = true): Promise<Omit<Lorry, "id" | "original"> | string> {
   const [firms, parties, products] = await Promise.all([getFirms(), getParties(), getProducts()]);
   const firm = firms.find((f) => f.id === input?.firmId);
   if (!firm) return "Choose which firm this lorry is bought for.";
   const company = parties.find((p) => p.id === input.companyId && p.kind === "company");
   if (!company) return "Choose the company that sent the lorry.";
   const lorryNo = text(input.lorryNo, 20).toUpperCase();
-  if (!lorryNo) return "Enter the lorry number.";
-  const driverName = text(input.driverName, 60);
-  if (!driverName) return "Enter the driver's name.";
+  if (!lorryNo) return "Enter the truck number.";
+  const driverMobile = mobileOf(text(input.driverMobile, 20));
+  if (driverMobile.length !== 10 && (requireDriver || driverMobile)) return "Enter the driver's 10-digit mobile number.";
   if (!isDate(input.invoiceDate)) return "Enter the invoice date.";
-  const sellOutDays = Number(input.sellOutDays);
-  if (!Number.isInteger(sellOutDays) || sellOutDays < 1 || sellOutDays > 60) return "Enter about how many days it takes to sell out (1 to 60).";
+  if (input.receivedOn !== undefined && !isDate(input.receivedOn)) return "Enter the day the truck was received.";
+  if (input.receivedOn && input.receivedOn < input.invoiceDate) return "The truck can't arrive before the invoice date.";
 
   // The same item on two rows is added together.
   const lines: Lorry["lines"] = [];
@@ -61,12 +64,12 @@ async function checkLorry(input: LorryInput): Promise<Omit<Lorry, "id" | "origin
     companyId: company.id,
     companyName: company.name,
     lorryNo,
-    driverName,
-    invoiceNo: text(input.invoiceNo, 40) || undefined,
+    driverMobile: driverMobile || undefined,
     invoiceDate: input.invoiceDate,
-    invoicePaperKept: Boolean(input.invoicePaperKept),
-    unloadingCharges: Boolean(input.unloadingCharges),
-    sellOutDays,
+    receivedOn: input.receivedOn || undefined,
+    // Ticked when the sale is updated (Sales › Lorry sales).
+    invoicePaperKept: false,
+    unloadingCharges: false,
     lines,
     invoiceValue: invoiceValue || undefined,
   };
@@ -88,44 +91,88 @@ export async function saveLorryPurchase(input: LorryInput): Promise<LorryResult>
 }
 
 export type LorrySaleInput = {
-  lines: { productId: string; qty: number; rate: number }[];
+  /** Each sale bill from the lorry: its number, who bought, how much of each item and the bill's amount. */
+  /** `billNo`: a bill already saved keeps its number; a new bill sends "" and is numbered next in the series on save. */
+  bills: { date: string; billNo: string; soldTo: string; lines: { productId: string; qty: number }[]; amount: number }[];
+  /** The sale's total invoice value: the bills added up, or what the owner typed in. */
+  invoiceValue: number;
   invoicePaperKept: boolean;
   unloadingCharges: boolean;
   /** Unloading charges received, when they are paid to us. */
   unloading: number;
-  other: number;
+  /** Other charges received, each with its name. */
+  others: { name: string; amount: number }[];
   notes: string;
   soldOut: boolean;
   soldOn: string;
 };
 
 /**
- * Sales › Lorry sales › Update: what has been sold from the lorry so far (each item's quantity and rate), the tick
- * boxes, charges received, and whether it is sold out (which ends the reminder). It can be updated again later.
+ * Sales › Lorry sales › Update: what has been sold from the lorry so far, bill by bill (each bill's number, who bought,
+ * the bags of each item and its amount), the tick boxes, charges received, and whether it is sold out (which ends the
+ * reminder). It can be updated again later.
  */
 export async function updateLorrySale(id: string, input: LorrySaleInput): Promise<LorryResult> {
   if (!(await isOwner())) return { ok: false, problem: "Only the owner can update lorry sales." };
   const lorry = (await getLorries()).find((l) => l.id === id);
   if (!lorry) return { ok: false, problem: "That lorry is no longer there. Reload the page." };
-  if (!lorry.original) return { ok: false, problem: "This is a sample lorry; only lorries you enter can be updated." };
+  if (!isSavedLorry(lorry)) return { ok: false, problem: "This is a sample lorry; only lorries you enter can be updated." };
 
-  const lines: NonNullable<Lorry["sale"]>["lines"] = [];
-  for (const line of Array.isArray(input?.lines) ? input.lines : []) {
-    const loaded = lorry.lines.find((l) => l.productId === line?.productId);
-    const qty = Number(line?.qty);
-    const rate = money(line?.rate);
-    if (!loaded || lines.some((l) => l.productId === loaded.productId)) return { ok: false, problem: "Check the items sold." };
-    if (!Number.isFinite(qty) || qty < 0 || qty > loaded.qty) return { ok: false, problem: `Sold can't be more than came on the lorry (${loaded.qty}).` };
-    if (rate === null) return { ok: false, problem: "Enter the rate in rupees." };
-    if (qty > 0 && rate === 0) return { ok: false, problem: "Enter the rate for each item sold." };
-    lines.push({ productId: loaded.productId, qty, rate });
+  // Each bill; empty rows are dropped, and the same item twice on a bill is added together.
+  const bills: NonNullable<NonNullable<Lorry["sale"]>["bills"]> = [];
+  const list = Array.isArray(input?.bills) ? input.bills : [];
+  if (list.length > 200) return { ok: false, problem: "Too many bills." };
+  for (const bill of list) {
+    const billLines: { productId: string; qty: number }[] = [];
+    for (const line of Array.isArray(bill?.lines) ? bill.lines : []) {
+      const qty = Number(line?.qty);
+      if (!lorry.lines.some((l) => l.productId === line?.productId) || !Number.isFinite(qty) || qty < 0 || qty > 1_000_000) return { ok: false, problem: "Check the items on the bills." };
+      if (qty === 0) continue;
+      const same = billLines.find((l) => l.productId === line.productId);
+      if (same) same.qty += qty;
+      else billLines.push({ productId: line.productId, qty });
+    }
+    // Only a number this lorry's bills already have is kept; anything else is a new bill, numbered on save.
+    const asked = text(bill?.billNo, 20);
+    const billNo = lorry.sale?.bills?.some((b) => b.billNo === asked) || (asked && asked === lorry.sale?.invoiceNo && !lorry.sale?.bills?.length) ? asked : "";
+    const name = billNo ? `bill ${billNo}` : "the new bill";
+    const soldTo = text(bill?.soldTo, 60) || undefined;
+    const amount = money(bill?.amount);
+    if (amount === null) return { ok: false, problem: "Enter each bill's amount in rupees." };
+    if (billLines.length === 0 && amount === 0 && !soldTo) continue;
+    if (billLines.length === 0) return { ok: false, problem: `Enter how much is on ${name}.` };
+    if (amount === 0) return { ok: false, problem: `Enter the amount of ${name}.` };
+    const date = isDate(bill?.date) && bill.date >= lorry.invoiceDate ? bill.date : undefined;
+    if (bill?.date && !date) return { ok: false, problem: `${name[0].toUpperCase()}${name.slice(1)} can't be dated before the lorry's invoice date.` };
+    bills.push({ date, billNo, soldTo, lines: billLines, amount });
   }
+  // What is sold of each item: the bills added up, never more than came on the lorry.
+  const lines: NonNullable<Lorry["sale"]>["lines"] = [];
+  for (const loaded of lorry.lines) {
+    const qty = bills.reduce((s, b) => s + (b.lines.find((l) => l.productId === loaded.productId)?.qty ?? 0), 0);
+    if (qty > loaded.qty) return { ok: false, problem: `Sold can't be more than came on the lorry (${loaded.qty}).` };
+    lines.push({ productId: loaded.productId, qty });
+  }
+  const typed = money(input.invoiceValue);
+  if (typed === null) return { ok: false, problem: "Enter the total invoice value in rupees." };
+  const invoiceValue = typed || Math.round(bills.reduce((s, b) => s + b.amount, 0) * 100) / 100;
+  if (bills.length && !(invoiceValue > 0)) return { ok: false, problem: "Enter the total invoice value." };
+  const invoiceNo = bills.map((b) => b.billNo).join(", ") || undefined;
   const unloading = input.unloadingCharges ? money(input.unloading) : 0;
-  const other = money(input.other);
-  if (unloading === null || other === null) return { ok: false, problem: "Enter the charges in rupees." };
+  const others: { name: string; amount: number }[] = [];
+  for (const c of Array.isArray(input.others) ? input.others.slice(0, 50) : []) {
+    const amount = money(c?.amount);
+    const name = text(c?.name, 40);
+    if (amount === null) return { ok: false, problem: "Enter the charges in rupees." };
+    if (amount === 0) continue;
+    if (!name) return { ok: false, problem: "Enter a name for each other charge." };
+    others.push({ name, amount });
+  }
+  const other = Math.round(others.reduce((s, c) => s + c.amount, 0) * 100) / 100;
+  if (unloading === null) return { ok: false, problem: "Enter the charges in rupees." };
   const notes = text(input.notes, 200) || undefined;
   const today = await getToday();
-  const sale = { lines, unloading: unloading || undefined, other: other || undefined, notes, updatedOn: today };
+  const sale = { lines, bills, invoiceNo, invoiceValue, unloading: unloading || undefined, other: other || undefined, others: others.length ? others : undefined, notes, updatedOn: today };
   const value = lorrySaleValue({ sale, unloadingCharges: Boolean(input.unloadingCharges) });
 
   let sold: Lorry["sold"];
@@ -134,8 +181,9 @@ export async function updateLorrySale(id: string, input: LorrySaleInput): Promis
     if (!(value > 0)) return { ok: false, problem: "Enter what was sold before marking it sold out." };
     sold = { on: input.soldOn, value, notes };
   }
-  await updateLorry(id, { sale, sold, invoicePaperKept: Boolean(input.invoicePaperKept), unloadingCharges: Boolean(input.unloadingCharges) });
-  return { ok: true };
+  // New bills are numbered here, next in the series that godown and lorry bills share.
+  const { saved, numbers } = await updateLorryBills(id, { sale, sold, invoicePaperKept: Boolean(input.invoicePaperKept), unloadingCharges: Boolean(input.unloadingCharges) });
+  return saved ? { ok: true, billNumbers: numbers } : { ok: false, problem: "That lorry is no longer there. Reload the page." };
 }
 
 /**
@@ -165,21 +213,23 @@ export async function importDeviceLorries(list: DeviceLorry[]): Promise<{ ok: tr
       firmId: old.firmId ?? primary.id,
       companyId: old.companyId,
       lorryNo,
-      driverName: old.driverName,
-      invoiceNo: old.invoiceNo ?? "",
+      // Older lorries kept the driver's name; a number typed there is kept as their mobile.
+      driverMobile: mobileOf(old.driverName ?? "").length === 10 ? old.driverName : "",
       invoiceDate: invoiceDate ?? "",
-      invoicePaperKept: old.invoicePaperKept,
-      unloadingCharges: old.unloadingCharges,
-      // Older lorries may not say; the reminder then comes a day after the invoice date.
-      sellOutDays: old.sellOutDays && old.sellOutDays > 0 ? old.sellOutDays : 1,
       lines: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
       invoiceValue: lines.length > 0 && lines.every((l) => l.rate) ? lines.reduce((s, l) => s + (l.rate ?? 0) * l.qty, 0) : 0,
-    });
+    }, false);
     if (typeof lorry === "string") {
       skipped++;
       continue;
     }
-    const added = await addLorryPurchase(lorry);
+    // An older lorry keeps the company's invoice number and tick boxes it was saved with.
+    const added = await addLorryPurchase({
+      ...lorry,
+      invoiceNo: text(old.invoiceNo, 40) || undefined,
+      invoicePaperKept: Boolean(old.invoicePaperKept),
+      unloadingCharges: Boolean(old.unloadingCharges),
+    });
     const value = money(old.closed?.value);
     if (value && old.closed && isDate(old.closed.on)) {
       await updateLorry(added.id, { sold: { on: old.closed.on, value }, invoicePaperKept: added.invoicePaperKept, unloadingCharges: added.unloadingCharges });

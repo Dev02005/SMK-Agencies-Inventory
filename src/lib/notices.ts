@@ -1,7 +1,7 @@
 /** Notification shape and per-person filter, kept apart from the data layer so the bell can use them in the browser. */
 import type { Role } from "@/lib/data/types";
 
-export type NoticeKind = "approval" | "dues" | "renewal" | "stock" | "order" | "cash" | "personal" | "delivery" | "lorry";
+export type NoticeKind = "approval" | "dues" | "renewal" | "stock" | "order" | "cash" | "personal" | "delivery";
 
 export type Notice = {
   /** Stable, so "read" survives a reload. */

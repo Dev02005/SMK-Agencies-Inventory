@@ -3,7 +3,7 @@ import { SampleTag } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import type { Lorry, Product } from "@/lib/data/types";
 import { formatDate, formatINR } from "@/lib/format";
-import { daysFrom, lorryState, lorryStateChip, updateDueOn } from "@/lib/lorries";
+import { lorryState, lorryStateChip } from "@/lib/lorries";
 import { lineQty } from "@/lib/quantities";
 
 /** "AP 39 T 1234" with the lorry icon, marked when it is sample data. */
@@ -17,18 +17,19 @@ export function LorryTitle({ lorry }: { lorry: Lorry }) {
   );
 }
 
-/** Selling, Update due today, Sale not updated, or Sold out. */
-export function LorryStateChip({ lorry, today }: { lorry: Lorry; today: string }) {
-  const state = lorryStateChip[lorryState(lorry, today)];
+/** Selling or Sold out. */
+export function LorryStateChip({ lorry }: { lorry: Lorry }) {
+  const state = lorryStateChip[lorryState(lorry)];
   return <Chip tone={state.tone}>{state.label}</Chip>;
 }
 
-/** Company · driver · invoice · date, and which firm bought it. */
+/** Company · driver's number · our sale invoice (or the company's, on an older lorry) · date, and which firm bought it. */
 export function LorryMeta({ lorry, firmName }: { lorry: Lorry; firmName?: string }) {
+  const invoiceNo = lorry.sale?.invoiceNo ?? lorry.invoiceNo;
   return (
     <>
       <p className="-mt-2 text-[13px] text-ink-secondary">
-        {[lorry.companyName, lorry.driverName && `driver ${lorry.driverName}`, lorry.invoiceNo ? `invoice ${lorry.invoiceNo}` : "no invoice number", formatDate(lorry.invoiceDate)]
+        {[lorry.companyName, lorry.driverMobile && `driver +91 ${lorry.driverMobile}`, invoiceNo && `invoice ${invoiceNo}`, formatDate(lorry.invoiceDate), lorry.receivedOn && lorry.receivedOn !== lorry.invoiceDate && `received ${formatDate(lorry.receivedOn)}`]
           .filter(Boolean)
           .join(" · ")}
       </p>
@@ -54,12 +55,12 @@ export function LorryItems({ lorry, products }: { lorry: Lorry; products: Produc
   );
 }
 
-/** The invoice value, whether we have the paper copy, and whether unloading charges are paid to us. */
+/** What it was bought for, whether we have the paper copy, and whether unloading charges are paid to us. */
 export function LorryCost({ lorry }: { lorry: Lorry }) {
   return (
     <dl className="mt-2 space-y-1 border-t border-hairline pt-2 text-[15px]">
       <div className="flex justify-between">
-        <dt className="text-ink-secondary">Invoice value</dt>
+        <dt className="text-ink-secondary">Bought for (company invoice)</dt>
         <dd className="font-semibold tabular-nums text-ink">{lorry.invoiceValue ? formatINR(lorry.invoiceValue) : "Not entered"}</dd>
       </div>
       <div className="flex justify-between">
@@ -71,22 +72,5 @@ export function LorryCost({ lorry }: { lorry: Lorry }) {
         <dd className="text-ink">{lorry.unloadingCharges ? "Yes" : "No"}</dd>
       </div>
     </dl>
-  );
-}
-
-/** "Update the sale by 5 Nov", "due today" or "3 days late", while the lorry is still selling. */
-export function LorryDue({ lorry, today }: { lorry: Lorry; today: string }) {
-  const state = lorryState(lorry, today);
-  if (state === "sold") return null;
-  const due = updateDueOn(lorry);
-  const late = daysFrom(due, today);
-  return (
-    <p className={state === "late" ? "mt-2 text-[13px] font-medium text-danger" : state === "due" ? "mt-2 text-[13px] font-medium text-warning" : "mt-2 text-[13px] text-ink-secondary"}>
-      {state === "late"
-        ? `Not marked sold out · update was due ${formatDate(due)} (${late} ${late === 1 ? "day" : "days"} late)`
-        : state === "due"
-          ? "Sale update due today"
-          : `Sells out in about ${lorry.sellOutDays} ${lorry.sellOutDays === 1 ? "day" : "days"} · update the sale by ${formatDate(due)}`}
-    </p>
   );
 }

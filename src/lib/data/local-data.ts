@@ -5,7 +5,7 @@ import type { BankAccount, Chit, EmployeeDetails, Godown, Lorry, Party, Product,
 
 /**
  * The firm's own records (staff, godowns, suppliers, products, banks and vehicles, and the parties, lorries, chits,
- * rents, check-ins and notes added in the app): one JSON record per list in the record store (store.ts: local-data/
+ * rents and notes added in the app): one JSON record per list in the record store (store.ts: local-data/
  * on a computer, Supabase online), never in the code or in git. Each list replaces the matching sample records when
  * it is there; without it the app runs on sample data. They are changed only inside saving() (store.ts).
  */
@@ -34,7 +34,7 @@ type LocalPerson = {
   role: StaffRole;
   mobile: string;
   email?: string;
-  /** A sample staff member whose records (bills, cash, attendance…) this person takes over. */
+  /** A sample staff member whose records (bills, cash, tours…) this person takes over. */
   replaces?: string;
   /** Ids of the godowns they look after. */
   godowns?: string[];
@@ -49,22 +49,95 @@ function isPerson(p: unknown): p is LocalPerson {
 
 type OwnerEntry = { name?: unknown; designation?: unknown; mobile?: unknown; email?: unknown };
 
+/** More people who sign in as the owner does and see everything (staff.json's "admins"); they are not employees. */
+type LocalAdmin = { name: string; mobile: string; designation?: string; email?: string };
+
+function isAdmin(a: unknown): a is LocalAdmin {
+  const x = a as Partial<LocalAdmin> | null;
+  return Boolean(x && isText(x.name) && typeof x.mobile === "string");
+}
+
 // Each list here is read by loadLocal(), at the end of this file.
 let staff: LocalPerson[] = [];
+let admins: LocalAdmin[] = [];
 let ownerEntry: OwnerEntry | undefined;
 
 /** What the owner is called in the business ("Admin"), when the staff file says. */
 export let ownerDesignation: string | undefined;
 
 const personId = (p: LocalPerson) => p.replaces ?? `u-staff-${slug(p.name)}`;
+const adminId = (a: LocalAdmin) => `u-admin-${slug(a.name)}`;
 
 function initialsOf(name: string) {
   const words = name.trim().split(/\s+/);
   return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : name.trim().slice(0, 2)).toUpperCase();
 }
 
-/** The owner (their own name and mobile when the file has them), then the real staff or the sample staff. */
+// ── Profile edits: local-data/profiles.json (Settings › Account: own name and photo) ───────────────────────────────
+
+/**
+ * What each person changed about themself, keyed by their id: a name shown instead of the one on the staff list, and
+ * a photo (a small square JPEG as a data URL). Kept apart from staff.json because a staff member's id comes from the
+ * name there, and every sale, note and code is filed under that id.
+ */
+type ProfileEdit = { name?: string; photo?: string; photoAt?: string };
+let profileEdits: Record<string, ProfileEdit> = {};
+
+function readProfileEdits(): Record<string, ProfileEdit> {
+  const people = (readRecord("profiles.json") as { people?: Record<string, unknown> } | undefined)?.people ?? {};
+  const out: Record<string, ProfileEdit> = {};
+  for (const [id, raw] of Object.entries(people)) {
+    const x = raw as Partial<ProfileEdit> | null;
+    if (!x || typeof x !== "object") continue;
+    out[id] = {
+      name: isText(x.name) ? x.name.trim() : undefined,
+      photo: typeof x.photo === "string" && x.photo.startsWith("data:image/jpeg;base64,") ? x.photo : undefined,
+      photoAt: typeof x.photoAt === "string" ? x.photoAt : undefined,
+    };
+  }
+  return out;
+}
+
+/** This person's photo as a data URL, if they have one. */
+export function profilePhoto(id: string): string | undefined {
+  return profileEdits[id]?.photo;
+}
+
+/** Changes a person's own name and/or photo (null removes the photo); call it only inside saving(). */
+export function saveLocalProfileEdit(id: string, change: { name?: string; photo?: string | null }) {
+  const now = { ...profileEdits[id] };
+  if (change.name !== undefined) now.name = change.name;
+  if (change.photo === null) {
+    delete now.photo;
+    delete now.photoAt;
+  } else if (change.photo !== undefined) {
+    now.photo = change.photo;
+    now.photoAt = Date.now().toString(36);
+  }
+  profileEdits = { ...profileEdits, [id]: now };
+  writeRecord("profiles.json", {
+    about: "Each person's own name and photo from Settings › Account, by their id. Delete someone's line to go back to the staff list's name and no photo.",
+    people: profileEdits,
+  });
+}
+
+/** A person with their own name and photo applied. */
+function withEdits(p: Profile): Profile {
+  const e = profileEdits[p.id];
+  if (!e) return p;
+  return {
+    ...p,
+    ...(e.name ? { fullName: e.name, initials: initialsOf(e.name) } : {}),
+    ...(e.photo ? { photoVersion: e.photoAt ?? "1" } : {}),
+  };
+}
+
+/** The owner (their own name and mobile when the file has them), the other admins, then the real staff or the sample staff. */
 export function withLocalProfiles(sample: Profile[]): Profile[] {
+  return listedProfiles(sample).map(withEdits);
+}
+
+function listedProfiles(sample: Profile[]): Profile[] {
   const entry = ownerEntry;
   const owner = sample
     .filter((p) => p.role === "owner")
@@ -80,8 +153,14 @@ export function withLocalProfiles(sample: Profile[]): Profile[] {
           }
         : p,
     );
+  const others = admins.map((a) => ({ id: adminId(a), fullName: a.name.trim(), initials: initialsOf(a.name), mobile: mobileOf(a.mobile), email: a.email?.trim(), role: "owner" as const, active: true, original: true }));
   const people = staff.length === 0 ? sample.filter((p) => p.role !== "owner") : staff.map((p) => ({ id: personId(p), fullName: p.name.trim(), initials: initialsOf(p.name), mobile: mobileOf(p.mobile), email: p.email, role: p.role, active: true, original: true }));
-  return [...owner, ...people];
+  return [...owner, ...others, ...people];
+}
+
+/** What each of the other admins is called ("Admin" unless the file says). */
+export function adminDesignations(): Record<string, string> {
+  return Object.fromEntries(admins.map((a) => [adminId(a), a.designation?.trim() || "Admin"]));
 }
 
 /**
@@ -93,7 +172,8 @@ export function withLocalEmployees(sample: EmployeeDetails[], sampleProfiles: Pr
   const roleOf = (profileId: string) => sampleProfiles.find((p) => p.id === profileId)?.role;
   return staff.map((p) => {
     const base = sample.find((e) => e.profileId === p.replaces) ?? sample.find((e) => roleOf(e.profileId) === p.role) ?? sample[0];
-    return { ...base, profileId: personId(p), designation: p.designation, vehicle: p.replaces ? base.vehicle : undefined };
+    // A driver's vehicle comes from the vehicles (the one they are set on), never from the sample records.
+    return { ...base, profileId: personId(p), designation: p.designation, vehicle: undefined };
   });
 }
 
@@ -126,15 +206,16 @@ function isSupplier(s: unknown): s is LocalSupplier {
 let suppliers: LocalSupplier[] = [];
 
 /**
- * The companies we buy from, with the brands they sell; one with a sample party's id takes over its records. Once the
- * real list is there, sample companies it doesn't name are dropped, so only real suppliers show.
+ * The companies we buy from, with the brands they sell. Once the real list is there, the sample companies are dropped
+ * and a real one with a sample company's id takes none of its sample balance or details, so only real suppliers show.
  */
 export function withLocalSuppliers(sample: Party[]): Party[] {
   if (suppliers.length === 0) return sample;
   const brandsOf = (s: LocalSupplier) => (Array.isArray(s.brands) ? s.brands.filter(isText) : undefined);
   const merged = sample.flatMap((p) => {
     const s = suppliers.find((x) => x.id === p.id);
-    if (s) return [{ ...p, kind: "company" as const, name: s.name.trim(), brands: brandsOf(s), place: s.place ?? p.place, gstin: s.gstin ?? p.gstin, mobile: s.mobile ?? p.mobile, original: true }];
+    // Only what the supplier list says: no sample place, GSTIN, number or opening balance.
+    if (s) return [{ id: p.id, kind: "company" as const, name: s.name.trim(), brands: brandsOf(s), place: s.place, gstin: s.gstin, mobile: s.mobile, creditLimit: null, openingBalance: 0, original: true }];
     return p.kind === "company" ? [] : [p];
   });
   const added = suppliers
@@ -278,7 +359,6 @@ function isLorry(l: unknown): l is Lorry {
       isText(x.companyName) &&
       isText(x.lorryNo) &&
       isISODate(x.invoiceDate) &&
-      typeof x.sellOutDays === "number" &&
       Array.isArray(x.lines) &&
       x.lines.every((line) => isText(line?.productId) && typeof line.qty === "number"),
   );
@@ -299,7 +379,7 @@ const writeLorries = () =>
 
 /** Saves a new lorry, or a lorry's sale update, into lorries.json. */
 export function saveLocalLorry(lorry: Lorry) {
-  const saved = { ...lorry, original: true };
+  const saved = { ...lorry, original: !lorry.sample };
   const at = lorries.findIndex((l) => l.id === lorry.id);
   if (at >= 0) lorries[at] = saved;
   else lorries.unshift(saved);
@@ -414,32 +494,6 @@ export function removeLocalDestination(name: string): boolean {
   return true;
 }
 
-// ── Attendance check-ins (Attendance): local-data/attendance.json ──────────────────────────────────────────────────
-
-/** One person's day: the time they checked in and, once they leave, checked out ("HH:MM", India time). */
-export type StoredCheckIn = { profileId: string; date: string; checkIn: string; checkOut?: string };
-
-const isTime = (v: unknown): v is string => typeof v === "string" && /^\d{2}:\d{2}$/.test(v);
-
-function isCheckIn(r: unknown): r is StoredCheckIn {
-  const x = r as Partial<StoredCheckIn> | null;
-  return Boolean(x && isText(x.profileId) && isISODate(x.date) && isTime(x.checkIn) && (x.checkOut === undefined || isTime(x.checkOut)));
-}
-
-let checkIns: StoredCheckIn[] = [];
-
-export function localCheckIns(): StoredCheckIn[] {
-  return checkIns;
-}
-
-/** Saves a check-in, or the check-out on it. */
-export function saveLocalCheckIn(record: StoredCheckIn) {
-  const at = checkIns.findIndex((r) => r.profileId === record.profileId && r.date === record.date);
-  if (at >= 0) checkIns[at] = record;
-  else checkIns.push(record);
-  writeRecord("attendance.json", { about: "Check-in and check-out times staff record on Attendance.", records: checkIns });
-}
-
 // ── Drivers of rented vehicles (New sale › Rent › Driver): local-data/rent-drivers.json ───────────────────────────
 
 let rentDrivers: string[] = [];
@@ -497,8 +551,30 @@ export function removeLocalNote(profileId: string, id: string): boolean {
 // ── Vehicles: local-data/vehicles.json ────────────────────────────────────────────────────────────────────────────
 
 /** Who a vehicle is: the rest of its record (papers, service, GPS) is built with the dated sample data. */
-export type FleetEntry = { id: string; number: string; kind: VehicleKind; category: "own" | "godown" | "rented"; model: string; original?: boolean };
-type LocalVehicle = { number: string; kind: VehicleKind; category: FleetEntry["category"]; model?: string; replaces?: string };
+export type FleetEntry = {
+  id: string;
+  number: string;
+  kind: VehicleKind;
+  category: "own" | "godown" | "rented";
+  model: string;
+  /** A rented vehicle's own driver. */
+  rentDriver?: { name: string; mobile?: string };
+  /** Our own vehicle's driver (one of the staff), set by the owner on the driver's page. */
+  driverId?: string;
+  original?: boolean;
+};
+/** `driverName` and `driverMobile`: a rented vehicle's own driver, filled in on a Rent delivery when it is chosen. */
+type LocalVehicle = {
+  number: string;
+  kind: VehicleKind;
+  category: FleetEntry["category"];
+  model?: string;
+  replaces?: string;
+  driverName?: string;
+  driverMobile?: string;
+  /** Our own vehicle's driver: a staff member's id. */
+  driver?: string;
+};
 
 const kinds: VehicleKind[] = ["lorry", "van", "car", "bike"];
 const categories: FleetEntry["category"][] = ["own", "godown", "rented"];
@@ -511,14 +587,113 @@ function isVehicle(v: unknown): v is LocalVehicle {
 let vehicles: LocalVehicle[] = [];
 
 /**
- * The real vehicles in place of the sample ones they name in "replaces" (keeping that vehicle's sample papers and
- * trips), the others added; sample vehicles nobody replaces stay.
+ * The real vehicles once any are entered, each in place of the sample one it names in "replaces" (keeping that
+ * vehicle's sample papers and trips); sample vehicles nobody replaces are left out. With none entered, the sample fleet.
  */
 export function withLocalFleet(sample: FleetEntry[]): FleetEntry[] {
   if (vehicles.length === 0) return sample;
-  const replaced = new Set(vehicles.flatMap((v) => (v.replaces ? [v.replaces] : [])));
-  const real = vehicles.map((v) => ({ id: v.replaces ?? `v-${slug(v.number)}`, number: v.number.trim(), kind: v.kind, category: v.category, model: v.model?.trim() ?? "", original: true }));
-  return [...real, ...sample.filter((s) => !replaced.has(s.id))];
+  const real = vehicles.map((v) => ({
+    id: v.replaces ?? `v-${slug(v.number)}`,
+    number: v.number.trim(),
+    kind: v.kind,
+    category: v.category,
+    model: v.model?.trim() ?? "",
+    rentDriver: isText(v.driverName) ? { name: v.driverName.trim(), mobile: typeof v.driverMobile === "string" && mobileOf(v.driverMobile).length === 10 ? mobileOf(v.driverMobile) : undefined } : undefined,
+    driverId: v.category !== "rented" && isText(v.driver) ? v.driver : undefined,
+    original: true,
+  }));
+  return real;
+}
+
+// ── The owner's edits to a driver: their mobile number (staff.json) and the vehicle they drive (vehicles.json) ──────
+
+/** Whether this id is one of the staff in staff.json. */
+export function isLocalStaff(id: string) {
+  return staff.some((p) => personId(p) === id);
+}
+
+/** Changes a staff member's mobile number and/or designation in staff.json; call it only inside saving(). False when they aren't there. */
+export function saveLocalStaffFields(id: string, change: { mobile?: string; designation?: string }): boolean {
+  const file = (readRecord("staff.json") as Record<string, unknown> | undefined) ?? {};
+  const list = Array.isArray(file.staff) ? (file.staff as LocalPerson[]) : [];
+  const at = list.findIndex((p) => isPerson(p) && personId(p) === id);
+  if (at < 0) return false;
+  const next = list.map((p, i) => (i === at ? { ...p, ...(change.mobile !== undefined ? { mobile: change.mobile } : {}), ...(change.designation !== undefined ? { designation: change.designation } : {}) } : p));
+  writeRecord("staff.json", { ...file, staff: next });
+  staff = next.filter(isPerson);
+  return true;
+}
+
+/**
+ * Puts a driver on one of our own vehicles (or on none, with ""): they come off any other vehicle, and a driver
+ * already on that vehicle comes off it. Call it only inside saving(); false when the vehicle isn't one of ours.
+ */
+export function saveLocalDriverVehicle(driverId: string, vehicleId: string): boolean {
+  const file = (readRecord("vehicles.json") as Record<string, unknown> | undefined) ?? {};
+  const list = Array.isArray(file.vehicles) ? (file.vehicles as LocalVehicle[]) : [];
+  const idOf = (v: LocalVehicle) => v.replaces ?? `v-${slug(v.number)}`;
+  if (vehicleId && !list.some((v) => isVehicle(v) && idOf(v) === vehicleId && v.category !== "rented")) return false;
+  const next = list.map((v) => {
+    if (!isVehicle(v)) return v;
+    if (idOf(v) === vehicleId) return { ...v, driver: driverId };
+    if (v.driver === driverId) {
+      const rest = { ...v };
+      delete rest.driver;
+      return rest;
+    }
+    return v;
+  });
+  writeRecord("vehicles.json", { ...file, vehicles: next });
+  vehicles = next.filter(isVehicle);
+  return true;
+}
+
+/** What the owner can change on a vehicle (Vehicles › the vehicle › Edit). */
+export type VehicleChange = {
+  number: string;
+  kind: VehicleKind;
+  category: FleetEntry["category"];
+  model: string;
+  /** Rented: its own driver. */
+  driverName?: string;
+  driverMobile?: string;
+  /** Own lorry or van: the staff driver on it ("" for none). */
+  driver?: string;
+};
+
+/**
+ * Changes one of the firm's own vehicles in vehicles.json; call it only inside saving(). Returns its id afterwards (a
+ * new number gives a vehicle without "replaces" a new id), or null when it isn't one of them. A staff driver put on
+ * it comes off any other vehicle.
+ */
+export function saveLocalVehicle(id: string, change: VehicleChange): string | null {
+  const file = (readRecord("vehicles.json") as Record<string, unknown> | undefined) ?? {};
+  const list = Array.isArray(file.vehicles) ? (file.vehicles as LocalVehicle[]) : [];
+  const idOf = (v: LocalVehicle) => v.replaces ?? `v-${slug(v.number)}`;
+  const at = list.findIndex((v) => isVehicle(v) && idOf(v) === id);
+  if (at < 0) return null;
+  const old = list[at];
+  const updated: LocalVehicle = { number: change.number, kind: change.kind, category: change.category, model: change.model || undefined, ...(old.replaces ? { replaces: old.replaces } : {}) };
+  if (change.category === "rented") {
+    if (change.driverName) updated.driverName = change.driverName;
+    if (change.driverMobile) updated.driverMobile = change.driverMobile;
+  } else if (change.driver) {
+    updated.driver = change.driver;
+  }
+  const newId = idOf(updated);
+  if (list.some((v, i) => i !== at && isVehicle(v) && idOf(v) === newId)) return null;
+  const next = list.map((v, i) => {
+    if (i === at) return updated;
+    if (updated.driver && v.driver === updated.driver) {
+      const rest = { ...v };
+      delete rest.driver;
+      return rest;
+    }
+    return v;
+  });
+  writeRecord("vehicles.json", { ...file, vehicles: next });
+  vehicles = next.filter(isVehicle);
+  return newId;
 }
 
 // ── Reading the lists ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -526,6 +701,7 @@ export function withLocalFleet(sample: FleetEntry[]): FleetEntry[] {
 /** Reads every list from the records: when the server starts, and again whenever they change (index.ts). */
 export function loadLocal() {
   staff = listIn("staff.json", "staff").filter(isPerson);
+  admins = listIn("staff.json", "admins").filter(isAdmin);
   ownerEntry = (readRecord("staff.json") as { owner?: OwnerEntry } | undefined)?.owner;
   ownerDesignation = isText(ownerEntry?.designation) ? ownerEntry.designation.trim() : undefined;
   godowns = listIn("godowns.json", "godowns").filter(isGodown);
@@ -537,7 +713,7 @@ export function loadLocal() {
     .map((c) => ({ ...c, creditLimit: typeof c.creditLimit === "number" ? c.creditLimit : null, openingBalance: Number(c.openingBalance) || 0, original: true }));
   lorries = listIn("lorries.json", "lorries")
     .filter(isLorry)
-    .map((l) => ({ ...l, original: true }));
+    .map((l) => ({ ...l, original: !l.sample }));
   chits = listIn("chits.json", "chits")
     .filter(isChit)
     .map((c) => ({ ...c, original: true }));
@@ -547,12 +723,12 @@ export function loadLocal() {
   destinations = listIn("destinations.json", "destinations")
     .filter(isText)
     .map((d) => d.trim().replace(/\s+/g, " "));
-  checkIns = listIn("attendance.json", "records").filter(isCheckIn);
   rentDrivers = listIn("rent-drivers.json", "drivers")
     .filter(isText)
     .map((d) => d.trim().replace(/\s+/g, " "));
   notes = listIn("notes.json", "notes").filter(isNote);
   vehicles = listIn("vehicles.json", "vehicles").filter(isVehicle);
+  profileEdits = readProfileEdits();
 }
 
 loadLocal();

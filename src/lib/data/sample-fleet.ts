@@ -29,8 +29,14 @@ const kindNames: Record<Vehicle["kind"], string> = { lorry: "Lorry", van: "Van",
 /** "Lorry AP 30 TB 1186". */
 export const vehicleLabel = (v: Pick<Vehicle, "kind" | "number">) => `${kindNames[v.kind]} ${v.number}`;
 
-/** The label of the vehicle with this id ("v-lorry", "v-van"…), whichever vehicle is in its place. */
+/**
+ * The label of the sample vehicle with this id ("v-lorry", "v-van"…), for the sample records that name it; "" once a
+ * real vehicle has taken its place, so no sample trip, cost or paper is pinned on one of the firm's own vehicles.
+ */
 export function fleetLabel(id: string) {
   const v = fleet.find((f) => f.id === id);
-  return v ? vehicleLabel(v) : "";
+  return v && !v.original ? vehicleLabel(v) : "";
 }
+
+/** Whether the firm's own vehicles are entered (then no sample vehicle data is shown). */
+export const hasRealFleet = () => fleet.some((f) => f.original);

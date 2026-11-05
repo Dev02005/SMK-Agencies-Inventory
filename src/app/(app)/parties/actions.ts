@@ -23,7 +23,7 @@ const GSTIN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 export async function createParty(input: PartyInput): Promise<{ ok: true; id: string } | { ok: false; problem: string }> {
   const user = await getCurrentUser();
   if (user.role !== "owner" && user.role !== "office" && user.role !== "field") return { ok: false, problem: "Only the owner, office and sales staff can add parties." };
-  const kinds: PartyInput["kind"][] = user.role === "field" ? ["customer", "sub_dealer"] : ["customer", "sub_dealer", "company", "lorry_owner"];
+  const kinds: PartyInput["kind"][] = user.role === "field" ? ["customer", "sub_dealer"] : ["customer", "sub_dealer", "company"];
   const kind = kinds.includes(input?.kind) ? input.kind : null;
   if (!kind) return { ok: false, problem: "Choose what kind of party this is." };
   const name = text(input.name, 80);

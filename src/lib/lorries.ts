@@ -1,40 +1,46 @@
 import type { ChipTone } from "@/components/ui/chip";
 import type { Lorry } from "@/lib/data/types";
-import { addDaysISO } from "@/lib/format";
 
-/** The day a lorry's sale should be updated: its invoice (purchase) date plus the days it takes to sell out. */
-export const updateDueOn = (l: Pick<Lorry, "invoiceDate" | "sellOutDays">) => addDaysISO(l.invoiceDate, l.sellOutDays);
+export type LorryState = "selling" | "sold";
 
-export type LorryState = "selling" | "due" | "late" | "sold";
-
-/** Still selling, its sale update due today, late (past that day and not updated), or sold out and updated. */
-export function lorryState(l: Lorry, today: string): LorryState {
-  if (l.sold) return "sold";
-  const due = updateDueOn(l);
-  return today > due ? "late" : today === due ? "due" : "selling";
-}
+/** Still selling, or sold out (its sale updated and marked sold out). */
+export const lorryState = (l: Pick<Lorry, "sold">): LorryState => (l.sold ? "sold" : "selling");
 
 export const lorryStateChip: Record<LorryState, { label: string; tone: ChipTone }> = {
   selling: { label: "Selling", tone: "warning" },
-  due: { label: "Update due today", tone: "warning" },
-  late: { label: "Update overdue", tone: "danger" },
   sold: { label: "Sold out", tone: "good" },
 };
 
-/** Whole days from one YYYY-MM-DD to a later one. */
-export const daysFrom = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+/** The sale bill's total invoice value; a sale saved the older way (a rate per bag on each item) adds those up. */
+export function saleInvoiceValue(sale: NonNullable<Lorry["sale"]>) {
+  return sale.invoiceValue ?? sale.lines.reduce((s, x) => s + x.qty * ((x as { rate?: number }).rate ?? 0), 0);
+}
 
-/** What has been sold from the lorry so far: the items at their rates, plus any charges received. */
+/** What has been sold from the lorry so far: the sale bill's total invoice value, plus any charges received. */
 export function lorrySaleValue(l: Pick<Lorry, "sale" | "unloadingCharges">) {
   if (!l.sale) return 0;
-  const items = l.sale.lines.reduce((s, x) => s + x.qty * x.rate, 0);
-  return items + (l.unloadingCharges ? (l.sale.unloading ?? 0) : 0) + (l.sale.other ?? 0);
+  return saleInvoiceValue(l.sale) + (l.unloadingCharges ? (l.sale.unloading ?? 0) : 0) + (l.sale.other ?? 0);
+}
+
+/**
+ * What is still to be filled in on a lorry's sale: the two tick boxes (the company invoice's paper copy kept, unloading
+ * charges paid to us) and the sale's total invoice value. Empty when nothing is missing.
+ */
+export function lorryMissing(l: Pick<Lorry, "invoicePaperKept" | "unloadingCharges" | "sale">): string[] {
+  const missing: string[] = [];
+  if (!l.invoicePaperKept) missing.push("Paper invoice copy");
+  if (!l.unloadingCharges) missing.push("Unloading charges");
+  if (!(l.sale && saleInvoiceValue(l.sale) > 0)) missing.push("Total invoice value");
+  return missing;
 }
 
 /** Bags (or kg) of each item still on the lorry: what came on it less what is updated as sold. */
 export function lorryLeft(l: Pick<Lorry, "lines" | "sale">) {
   return l.lines.map((line) => ({ productId: line.productId, qty: Math.max(0, line.qty - (l.sale?.lines.find((x) => x.productId === line.productId)?.qty ?? 0)) }));
 }
+
+/** Saved in the app (a real lorry, or a practice one marked sample), so it can be updated and deleted. */
+export const isSavedLorry = (l: Pick<Lorry, "original" | "sample">) => Boolean(l.original || l.sample);
 
 /** What the lorry cost us: its invoice value, once known. */
 export const lorryCost = (l: Lorry) => l.invoiceValue || undefined;
@@ -54,7 +60,6 @@ export type DeviceLorry = {
   invoiceDate?: string;
   invoicePaperKept: boolean;
   unloadingCharges: boolean;
-  sellOutDays?: number;
   arrivedOn: string;
   lines?: { productId: string; qty: number; rate?: number }[];
   freight?: number;
@@ -62,3 +67,10 @@ export type DeviceLorry = {
 };
 
 export const DEVICE_LORRY_KEY = "ska-lorry-book";
+
+/** A lorry's sale bills for the "Sold from this lorry" list: date, number, buyer, bags and amount, oldest first. */
+export function soldBills(l: Pick<Lorry, "sale">) {
+  return (l.sale?.bills ?? [])
+    .map((b) => ({ date: b.date, billNo: b.billNo, soldTo: b.soldTo, qty: b.lines.reduce((s, x) => s + x.qty, 0), amount: b.amount }))
+    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+}

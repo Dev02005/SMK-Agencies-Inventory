@@ -53,6 +53,8 @@ export type Profile = {
   email?: string;
   role: Role;
   active: boolean;
+  /** Set when they have a profile photo (Settings › Account); changes with each new photo, served at /profile-photo/{id}. */
+  photoVersion?: string;
   /** One of the firm's own records (from local-data/), not sample data. */
   original?: boolean;
 };
@@ -144,14 +146,12 @@ export type Purchase = {
   godownId: string;
   /** Sold straight off the lorry without unloading into a godown. */
   onLorry?: boolean;
-  /** The lorry's driver. */
-  driverName?: string;
+  /** The truck driver's mobile number (10 digits). */
+  driverMobile?: string;
   /** The physical invoice paper is kept with us. */
   invoicePaperKept?: boolean;
   /** Unloading is charged for this lorry. */
   unloadingCharges?: boolean;
-  /** Expected to sell out in about this many days. */
-  sellOutDays?: number;
   /** A lorry sold off the truck, once sold out: when, and what it sold for. */
   soldOut?: { on: string; value: number; notes?: string };
   lines: { productId: string; qty: number; rate: number }[];
@@ -264,24 +264,44 @@ export type Lorry = {
   companyId: string;
   companyName: string;
   lorryNo: string;
-  driverName?: string;
+  /** The truck driver's mobile number (10 digits). */
+  driverMobile?: string;
   invoiceNo?: string;
   /** YYYY-MM-DD: the purchase date; selling starts then. */
   invoiceDate: string;
+  /** YYYY-MM-DD: the day the truck arrived (not before the invoice date). */
+  receivedOn?: string;
   invoicePaperKept: boolean;
   unloadingCharges: boolean;
-  /** About how many days it takes to sell out; the sale update is due after that. */
-  sellOutDays: number;
   /** What came on it: bags of cement, kg of steel. */
   lines: { productId: string; qty: number }[];
   /** The total on the company's invoice. */
   invoiceValue?: number;
-  /** What has been sold from it so far, as the owner updates it (Sales › Lorry sales › Update): each item's quantity and rate, and charges received. */
-  sale?: { lines: { productId: string; qty: number; rate: number }[]; unloading?: number; other?: number; notes?: string; updatedOn: string };
+  /**
+   * What has been sold from it so far, as the owner updates it (Sales › Lorry sales › Update): the bags (or kg) sold
+   * of each item, our sale bill's number and total invoice value, and charges received.
+   */
+  sale?: {
+    lines: { productId: string; qty: number }[];
+    /** Each sale bill from the lorry: its number, who bought, how much of each item and its amount. `lines` is their total, `invoiceValue` their amounts added up. */
+    bills?: { date?: string; billNo: string; soldTo?: string; lines: { productId: string; qty: number }[]; amount: number }[];
+    /** Before bills: where it sold, place by place. Read only, to open older updates as bills. */
+    drops?: { place: string; lines: { productId: string; qty: number }[] }[];
+    /** Other charges received, each with its name; `other` is their total. */
+    others?: { name: string; amount: number }[];
+    invoiceNo?: string;
+    invoiceValue: number;
+    unloading?: number;
+    other?: number;
+    notes?: string;
+    updatedOn: string;
+  };
   /** Set once it is sold out: the day, and the total sale value. */
   sold?: { on: string; value: number; notes?: string };
   /** A sample lorry comes from a sample purchase. */
   purchaseId?: string;
+  /** A practice lorry saved in the app: tagged Sample, yet updated, sold out and deleted like a real one. */
+  sample?: boolean;
   /** One of the firm's own records (from local-data/), not sample data. */
   original?: boolean;
 };
@@ -394,22 +414,6 @@ export type EmployeeDetails = {
   vehicle?: string;
 };
 
-export type AttendanceStatus = "present" | "half_day" | "leave" | "absent" | "holiday";
-
-export type AttendanceRecord = {
-  profileId: string;
-  date: string;
-  status: AttendanceStatus;
-  checkIn?: string;
-  checkOut?: string;
-  location?: string;
-  late?: boolean;
-  correctedBy?: string;
-  correctionReason?: string;
-  /** A check-in made in the app (local-data/), not sample data. */
-  original?: boolean;
-};
-
 export type VisitPurpose = "collection" | "order" | "new_party" | "complaint";
 export type VisitStatus = "planned" | "completed" | "postponed" | "cancelled";
 
@@ -444,7 +448,6 @@ export type SalarySlip = {
   profileId: string;
   month: string;
   gross: number;
-  absenceDeduction: number;
   loanDeduction: number;
   net: number;
   paidOn?: string;
@@ -508,6 +511,8 @@ export type Vehicle = {
   model: string;
   capacityMT?: number;
   driverId?: string;
+  /** A rented vehicle's own driver (not one of our staff): chosen with the vehicle on a Rent delivery. */
+  rentDriver?: { name: string; mobile?: string };
   ownerPartyId?: string;
   odometer: number;
   nextServiceKm: number;
@@ -529,7 +534,6 @@ export type ServiceRecord = {
   notes?: string;
 };
 
-export type FreightRate = { id: string; place: string; distanceKm: number; perBag: number; perMT: number; minimum: number; lat: number; lng: number };
 
 export type Trip = {
   id: string;

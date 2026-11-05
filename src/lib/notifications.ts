@@ -11,7 +11,6 @@ import {
   getDashboard,
   getDeliveries,
   getGodowns,
-  getLorries,
   getOrders,
   getParties,
   getPolicies,
@@ -27,7 +26,6 @@ import {
 } from "@/lib/data";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { CASH_LIMIT, isLowStock } from "@/lib/limits";
-import { daysFrom, lorryState, updateDueOn } from "@/lib/lorries";
 import { dataVersion } from "@/lib/data/store";
 import { noticesFor, type Notice } from "@/lib/notices";
 
@@ -93,24 +91,6 @@ async function getNotifications(): Promise<Notice[]> {
         forProfile: sale.createdBy,
       });
     }
-  }
-
-  // Company lorries whose sale should be updated by now: the owner's alone (getLorries gives nobody else any).
-  for (const l of await getLorries()) {
-    const state = lorryState(l, today);
-    if (state !== "due" && state !== "late") continue;
-    const due = updateDueOn(l);
-    const late = daysFrom(due, today);
-    notices.push({
-      id: `lorry-${state}-${l.id}`,
-      kind: "lorry",
-      title: state === "late" ? `Update the sale of lorry ${l.lorryNo}` : `Lorry ${l.lorryNo}: sale update due today`,
-      body: `${l.companyName} · bought ${formatDate(l.invoiceDate)}${state === "late" ? ` · ${late} ${late === 1 ? "day" : "days"} late` : ""}. Enter what it sold for.`,
-      href: `/sales/lorries/${l.id}`,
-      date: due,
-      tone: state === "late" ? "danger" : "warning",
-      roles: ["owner"],
-    });
   }
 
   // Payment reminders for the office, and who to collect from for each field staff member.

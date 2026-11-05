@@ -14,25 +14,71 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localCheckIns, saveLocalCheckIn, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, notesOf, ownerDesignation, removeLocalNote, saveLocalLorry, saveLocalProduct } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange } from "./local-data";
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
-import type { Ageing, AttendanceRecord, BankEntry, CashHolder, Chit, LedgerEntry, Lorry, Party, Product, Profile, Rental, Sale } from "./types";
-import { LATE_AFTER_MINUTES, WORK_STARTS_AT } from "@/lib/limits";
+import type { Ageing, BankEntry, CashHolder, Chit, LedgerEntry, Lorry, Party, Product, Profile, Rental, Sale } from "./types";
 
 export type * from "./types";
 
 /** The fixed records (firm, products, people, banks, vehicles' chart) plus the dated ones built for `today`. */
 function buildBooks(today: string) {
-  const book = base.buildSample(today);
-  const [dated2, dated3, dated4] = [base2.buildPhase2(book), base3.buildPhase3(book), base4.buildPhase4(book)];
+  const book = withoutSampleParties(base.buildSample(today));
+  const [dated2, dated3, dated4] = [base2.buildPhase2(book), base3.buildPhase3(book), base4.buildPhase4(book)].map(ofShownParties) as [
+    ReturnType<typeof base2.buildPhase2>,
+    ReturnType<typeof base3.buildPhase3>,
+    ReturnType<typeof base4.buildPhase4>,
+  ];
+  // Deliveries only for bills still in the book.
+  const billed = new Set(book.sales.map((s) => s.id));
+  dated3.deliveries = dated3.deliveries.filter((d) => billed.has(d.saleId));
   return {
     sample: { ...base, ...book },
     phase2: { ...base2, ...dated2 },
     phase3: { ...base3, ...dated3 },
     phase4: { ...base4, ...dated4 },
   };
+}
+
+/** Whether a sample record belongs to a party the screens show (or to no party at all). */
+const shownParty = (shown: Set<string>, x: unknown) => {
+  const r = x as { partyId?: unknown; assigned?: { partyId?: unknown } } | null;
+  if (r && typeof r === "object") {
+    if (typeof r.partyId === "string" && !shown.has(r.partyId)) return false;
+    if (r.assigned && typeof r.assigned.partyId === "string" && !shown.has(r.assigned.partyId)) return false;
+  }
+  return true;
+};
+
+/**
+ * The sample book without the sample customers' records: their bills (and the stock those bills moved), receipts,
+ * advances, payments and quotations. Cash bills and the firm's own parties' records stay.
+ */
+function withoutSampleParties(book: ReturnType<typeof base.buildSample>) {
+  const shown = new Set(base.parties.map((p) => p.id));
+  const names = new Set(base.parties.map((p) => p.name.toLowerCase()));
+  const sales = book.sales.filter((s) => shownParty(shown, s));
+  const dropped = new Set(book.sales.filter((s) => !sales.includes(s)).map((s) => s.billNo).filter((n) => n !== undefined).map(String));
+  const fromDroppedBill = (ref: string) => {
+    const m = /^Bill (\d+)( cancelled)?$/.exec(ref);
+    return Boolean(m && dropped.has(m[1]));
+  };
+  return {
+    ...book,
+    sales,
+    stockMovements: book.stockMovements.filter((m) => !(m.kind === "sale" && fromDroppedBill(m.ref))),
+    receipts: book.receipts.filter((r) => shownParty(shown, r)),
+    commitments: book.commitments.filter((c) => shownParty(shown, c)),
+    payments: book.payments.filter((p) => shownParty(shown, p)),
+    quotations: book.quotations.filter((q) => names.has(q.clientName.toLowerCase())),
+  };
+}
+
+/** A later sample phase with every list's records of sample parties left out. */
+function ofShownParties<T extends object>(dated: T): T {
+  const shown = new Set(base.parties.map((p) => p.id));
+  return Object.fromEntries(Object.entries(dated).map(([k, v]) => [k, Array.isArray(v) ? v.filter((x) => shownParty(shown, x)) : v])) as T;
 }
 type Books = ReturnType<typeof buildBooks>;
 let builtFor = "";
@@ -176,6 +222,26 @@ export async function removeMyQuickNote(id: string): Promise<boolean> {
 export async function getShellProfiles(): Promise<Profile[]> {
   const me = await getCurrentUser();
   return me.role === "owner" ? base.profiles : [me];
+}
+
+/**
+ * Changes the signed-in person's own name and/or photo (Settings › Account). The lists built from the people are built
+ * again, so every screen shows the change.
+ */
+export async function updateMyProfile(change: { name?: string; photo?: string | null }): Promise<Profile> {
+  const { userId } = await requireSession();
+  return saving(() => {
+    saveLocalProfileEdit(userId, change);
+    base.loadMasters();
+    builtFor = "";
+    return base.profiles.find((p) => p.id === userId) ?? base.profiles[0];
+  });
+}
+
+/** A person's photo (a JPEG data URL), for /profile-photo/{id}. */
+export async function getProfilePhoto(id: string): Promise<string | undefined> {
+  await live();
+  return profilePhoto(id);
 }
 
 export async function getProfiles() {
@@ -418,9 +484,49 @@ const newestFirst = <T extends { date?: string; billDate?: string }>(a: T, b: T)
 const billOrder = (s: Sale) => s.billNo ?? Number.MAX_SAFE_INTEGER;
 
 /** The number the next bill would take: one after the highest so far. The owner can change it when approving. */
+/**
+ * The next number in the one bill series that godown and lorry bills share (1, 2, 3…: bills 1 and 2 from a godown,
+ * bill 3 from a lorry). Only bills actually saved count, so the sample bills never push it on; it starts at 1.
+ * Godown sales join it once they are saved for real (today New sale only shows a sample message).
+ */
 export async function getNextBillNo(): Promise<number> {
   await live();
-  return sample.sales.reduce((max, s) => Math.max(max, s.billNo ?? 0), 0) + 1;
+  return nextBillNumberNow();
+}
+
+/** The latest saved bill number plus one, read straight from the records (for numbering bills as they are saved). */
+function nextBillNumberNow(): number {
+  const lorry = localLorries()
+    .flatMap((l) => l.sale?.bills ?? [])
+    .reduce((max, b) => (/^\d+$/.test(b.billNo) ? Math.max(max, Number(b.billNo)) : max), 0);
+  return lorry + 1;
+}
+
+/**
+ * Saves a lorry's sale with its bills numbered: a bill already saved keeps its number, each new one (no number yet)
+ * takes the next in the series, in order. Numbered inside saving(), so two bills saved at once never share a number.
+ */
+export async function updateLorryBills(
+  id: string,
+  patch: Pick<Lorry, "sale" | "sold" | "invoicePaperKept" | "unloadingCharges">,
+): Promise<{ saved: boolean; numbers: string[] }> {
+  const fresh = patch.sale?.bills?.filter((b) => !b.billNo).length ?? 0;
+  if (!fresh) return { saved: await updateLorry(id, patch), numbers: [] };
+  return saving(() => {
+    const lorry = localLorries().find((l) => l.id === id);
+    if (!lorry) return { saved: false, numbers: [] };
+    let next = nextBillNumberNow();
+    const numbers: string[] = [];
+    const bills = (patch.sale?.bills ?? []).map((b) => {
+      if (b.billNo) return b;
+      const billNo = String(next++);
+      numbers.push(billNo);
+      return { ...b, billNo };
+    });
+    const sale = patch.sale && { ...patch.sale, bills, invoiceNo: bills.map((b) => b.billNo).join(", ") || undefined };
+    saveLocalLorry({ ...lorry, ...patch, sale });
+    return { saved: true, numbers };
+  });
 }
 
 export async function getSales(): Promise<SaleWithParty[]> {
@@ -951,84 +1057,15 @@ export async function getDocuments() {
   return [...phase2.documents].sort((a, b) => b.addedOn.localeCompare(a.addedOn));
 }
 
-// ── People: employees, attendance, tours, targets, salary ───────────────────
+// ── People: employees, tours, targets, salary ───────────────────────────────
 
 const staffName = (id: string | undefined) => sample.profiles.find((p) => p.id === id)?.fullName ?? "Office";
-
-const minutesOf = (time: string) => {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
-};
-
-/**
- * Every attendance record: the check-ins made in the app, then the sample records for the days without one. The
- * firm's own staff get no sample record from today on, so nobody shows as checked in before they really do.
- */
-function attendanceRecords(): AttendanceRecord[] {
-  const today = todayISO();
-  const real: AttendanceRecord[] = localCheckIns().map((r) => ({
-    profileId: r.profileId,
-    date: r.date,
-    status: "present",
-    checkIn: r.checkIn,
-    checkOut: r.checkOut,
-    late: minutesOf(r.checkIn) > minutesOf(WORK_STARTS_AT) + LATE_AFTER_MINUTES,
-    original: true,
-  }));
-  const recorded = new Set(real.map((r) => `${r.profileId}|${r.date}`));
-  const ownStaff = new Set(base.profiles.filter((p) => p.original).map((p) => p.id));
-  return [...real, ...phase3.attendance.filter((a) => !recorded.has(`${a.profileId}|${a.date}`) && !(ownStaff.has(a.profileId) && a.date >= today))];
-}
-
-const attendanceOn = (profileId: string, date: string, records = attendanceRecords()) => records.find((a) => a.profileId === profileId && a.date === date);
-
-/** The signed-in person's own attendance: today, this month's counts and every day they have, newest first. */
-export async function getMyAttendance() {
-  await live();
-  const me = await getCurrentUser();
-  const records = attendanceRecords()
-    .filter((a) => a.profileId === me.id)
-    .sort((a, b) => b.date.localeCompare(a.date));
-  return { today: records.find((a) => a.date === todayISO()), month: attendanceSummary(me.id), records };
-}
-
-/** Checks the signed-in person in, or out, now (India time). */
-export async function markMyAttendance(kind: "in" | "out"): Promise<{ ok: true; time: string } | { ok: false; problem: string }> {
-  const me = await getCurrentUser();
-  const date = todayISO();
-  const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
-  return saving(() => {
-    const day = localCheckIns().find((r) => r.profileId === me.id && r.date === date);
-    if (kind === "in") {
-      if (day) return { ok: false, problem: `You already checked in today at ${day.checkIn}.` };
-      saveLocalCheckIn({ profileId: me.id, date, checkIn: time });
-    } else {
-      if (!day) return { ok: false, problem: "Check in first." };
-      if (day.checkOut) return { ok: false, problem: `You already checked out today at ${day.checkOut}.` };
-      saveLocalCheckIn({ ...day, checkOut: time });
-    }
-    return { ok: true, time };
-  });
-}
-
-function attendanceSummary(profileId: string, records = attendanceRecords()) {
-  const month = records.filter((a) => a.profileId === profileId && a.date.startsWith(todayISO().slice(0, 7)));
-  const count = (s: string) => month.filter((a) => a.status === s).length;
-  return {
-    present: count("present"),
-    halfDay: count("half_day"),
-    leave: count("leave"),
-    absent: count("absent"),
-    late: month.filter((a) => a.late).length,
-    workingDays: month.filter((a) => a.status !== "holiday").length,
-  };
-}
 
 function loanBalance(loan: (typeof phase3.loans)[number]) {
   return loan.amount - loan.repayments.reduce((s, r) => s + r.amount, 0);
 }
 
-/** Each person's designation ("Wholesale manager", "Owner"…), without the day's attendance, so any page can show it. */
+/** Each person's designation ("Wholesale manager", "Owner"…), so any page can show it. */
 export async function getDesignations(): Promise<Record<string, string>> {
   await live();
   return designationsNow();
@@ -1036,30 +1073,33 @@ export async function getDesignations(): Promise<Record<string, string>> {
 
 function designationsNow(): Record<string, string> {
   const owner = base.profiles.find((p) => p.role === "owner");
-  return { ...(owner ? { [owner.id]: ownerDesignation ?? "Owner" } : {}), ...Object.fromEntries(base3.employees.map((e) => [e.profileId, e.designation])) };
+  return {
+    ...(owner ? { [owner.id]: ownerDesignation ?? "Owner" } : {}),
+    ...adminDesignations(),
+    ...Object.fromEntries(base3.employees.map((e) => [e.profileId, e.designation])),
+  };
 }
 
-/** Everyone who can sign in, with their designation, from one fetch of the records (the sign-in screen). */
+/** Everyone who can sign in, with their designation, from one fetch of the records (the sign-in screen). Drivers don't sign in. */
 export async function getSignInPeople(): Promise<(Profile & { designation: string })[]> {
   await live();
   const designations = designationsNow();
-  return base.profiles.filter((p) => p.active).map((p) => ({ ...p, designation: designations[p.id] ?? "" }));
+  return base.profiles.filter((p) => p.active && p.role !== "driver").map((p) => ({ ...p, designation: designations[p.id] ?? "" }));
 }
 
 export async function getEmployees() {
   await live();
-  // Worked out once for everyone, not once per person.
-  const records = attendanceRecords();
-  const today = todayISO();
   return phase3.employees.map((e) => {
     const profile = sample.profiles.find((p) => p.id === e.profileId)!;
+    // The vehicle they drive: the one the owner set them on (Vehicles and New sale read the same).
+    const drives = phase4.vehicles.find((v) => v.driverId === e.profileId);
     return {
       ...profile,
       ...e,
-      today: attendanceOn(e.profileId, today, records),
+      vehicle: drives ? phase4.vehicleLabel(drives) : e.vehicle,
+      vehicleId: drives?.id,
       partiesCount: sample.parties.filter((p) => p.assignedTo === e.profileId).length,
       loanBalance: phase3.loans.filter((l) => l.profileId === e.profileId).reduce((s, l) => s + loanBalance(l), 0),
-      month: attendanceSummary(e.profileId, records),
     };
   });
 }
@@ -1071,9 +1111,6 @@ export async function getEmployee(id: string) {
   const parties = (await getParties()).filter((p) => p.assignedTo === id);
   return {
     ...employee,
-    attendance: attendanceRecords()
-      .filter((a) => a.profileId === id)
-      .sort((a, b) => a.date.localeCompare(b.date)),
     parties,
     target: (await getTargets()).find((t) => t.profileId === id),
     visits: (await getVisits()).filter((v) => v.profileId === id),
@@ -1082,26 +1119,48 @@ export async function getEmployee(id: string) {
   };
 }
 
-export async function getAttendanceToday() {
-  await live();
-  return (await getEmployees()).map((e) => ({ id: e.id, name: e.fullName, role: e.role, record: e.today, month: e.month }));
+/** Builds every list made from people and vehicles again, so sales, People and Vehicles show a change at once. */
+function rebuildPeopleAndFleet() {
+  loadFleet();
+  base.loadMasters();
+  base2.loadPhase2();
+  base3.loadPhase3();
+  builtFor = "";
 }
 
-/** Attendance records someone corrected, newest first, with whose record it was. */
-export async function getAttendanceCorrections() {
-  await live();
-  return attendanceRecords()
-    .filter((a) => a.correctedBy)
-    .map((a) => ({ ...a, name: staffName(a.profileId) }))
-    .sort((a, b) => b.date.localeCompare(a.date));
+/**
+ * The owner's changes to a staff member: name (shown everywhere; their records stay theirs), mobile number,
+ * designation and, for a driver, the vehicle they drive.
+ */
+export async function updateStaffDetails(
+  id: string,
+  change: { name: string; mobile: string; designation: string; vehicleId?: string },
+): Promise<{ ok: true } | { ok: false; problem: string }> {
+  const person = (await getProfiles()).find((p) => p.id === id);
+  if (!person || person.role === "owner") return { ok: false, problem: "That person is no longer on the staff list." };
+  if (!isLocalStaff(id)) return { ok: false, problem: "This is a sample staff member; only the firm's own staff can be edited." };
+  if (change.mobile !== person.mobile && (await getProfiles()).some((p) => p.id !== id && p.mobile === change.mobile)) {
+    return { ok: false, problem: "Someone else already signs in with that mobile number." };
+  }
+  return saving(() => {
+    if (person.role === "driver" && change.vehicleId !== undefined && !saveLocalDriverVehicle(id, change.vehicleId)) return { ok: false as const, problem: "Choose one of our own vehicles." };
+    if (change.name !== person.fullName) saveLocalProfileEdit(id, { name: change.name });
+    saveLocalStaffFields(id, { mobile: change.mobile, designation: change.designation });
+    rebuildPeopleAndFleet();
+    return { ok: true as const };
+  });
 }
 
-/** Every attendance record with whose it is, newest first (the date-filtered list on Attendance). */
-export async function getAttendanceRecords() {
+/** The owner's changes to one of the firm's own vehicles; returns its id afterwards (a new number can change it). */
+export async function updateVehicleDetails(id: string, change: VehicleChange): Promise<{ ok: true; id: string } | { ok: false; problem: string }> {
   await live();
-  return attendanceRecords()
-    .map((a) => ({ ...a, name: staffName(a.profileId) }))
-    .sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+  if (change.driver && !(await getProfiles()).some((p) => p.id === change.driver && p.role === "driver")) return { ok: false, problem: "Choose one of the drivers." };
+  return saving(() => {
+    const newId = saveLocalVehicle(id, change);
+    if (!newId) return { ok: false as const, problem: "Another vehicle already has that number, or this one is a sample vehicle." };
+    rebuildPeopleAndFleet();
+    return { ok: true as const, id: newId };
+  });
 }
 
 export async function getVisits() {
@@ -1195,7 +1254,6 @@ export async function getFieldHome(profileId: string) {
   const myParties = new Set(sample.parties.filter((p) => p.assignedTo === profileId).map((p) => p.id));
   return {
     name: staffName(profileId),
-    attendance: attendanceOn(profileId, todayISO()),
     visits: visits.filter((v) => v.profileId === profileId && v.date === today),
     toCollect: ageing.filter((r) => myParties.has(r.id)).sort((a, b) => b.overdue - a.overdue),
     cash: cash.find((c) => c.holder === profileId),
@@ -1210,8 +1268,6 @@ export async function getGodownHome() {
   const today = sample.SAMPLE_TODAY;
   const [balances, products, godowns, orders, visible] = await Promise.all([getStockBalances(), getProducts(), getMyGodowns(), getOrders(), visibleGodowns()]);
   return {
-    // The signed-in in-charge's own day.
-    attendance: attendanceOn((await getCurrentUser()).id, todayISO()),
     stock: godowns.map((g) => ({
       ...g,
       items: balances.filter((b) => b.godownId === g.id).map((b) => ({ ...b, product: products.find((p) => p.id === b.productId)! })),
@@ -1230,22 +1286,6 @@ export async function getGodownHome() {
         transportMode: s.transportMode,
       })),
     pendingOrders: orders.filter((o) => o.status === "confirmed" || o.status === "partly_dispatched"),
-  };
-}
-
-/** Driver: today's deliveries, cash in hand and vehicle renewals. */
-export async function getDriverHome(profileId: string) {
-  await live();
-  const today = sample.SAMPLE_TODAY;
-  const [deliveries, cash, policies] = await Promise.all([getDeliveries(), getCashSummary(), getPolicies()]);
-  return {
-    name: staffName(profileId),
-    vehicle: phase3.employees.find((e) => e.profileId === profileId)?.vehicle,
-    attendance: attendanceOn(profileId, todayISO()),
-    deliveries: deliveries.filter((d) => d.driverId === profileId),
-    cash: cash.find((c) => c.holder === profileId),
-    renewals: policies.filter((p) => p.kind === "vehicle" && p.daysLeft <= 30),
-    fuelToday: phase2.expenses.filter((e) => e.date === today && e.head === "fuel" && e.paidBy === profileId).reduce((s, e) => s + e.amount, 0),
   };
 }
 
@@ -1272,12 +1312,11 @@ const sampleLorries = (): Lorry[] =>
       companyId: p.companyId,
       companyName: partyName(p.companyId),
       lorryNo: p.lorryNo,
-      driverName: p.driverName,
+      driverMobile: p.driverMobile,
       invoiceNo: p.invoiceNo || undefined,
       invoiceDate: p.invoiceDate,
       invoicePaperKept: Boolean(p.invoicePaperKept),
       unloadingCharges: Boolean(p.unloadingCharges),
-      sellOutDays: p.sellOutDays ?? 0,
       lines: p.lines.map(({ productId, qty }) => ({ productId, qty })),
       invoiceValue: p.lines.reduce((s, l) => s + l.qty * l.rate, 0),
       sold: p.soldOut,
@@ -1341,7 +1380,7 @@ function vehicleSummary(v: (typeof phase4.vehicles)[number]) {
   return {
     ...v,
     label,
-    driverName: v.driverId ? staffName(v.driverId) : undefined,
+    driverName: v.driverId ? staffName(v.driverId) : v.rentDriver?.name,
     ownerName: v.ownerPartyId ? partyName(v.ownerPartyId) : undefined,
     renewals,
     nextRenewal: renewals[0],
@@ -1386,10 +1425,6 @@ export async function getTrips() {
   });
 }
 
-export async function getFreightRates() {
-  return base4.freightRates;
-}
-
 /** Own drivers (cash given, spent and returned) and lorry owners we rent from. */
 export async function getDrivers() {
   await live();
@@ -1421,13 +1456,13 @@ export async function getDrivers() {
   return { own, rented };
 }
 
-/** Vehicles with a GPS position, today's route for the lorry, and the places on the freight chart. */
+/** Vehicles with a GPS position, today's route for the lorry, and the places we deliver to. */
 export async function getFleetMap() {
   await live();
   return {
     vehicles: (await getVehicles()).filter((v) => v.gps),
     route: phase4.routeToday,
-    places: phase4.freightRates.map((f) => ({ name: f.place, lat: f.lat, lng: f.lng })),
+    places: phase4.places.map((f) => ({ name: f.name, lat: f.lat, lng: f.lng })),
   };
 }
 

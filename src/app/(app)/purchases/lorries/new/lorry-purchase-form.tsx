@@ -4,21 +4,21 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
 import { ItemLines, newLine, toNumber, type ItemLine } from "@/components/forms/item-lines";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { SubmitBar } from "@/components/ui/submit-bar";
 import { useToast } from "@/components/ui/toast";
 import type { Product } from "@/lib/data/types";
-import { addDaysISO, formatDate, formatINR } from "@/lib/format";
+import { formatINR } from "@/lib/format";
+import { mobileOf } from "@/lib/mobile";
 import { describeQuantities } from "@/lib/quantities";
 import { saveLorryPurchase } from "../actions";
 
 /**
  * A lorry purchase: a company lorry bought to sell straight off the truck, laid out like a godown purchase (firm,
- * company, invoice, lorry, items) but with the driver instead of a godown, and the invoice's total value instead of a
- * rate per bag. No freight is taken. The lorry is sold as a whole: once it is sold out, its sale is updated under Sales › Lorry sales, and
+ * company, invoice date, lorry, items) but with the driver instead of a godown, and the invoice's total value instead
+ * of a rate per bag. No freight is taken; the tick boxes and our sale invoice are filled when the sale is updated. The lorry is sold as a whole: once it is sold out, its sale is updated under Sales › Lorry sales, and
  * Home reminds the owner when that is late.
  */
 export function LorryPurchaseForm({
@@ -41,13 +41,10 @@ export function LorryPurchaseForm({
   // With more than one firm nothing is picked, so the firm is always chosen on purpose.
   const [firmId, setFirmId] = useState(firms.length === 1 ? firms[0].id : "");
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
-  const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
+  const [receivedDate, setReceivedDate] = useState(today);
   const [lorryNo, setLorryNo] = useState("");
-  const [driver, setDriver] = useState("");
-  const [days, setDays] = useState("");
-  const [paperKept, setPaperKept] = useState(false);
-  const [unloading, setUnloading] = useState(false);
+  const [driverMobile, setDriverMobile] = useState("");
   const [invoiceValue, setInvoiceValue] = useState("");
 
   const offeredBy = (supplierId: string) => {
@@ -60,19 +57,18 @@ export function LorryPurchaseForm({
 
   const loaded = lines.map((l) => ({ productId: l.productId, qty: toNumber(l.qty) })).filter((l) => l.qty > 0);
   const total = toNumber(invoiceValue);
-  const sellOutDays = parseInt(days, 10);
 
   const missing = !firmId
     ? "Choose which firm this lorry is bought for."
     : !lorryNo.trim()
-      ? "Enter the lorry number."
-      : !driver.trim()
-        ? "Enter the driver's name."
-        : !(sellOutDays >= 1 && sellOutDays <= 60)
-          ? "Enter about how many days it takes to sell out."
+      ? "Enter the truck number."
+      : mobileOf(driverMobile).length !== 10
+        ? "Enter the driver's 10-digit mobile number."
           : loaded.length === 0
             ? "Enter what's on the lorry."
-            : null;
+            : receivedDate < invoiceDate
+              ? "The truck can't arrive before the invoice date."
+              : null;
 
   function save() {
     if (missing || pending) return;
@@ -81,12 +77,9 @@ export function LorryPurchaseForm({
         firmId,
         companyId,
         lorryNo,
-        driverName: driver,
-        invoiceNo,
+        driverMobile,
         invoiceDate,
-        invoicePaperKept: paperKept,
-        unloadingCharges: unloading,
-        sellOutDays,
+        receivedOn: receivedDate,
         lines: loaded,
         invoiceValue: toNumber(invoiceValue),
       });
@@ -129,15 +122,15 @@ export function LorryPurchaseForm({
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Invoice no." htmlFor={`${id}-invoice`} hint="Leave empty if you don't have it">
-            <input id={`${id}-invoice`} className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Optional" />
-          </Field>
           <Field label="Invoice date" htmlFor={`${id}-invdate`} hint="Selling starts from this day">
             <DatePicker id={`${id}-invdate`} label="Invoice date" value={invoiceDate} onChange={setInvoiceDate} />
           </Field>
+          <Field label="Truck received on" htmlFor={`${id}-recv`}>
+            <DatePicker id={`${id}-recv`} label="Truck received on" value={receivedDate} onChange={setReceivedDate} />
+          </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Lorry number" htmlFor={`${id}-lorry`}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Truck number" htmlFor={`${id}-lorry`}>
             <input
               id={`${id}-lorry`}
               className={inputClass}
@@ -147,20 +140,16 @@ export function LorryPurchaseForm({
               autoCapitalize="characters"
             />
           </Field>
-          <Field label="Driver name" htmlFor={`${id}-driver`}>
-            <input id={`${id}-driver`} className={inputClass} value={driver} onChange={(e) => setDriver(e.target.value)} autoCapitalize="words" />
+          <Field label="Driver number" htmlFor={`${id}-driver`}>
+            <AffixInput
+              id={`${id}-driver`}
+              prefix="+91"
+              inputMode="numeric"
+              autoComplete="off"
+              value={driverMobile}
+              onChange={(e) => setDriverMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            />
           </Field>
-          <Field
-            label="Sells out in"
-            htmlFor={`${id}-days`}
-            hint={sellOutDays >= 1 && sellOutDays <= 60 ? `Update the sale by ${formatDate(addDaysISO(invoiceDate, sellOutDays))}` : "About how many days"}
-          >
-            <AffixInput id={`${id}-days`} inputMode="numeric" placeholder="2" suffix="days" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, "").slice(0, 2))} />
-          </Field>
-        </div>
-        <div className="space-y-1">
-          <Tick checked={paperKept} onChange={setPaperKept} label="Physical invoice paper copy" hint="We have the paper copy of the company's invoice" />
-          <Tick checked={unloading} onChange={setUnloading} label="Unloading charges" hint="Unloading charges are paid to us" />
         </div>
       </section>
 
@@ -183,17 +172,5 @@ export function LorryPurchaseForm({
         onSubmit={save}
       />
     </form>
-  );
-}
-
-function Tick({ checked, onChange, label, hint }: { checked: boolean; onChange: (checked: boolean) => void; label: string; hint: string }) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xl px-1 py-2 hover:bg-card-subtle">
-      <Checkbox className="mt-0.5" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        <span className="block text-[15px] text-ink">{label}</span>
-        <span className="block text-[13px] text-ink-secondary">{hint}</span>
-      </span>
-    </label>
   );
 }

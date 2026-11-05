@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { KeyRound, LockKeyhole } from "lucide-react";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { TimeLeft } from "@/components/ui/live-clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireSession } from "@/lib/auth";
@@ -9,13 +11,14 @@ import { getCurrentUser, getFirm, getNow } from "@/lib/data";
 import { roleLabels } from "@/lib/labels";
 import { pinIsSet } from "@/lib/personal-lock";
 import { ChangePasswordForm, ChangePinForm, SignOutButton } from "./account-forms";
+import { ProfileCard } from "./profile-card";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default function AccountPage() {
   return (
     <div className="animate-fade-up mx-auto max-w-[760px]">
-      <PageHeader back={<BackLink href="/settings">Settings</BackLink>} title="Account" subtitle="Your sign-in, password and automatic sign-out" actions={<SampleChip />} />
+      <PageHeader back={<BackLink href="/settings">Settings</BackLink>} title="Account" subtitle="Your name, photo, sign-in and automatic sign-out" actions={<SampleChip />} />
       <Suspense fallback={<ListSkeleton rows={6} />}>
         <AccountDetails />
       </Suspense>
@@ -31,17 +34,11 @@ async function AccountDetails() {
 
   return (
     <div className="space-y-4">
-      <section className="surface flex items-center gap-4 p-5 md:p-6">
-        <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-accent-soft text-[22px] font-semibold text-accent">
-          {user.initials}
-        </span>
-        <div className="min-w-0">
-          <h2 className="truncate text-[22px] font-semibold tracking-[-0.3px] text-ink">{user.fullName}</h2>
-          <p className="text-[15px] text-ink-secondary">
-            {roleLabels[user.role]} · {firm.name}
-          </p>
-        </div>
-      </section>
+      <ProfileCard
+        key={`${user.fullName}-${user.photoVersion ?? ""}`}
+        user={{ id: user.id, fullName: user.fullName, initials: user.initials, photoVersion: user.photoVersion }}
+        subtitle={`${roleLabels[user.role]} · ${firm.name}`}
+      />
 
       <SectionCard title="Sign-in">
         <DetailList
@@ -66,12 +63,12 @@ async function AccountDetails() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Change password">
-        <ChangePasswordForm mobile={user.mobile} />
-      </SectionCard>
+      <CollapsibleCard title="Change sign-in code" hint="The 6-digit code you sign in with" icon={KeyRound}>
+        <ChangePasswordForm />
+      </CollapsibleCard>
 
       {user.role === "owner" && (
-        <SectionCard title="Personal PIN">
+        <CollapsibleCard title={pinSet ? "Change Personal PIN" : "Personal PIN"} hint="The 4-digit PIN that locks Personal" icon={LockKeyhole}>
           {pinSet ? (
             <ChangePinForm />
           ) : (
@@ -83,7 +80,7 @@ async function AccountDetails() {
               .
             </p>
           )}
-        </SectionCard>
+        </CollapsibleCard>
       )}
 
       {user.role === "owner" && (

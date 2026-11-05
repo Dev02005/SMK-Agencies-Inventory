@@ -1,7 +1,6 @@
 import { Truck } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { AttendanceChip } from "@/components/people/attendance-chip";
 import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
 import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -53,7 +52,7 @@ async function GodownDay() {
       </StatRow>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Load now" action={<AttendanceChip record={d.attendance} />}>
+        <SectionCard title="Load now">
           {d.toLoad.length === 0 ? (
             <p className="py-2 text-[15px] text-ink-secondary">No bills waiting.</p>
           ) : (

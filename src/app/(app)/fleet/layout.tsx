@@ -10,7 +10,6 @@ export default function FleetLayout({ children }: { children: ReactNode }) {
           { href: "/fleet", label: "Vehicles" },
           { href: "/fleet/trips", label: "Trips" },
           { href: "/fleet/map", label: "Map" },
-          { href: "/fleet/freight", label: "Freight chart" },
           { href: "/fleet/drivers", label: "Drivers", roles: ["owner", "office"] },
         ]}
       />

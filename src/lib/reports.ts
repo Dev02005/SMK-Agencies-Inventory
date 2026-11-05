@@ -6,7 +6,6 @@ import "server-only";
 import {
   getAgeingReport,
   getAllStockMovements,
-  getAttendanceToday,
   getExpenses,
   getGodowns,
   getOrders,
@@ -22,7 +21,7 @@ import {
   getVehicles,
 } from "@/lib/data";
 import { inDateFilter, type DateFilter, type DatePreset } from "@/lib/date-filter";
-import { formatDate, formatMonth } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { billName, expenseHeadLabels, paymentModeLabels } from "@/lib/labels";
 import { toMT } from "@/lib/sales";
 
@@ -325,36 +324,6 @@ export const reports: ReportDef[] = [
         rows,
         totals: { godown: "Total", mt: sumBy(rows, (r) => r.mt) },
         note: "Lorry stock sold straight off the truck is in Stock → Lorry stock, not here.",
-      };
-    },
-  },
-  {
-    key: "attendance",
-    title: "Attendance",
-    description: "This month's present, half days, leave, absent and late for each person",
-    group: "People",
-    async run() {
-      const rows = (await getAttendanceToday()).map((r) => ({
-        name: r.name,
-        working: r.month.workingDays,
-        present: r.month.present,
-        half: r.month.halfDay,
-        leave: r.month.leave,
-        absent: r.month.absent,
-        late: r.month.late,
-      }));
-      return {
-        columns: [
-          { key: "name", label: "Name" },
-          { key: "working", label: "Working days", kind: "number" },
-          { key: "present", label: "Present", kind: "number" },
-          { key: "half", label: "Half days", kind: "number" },
-          { key: "leave", label: "Leave", kind: "number" },
-          { key: "absent", label: "Absent", kind: "number" },
-          { key: "late", label: "Late", kind: "number" },
-        ],
-        rows,
-        note: `${formatMonth((await getToday()).slice(0, 7))}, up to ${formatDate(await getToday())}. Sundays are the weekly off.`,
       };
     },
   },

@@ -1,10 +1,12 @@
 "use client";
 
 import { useId, useState } from "react";
+import { chargesTotal, OtherCharges, unnamedCharge, type OtherCharge } from "@/components/forms/other-charges";
 import { SectionCard } from "@/components/ui/blocks";
 import { Button } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/cn";
 import { formatINR, formatNumber } from "@/lib/format";
 import { computeTotals, type TransportMode } from "@/lib/sales";
 
@@ -31,11 +33,12 @@ export function ConfirmRequest({
 }) {
   const id = useId();
   const toast = useToast();
-  const [billNo, setBillNo] = useState(String(nextBillNo));
+  // The next number in the one series godown and lorry bills share; not typed, so it always follows on.
+  const billNo = String(nextBillNo);
   const [rates, setRates] = useState(lines.map(() => ""));
   const [discount, setDiscount] = useState("");
-  const [transport, setTransport] = useState("");
-  const [other, setOther] = useState("");
+  // The vehicle's other costs, each named: kept with the sale, never added to the bill.
+  const [vehicleCosts, setVehicleCosts] = useState<OtherCharge[]>([]);
   const charged = transportMode !== "EX";
 
   const totals = computeTotals({
@@ -43,24 +46,28 @@ export function ConfirmRequest({
     discountMode: "amount",
     discountValue: num(discount),
     transportMode,
-    transportCharge: transportMode === "FOR" ? num(transport) : 0,
+    transportCharge: 0,
     unloadingCharge: 0,
-    otherCharge: charged ? num(other) : 0,
+    otherCharge: 0,
   });
   const bill = Number(billNo);
   const missing = !(Number.isInteger(bill) && bill > 0)
     ? "Enter the bill no."
     : lines.some((_, i) => num(rates[i]) <= 0)
       ? "Enter the rate for every item."
-      : null;
+      : charged && unnamedCharge(vehicleCosts)
+        ? "Enter a name for each vehicle cost."
+        : null;
 
   return (
     <SectionCard title="Bill no. and prices" className="lg:col-span-2">
       <p className="-mt-2 text-[13px] text-ink-secondary">
         {requestedBy ? `${requestedBy} saved` : "Staff saved"} this sale with the items and quantities. Give it a bill no., enter the rates, discount and charges, then approve it.
       </p>
-      <Field label="Bill no." htmlFor={`${id}-bill`} hint="The next number in the series; change it if needed" className="mt-4 max-w-[220px]">
-        <input id={`${id}-bill`} className={inputClass} inputMode="numeric" value={billNo} onChange={(e) => setBillNo(e.target.value.replace(/\D/g, ""))} />
+      <Field label="Bill no." htmlFor={`${id}-bill`} hint="Next in the series (godown and lorry bills share it)" className="mt-4 max-w-[260px]">
+        <output id={`${id}-bill`} className={cn(inputClass, "flex items-center bg-card-subtle tabular-nums")}>
+          {billNo}
+        </output>
       </Field>
       <ul className="mt-2 divide-y divide-hairline">
         {lines.map((l, i) => (
@@ -88,19 +95,13 @@ export function ConfirmRequest({
         <Field label="Discount" htmlFor={`${id}-discount`}>
           <AffixInput id={`${id}-discount`} prefix="₹" inputMode="decimal" placeholder="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
         </Field>
-        {charged && (
-          <>
-            {transportMode === "FOR" && (
-              <Field label="Transport" htmlFor={`${id}-transport`}>
-                <AffixInput id={`${id}-transport`} prefix="₹" inputMode="decimal" placeholder="0" value={transport} onChange={(e) => setTransport(e.target.value)} />
-              </Field>
-            )}
-            <Field label="Other" htmlFor={`${id}-other`} hint="Optional">
-              <AffixInput id={`${id}-other`} prefix="₹" inputMode="decimal" placeholder="0" value={other} onChange={(e) => setOther(e.target.value)} />
-            </Field>
-          </>
-        )}
       </div>
+      {charged && (
+        <div className="mt-4 border-t border-hairline pt-4">
+          <OtherCharges value={vehicleCosts} onChange={setVehicleCosts} title="Vehicle other costs" hint="Not added to the bill. Name each one, like Toll or Hamali." />
+          {chargesTotal(vehicleCosts) > 0 && <p className="mt-2 text-[13px] text-ink-secondary">Vehicle costs {formatINR(chargesTotal(vehicleCosts))} · not on the bill</p>}
+        </div>
+      )}
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-t border-hairline pt-4">
         <div>
           <p className="text-[13px] text-ink-secondary">Total</p>

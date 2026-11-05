@@ -56,11 +56,11 @@ function parseSpot(raw: string): Spot {
 
 type Shortcut = { label: string; href: string; icon: LucideIcon; tone: Tone; roles: Role[] };
 const places: Shortcut[] = [
-  { label: "Home", href: "/", icon: Home, tone: "grey", roles: ["owner", "office", "godown", "field", "driver"] },
+  { label: "Home", href: "/", icon: Home, tone: "grey", roles: ["owner", "office", "godown", "field"] },
   { label: "Godown stock", href: "/stock", icon: Package, tone: "amber", roles: ["owner", "office", "godown"] },
   { label: "Lorry purchase", href: "/purchases/lorries/new", icon: Truck, tone: "purple", roles: ["owner"] },
   { label: "Lorry sales", href: "/sales/lorries", icon: Truck, tone: "purple", roles: ["owner"] },
-  { label: "Notifications", href: "/notifications", icon: Bell, tone: "teal", roles: ["owner", "office", "godown", "field", "driver"] },
+  { label: "Notifications", href: "/notifications", icon: Bell, tone: "teal", roles: ["owner", "office", "godown", "field"] },
 ];
 
 type Tab = "notes" | "shortcuts" | "calculator";

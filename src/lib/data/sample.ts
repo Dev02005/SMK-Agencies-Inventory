@@ -49,7 +49,8 @@ export const sampleProfiles: Profile[] = [
 
 /** Sample parties with the real suppliers (local-data/suppliers.json), plus the customers added in the app. */
 const sampleParties: Party[] = [
-  { id: "cash", name: "Cash customer", kind: "cash", creditLimit: null, openingBalance: 0 },
+  // Not sample data: the app's own entry for walk-in buyers (their name and phone are taken on each bill).
+  { id: "cash", name: "Cash customer", kind: "cash", creditLimit: null, openingBalance: 0, original: true },
   {
     id: "raja",
     name: "Sri Durga Agencies",
@@ -76,7 +77,13 @@ const sampleParties: Party[] = [
 export let godowns: Godown[];
 export let products: Product[];
 export let profiles: Profile[];
+/** The parties every screen shows: Cash customer, the suppliers and the firm's own customers; no sample customers. */
 export let parties: Party[];
+/**
+ * The sample generator's own list, with the sample customers, so the sample book is made the same way every time;
+ * lib/data drops whatever it made for them before any screen sees it (withoutSampleParties).
+ */
+export let bookParties: Party[];
 
 /** Builds the lists from the sample ones and the records: when the server starts, and whenever the records change. */
 export function loadMasters() {
@@ -84,7 +91,8 @@ export function loadMasters() {
   // Copies, because adding a product or a party adds it to these lists.
   products = withLocalProducts([...sampleProducts]);
   profiles = withLocalProfiles(sampleProfiles);
-  parties = withLocalCustomers(withLocalSuppliers([...sampleParties]));
+  bookParties = withLocalSuppliers([...sampleParties]);
+  parties = withLocalCustomers(withLocalSuppliers(sampleParties.filter((p) => p.kind === "cash" || p.kind === "company")));
 }
 
 loadMasters();
@@ -144,6 +152,8 @@ export function salaryPayday(today: string) {
  */
 export function buildSample(SAMPLE_TODAY: string) {
   const at = dateShifter(SAMPLE_TODAY);
+  // The generator's full party list (sample customers included); never the firm's own customers.
+  const parties = bookParties;
   const quotations: Quotation[] = [
     {
       id: "q-2023-12",
@@ -201,8 +211,9 @@ export function buildSample(SAMPLE_TODAY: string) {
     // Came in today: its bags are already in the godown's stock.
     [at("2026-10-25"), "deccan", [["p-deccan-opc", 800, 320], ["p-deccan-ppc", 200, 300]]],
   ];
-  // Only companies still in the party list (a real supplier list drops the sample ones it doesn't name).
-  const plan = purchasePlan.filter(([, companyId]) => parties.some((p) => p.id === companyId));
+  // Only the sample companies: the firm's own suppliers (local-data/suppliers.json) get no sample purchases.
+  const sampleCompany = (id: string) => parties.some((p) => p.id === id && p.kind === "company" && !p.original);
+  const plan = purchasePlan.filter(([, companyId]) => sampleCompany(companyId));
   plan.forEach(([invoiceDate, companyId, lines], i) => {
     purchases.push({
       id: `pur-${i + 1}`,
@@ -219,7 +230,7 @@ export function buildSample(SAMPLE_TODAY: string) {
     });
   });
   // A Deccan lorry sold straight off the truck instead of unloading into a godown; it has sold out.
-  purchases.push({
+  if (sampleCompany("deccan")) purchases.push({
     id: "pur-lorry-1",
     purchaseNo: 301 + plan.length,
     companyId: "deccan",
@@ -229,9 +240,8 @@ export function buildSample(SAMPLE_TODAY: string) {
     lorryNo: "AP 39 T 9902",
     godownId: "",
     onLorry: true,
-    driverName: "Ramesh",
+    driverMobile: "9000000201",
     invoicePaperKept: true,
-    sellOutDays: 3,
     soldOut: { on: at("2026-10-26"), value: 207000, notes: "Sold off the truck at Polaki" },
     lines: [{ productId: "p-deccan-opc", qty: 600, rate: 320 }],
     total: 192000,
@@ -538,8 +548,8 @@ export function buildSample(SAMPLE_TODAY: string) {
     { id: "pay-5", paymentNo: 505, partyId: "deccan", date: at("2026-10-22"), amount: 400000, mode: "neft", reference: "UTR55113390" },
     { id: "pay-6", paymentNo: 506, partyId: "vishaka", date: at("2026-10-25"), amount: 300000, mode: "neft", reference: "UTR55114021" },
   ];
-  // Only parties still in the list (a real supplier list drops the sample ones it doesn't name).
-  const payments = allPayments.filter((p) => parties.some((x) => x.id === p.partyId));
+  // Only sample parties still in the list: the firm's own suppliers get no sample payments.
+  const payments = allPayments.filter((p) => parties.some((x) => x.id === p.partyId && !x.original));
 
   return { SAMPLE_TODAY, OPENING_DATE, FIRST_DAY, quotations, purchases, stockMovements, sales, receipts, commitments, payments };
 }

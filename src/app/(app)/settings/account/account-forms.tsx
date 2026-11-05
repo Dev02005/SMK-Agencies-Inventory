@@ -7,7 +7,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { PasswordInput } from "@/components/ui/password-input";
-import { passwordProblem } from "@/lib/password-rules";
+import { CODE_LENGTH, codeProblem, isCode } from "@/lib/password-rules";
 import { forgetSignedIn } from "@/lib/roles";
 import { changePassword, changePersonalPin } from "./actions";
 
@@ -28,10 +28,10 @@ export function SignOutButton() {
 }
 
 /**
- * The password for signing in with a mobile number or email. It is kept (hashed) in the passwords record, in Supabase
- * online; once it is set the mobile number no longer works as the password.
+ * The 6-digit code for signing in with a mobile number or email. It is kept (hashed) in the login-codes record, in
+ * Supabase online; once it is set 000000 no longer works.
  */
-export function ChangePasswordForm({ mobile }: { mobile: string }) {
+export function ChangePasswordForm() {
   const id = useId();
   const toast = useToast();
   const [current, setCurrent] = useState("");
@@ -39,18 +39,23 @@ export function ChangePasswordForm({ mobile }: { mobile: string }) {
   const [again, setAgain] = useState("");
   const [serverError, setServerError] = useState<{ field: "current" | "next"; problem: string }>();
   const [pending, startTransition] = useTransition();
-  const nextError = !next ? undefined : next === current ? "Choose a password different from the current one." : passwordProblem(next, mobile);
-  const againError = again && again !== next ? "The two new passwords don't match." : undefined;
-  const ready = current.length > 0 && next.length > 0 && again === next && !nextError;
+  const nextError =
+    next.length < CODE_LENGTH ? undefined : next === current ? "Choose a code different from the current one." : codeProblem(next);
+  const againError = again.length === CODE_LENGTH && again !== next ? "The two new codes don't match." : undefined;
+  const ready = isCode(current) && isCode(next) && again === next && !nextError;
 
   const field = (key: string, label: string, value: string, set: (v: string) => void, autoComplete: string, error?: string) => (
     <Field label={label} htmlFor={`${id}-${key}`} error={error}>
       <PasswordInput
         id={`${id}-${key}`}
         autoComplete={autoComplete}
+        inputMode="numeric"
+        maxLength={CODE_LENGTH}
+        placeholder="6 digits"
+        className="tabular-nums tracking-[0.3em]"
         value={value}
         onChange={(e) => {
-          set(e.target.value);
+          set(e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH));
           setServerError(undefined);
         }}
         aria-invalid={error ? true : undefined}
@@ -70,7 +75,7 @@ export function ChangePasswordForm({ mobile }: { mobile: string }) {
             setServerError(result);
             return;
           }
-          toast("Password changed.");
+          toast("Sign-in code changed.");
           setCurrent("");
           setNext("");
           setAgain("");
@@ -78,13 +83,13 @@ export function ChangePasswordForm({ mobile }: { mobile: string }) {
       }}
     >
       <div className="sm:col-span-2">
-        {field("current", "Current password", current, setCurrent, "current-password", serverError?.field === "current" ? serverError.problem : undefined)}
+        {field("current", "Current code", current, setCurrent, "current-password", serverError?.field === "current" ? serverError.problem : undefined)}
       </div>
-      {field("new", "New password", next, setNext, "new-password", nextError ?? (serverError?.field === "next" ? serverError.problem : undefined))}
-      {field("again", "New password again", again, setAgain, "new-password", againError)}
+      {field("new", "New 6-digit code", next, setNext, "new-password", nextError ?? (serverError?.field === "next" ? serverError.problem : undefined))}
+      {field("again", "New code again", again, setAgain, "new-password", againError)}
       <div className="sm:col-span-2">
         <Button type="submit" disabled={!ready || pending}>
-          {pending ? "Changing…" : "Change password"}
+          {pending ? "Changing…" : "Change code"}
         </Button>
       </div>
     </form>

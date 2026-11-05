@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/data";
 
 /**
  * Shows its children only to the owner. Checked on the server against the signed-in person, so nobody else gets
- * the data at all; "View as" another role (sample mode) also hides it, to preview what staff see.
+ * the data at all; only the owner's own screens show it.
  */
 export async function OwnerOnly({ what, children }: { what: string; children: ReactNode }) {
   const denied = <div className="surface px-6 py-12 text-center text-[15px] text-ink-secondary">Only the owner can see {what}.</div>;

@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  CalendarCheck,
   ChartColumn,
   CircleSlash,
   ClipboardList,
@@ -16,7 +15,6 @@ import {
   Lock,
   Package,
   ReceiptText,
-  Route,
   Settings,
   ShoppingCart,
   Truck,
@@ -168,18 +166,10 @@ const sections: Section[] = [
   {
     href: "/people",
     title: "People",
-    description: "Staff, attendance, tours, targets and salary",
+    description: "Staff, tours, targets and salary",
     icon: IdCard,
     tone: "blue",
     roles: rolesFor("/people"),
-  },
-  {
-    href: "/attendance",
-    title: "Attendance",
-    description: "Check in and out, and your own attendance",
-    icon: CalendarCheck,
-    tone: "green",
-    roles: rolesFor("/attendance"),
   },
   {
     href: "/fleet",
@@ -222,7 +212,7 @@ export const sidebarGroups: { label?: string; items: Section[] }[] = [
   { items: [home] },
   { label: "Sales", items: ["/sales", "/orders", "/quotations", "/purchases"].map(byHref) },
   { label: "Money", items: ["/money", "/money/cash", "/money/expenses", "/money/advances", "/money/ageing", "/money/banks", "/money/bad-debts"].map(byHref) },
-  { label: "Records", items: ["/parties", "/stock", "/people", "/attendance", "/fleet"].map(byHref) },
+  { label: "Records", items: ["/parties", "/stock", "/people", "/fleet"].map(byHref) },
   { label: "Insights", items: [byHref("/reports")] },
   { label: "Private", items: [byHref("/personal")] },
   { items: [byHref("/settings")] },
@@ -256,12 +246,8 @@ export const roleTabs: Record<Role, Tab[]> = {
     { href: "/parties", title: "Parties", icon: Users },
     { href: "/orders", title: "Orders", icon: ClipboardList },
   ],
-  driver: [
-    { href: "/", title: "Today", icon: Route },
-    { href: "/money/expenses/new", title: "Expense", icon: ReceiptText },
-    { href: "/attendance", title: "Attendance", icon: CalendarCheck },
-    { href: "/money/cash", title: "Cash", icon: HandCoins },
-  ],
+  // Drivers don't sign in.
+  driver: [],
 };
 
 export const moreTab: Tab = { href: "/more", title: "More", icon: LayoutGrid };
@@ -270,12 +256,12 @@ export const quickAddItems: { label: string; href: string; icon: LucideIcon; ton
   { label: "New sale", href: "/sales/new", icon: ReceiptText, tone: "blue", roles: ["owner", "office", "field", "godown"] },
   { label: "Receipt", href: "/money/receipts/new", icon: Wallet, tone: "green", roles: ["owner", "office", "field"] },
   { label: "Payment", href: "/money/payments/new", icon: HandCoins, tone: "green", roles: ["owner", "office"] },
-  { label: "Hand over cash", href: "/money/cash/handover/new", icon: HandCoins, tone: "green", roles: ["owner", "office", "field", "driver"] },
+  { label: "Hand over cash", href: "/money/cash/handover/new", icon: HandCoins, tone: "green", roles: ["owner", "office", "field"] },
   { label: "Quotation", href: "/quotations/new", icon: FileText, tone: "blue", roles: ["owner", "office", "field"] },
   { label: "Purchase", href: "/purchases/new", icon: ShoppingCart, tone: "blue", roles: ["owner", "office", "godown"] },
   { label: "Transfer", href: "/stock/transfers/new", icon: Package, tone: "amber", roles: ["owner", "office", "godown"] },
   { label: "New party", href: "/parties/new", icon: Users, tone: "blue", roles: ["owner", "office", "field"] },
-  { label: "Expense", href: "/money/expenses/new", icon: Fuel, tone: "green", roles: ["owner", "office", "driver"] },
+  { label: "Expense", href: "/money/expenses/new", icon: Fuel, tone: "green", roles: ["owner", "office"] },
   { label: "Order", href: "/orders/new", icon: ClipboardList, tone: "blue", roles: ["owner", "office", "field"] },
 ];
 

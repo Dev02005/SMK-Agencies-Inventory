@@ -1,25 +1,14 @@
 "use client";
 
-import { Check, LogOut, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/login/actions";
-import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui/avatar";
 import type { Profile, Role } from "@/lib/data/types";
-import { allRoles, forgetSignedIn, roleLabels } from "@/lib/roles";
+import { forgetSignedIn, roleLabels } from "@/lib/roles";
 
-export function ProfileMenu({
-  user,
-  role,
-  canViewAs,
-  onRoleChange,
-}: {
-  user: Profile;
-  role: Role;
-  /** Only the owner can preview other roles' screens. */
-  canViewAs: boolean;
-  onRoleChange: (role: Role) => void;
-}) {
+export function ProfileMenu({ user, role }: { user: Profile; role: Role }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -47,40 +36,19 @@ export function ProfileMenu({
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={`${user.fullName}, ${roleLabels[role]}`}
-        className="grid size-9 place-items-center rounded-full bg-hairline text-[13px] font-semibold text-ink-secondary hover:bg-divider"
+        className="rounded-full hover:opacity-90"
       >
-        {user.initials}
+        <Avatar person={user} className="size-9 bg-hairline text-[13px] text-ink-secondary" />
       </button>
       {open && (
         <div role="menu" className="surface animate-fade-up absolute right-0 top-11 z-40 w-72 p-2">
-          <div className="px-3 pb-3 pt-2">
-            <p className="text-[15px] font-semibold text-ink">{user.fullName}</p>
-            <p className="text-[13px] text-ink-secondary">{roleLabels[role]}</p>
-          </div>
-          {canViewAs && (
-            <div className="border-t border-hairline px-3 pb-1 pt-3 text-[12px] text-ink-tertiary">
-              View as (sample mode)
+          <div className="flex items-center gap-3 px-3 pb-3 pt-2">
+            <Avatar person={user} className="size-11 bg-accent-soft text-[15px] text-accent" />
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold text-ink">{user.fullName}</p>
+              <p className="text-[13px] text-ink-secondary">{roleLabels[role]}</p>
             </div>
-          )}
-          {canViewAs && allRoles.map((r) => (
-            <button
-              key={r}
-              type="button"
-              role="menuitemradio"
-              aria-checked={r === role}
-              onClick={() => {
-                onRoleChange(r);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[15px] hover:bg-card-subtle",
-                r === role ? "font-medium text-ink" : "text-ink-secondary",
-              )}
-            >
-              {roleLabels[r]}
-              {r === role && <Check size={16} strokeWidth={2.25} className="text-accent" aria-hidden />}
-            </button>
-          ))}
+          </div>
           <div className="mt-1 border-t border-hairline pt-1">
             <Link
               href="/settings/account"
@@ -89,7 +57,7 @@ export function ProfileMenu({
               className="flex items-center gap-2 rounded-xl px-3 py-2 text-[15px] text-ink-secondary hover:bg-card-subtle"
             >
               <UserRound size={16} strokeWidth={1.75} aria-hidden />
-              Account
+              Edit profile &amp; account
             </Link>
             <button
               type="button"

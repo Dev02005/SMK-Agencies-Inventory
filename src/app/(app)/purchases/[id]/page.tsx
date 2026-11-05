@@ -64,14 +64,15 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
             <span className="text-[28px] font-semibold tabular-nums tracking-[-0.4px] text-ink">{formatINR(purchase.total)}</span>
           </div>
         </SectionCard>
-        <SectionCard title="Lorry">
+        <SectionCard title="Invoice and truck">
           <DetailList
             items={[
               { label: "For firm", value: firm?.name },
               { label: "Invoice no.", value: purchase.invoiceNo },
               { label: "Invoice date", value: formatDate(purchase.invoiceDate) },
               { label: "Truck received", value: formatDate(purchase.receivedDate) },
-              { label: "Lorry", value: purchase.lorryNo },
+              { label: "Truck number", value: purchase.lorryNo },
+              { label: "Driver number", value: purchase.driverMobile && `+91 ${purchase.driverMobile}` },
               { label: "Unloaded at", value: godowns.find((g) => g.id === purchase.godownId)?.name },
             ]}
           />

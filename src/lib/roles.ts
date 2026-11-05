@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import type { Role } from "@/lib/data/types";
 import { allRoles } from "@/lib/labels";
 
 export { allRoles, roleLabels } from "@/lib/labels";
 
 /**
- * Who is signed in on this device, and the role whose screens are shown. Staff always see their own role.
- * The owner can also use "View as" to preview another role's screens (sample stage).
+ * Who is signed in on this device, and the role whose screens are shown: always their own role.
  * Written at sign-in and checked against the server's session on every page (SignedInSync).
  */
+// Left over from the old "View as" switcher; cleared at sign-in and sign-out so no old choice lingers.
 const VIEW_AS = "ska-view-as";
 const SIGNED_IN = "ska-signed-in";
 const listeners = new Set<() => void>();
@@ -48,7 +48,7 @@ const notify = () => listeners.forEach((listener) => listener());
 /** Called at sign-in (and when the server's session names someone else): their own screens, from the start. */
 export function rememberSignedIn(user: SignedIn) {
   write(SIGNED_IN, JSON.stringify(user));
-  write(VIEW_AS, user.role);
+  write(VIEW_AS, null);
   notify();
 }
 
@@ -78,15 +78,8 @@ export function useSignedIn(): SignedIn | null {
   return useMemo(() => parse(raw), [raw]);
 }
 
-export function useViewAs(): [Role, (role: Role) => void] {
+/** The role whose screens are shown: the signed-in person's own (the owner's until the device knows who it is). */
+export function useViewAs(): [Role] {
   const signedIn = useSignedIn();
-  const stored = useSyncExternalStore(subscribe, () => read(VIEW_AS), () => null);
-  const chosen = allRoles.includes(stored as Role) ? (stored as Role) : "owner";
-  // Only the owner may look at other roles' screens.
-  const role = signedIn && signedIn.role !== "owner" ? signedIn.role : chosen;
-  const setRole = useCallback((next: Role) => {
-    write(VIEW_AS, next);
-    notify();
-  }, []);
-  return [role, setRole];
+  return [signedIn?.role ?? "owner"];
 }

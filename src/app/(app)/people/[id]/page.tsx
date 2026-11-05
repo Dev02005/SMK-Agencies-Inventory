@@ -3,15 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { AttendanceChip, attendanceLabels } from "@/components/people/attendance-chip";
 import { TargetBar } from "@/components/people/target-bar";
 import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
 import { iconButtonClass } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
-import { cn } from "@/lib/cn";
-import { getEmployee, getToday } from "@/lib/data";
+import { getCurrentUser, getEmployee, getToday, getVehicles } from "@/lib/data";
+import { StaffEditor } from "./staff-editor";
 import { formatBalance, formatDate, formatINR, formatMonth, formatShortDate } from "@/lib/format";
 import { roleLabels } from "@/lib/labels";
 import { OwnerPage } from "@/components/auth/owner-only";
@@ -33,7 +32,11 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
   const { id } = await params;
   const e = await getEmployee(id);
   if (!e) notFound();
-  const today = await getToday();
+  const [today, me, vehicles] = await Promise.all([getToday(), getCurrentUser(), getVehicles()]);
+  // Our own lorries and vans a driver can be put on, with who drives each now.
+  const ownVehicles = vehicles
+    .filter((v) => v.category !== "rented" && (v.kind === "lorry" || v.kind === "van"))
+    .map((v) => ({ id: v.id, label: v.label, hint: [v.model, v.driverName && v.driverId !== e.id ? `driven by ${v.driverName}` : undefined].filter(Boolean).join(" · ") }));
   const thisWeek = e.visits.filter((v) => v.date >= today).slice(0, 8);
   const thisMonth = today.slice(0, 7);
   const slip = e.slips.find((s) => s.month === thisMonth);
@@ -53,34 +56,17 @@ async function Employee({ params }: { params: PageProps<"/people/[id]">["params"
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SectionCard title="Attendance" action={<AttendanceChip record={e.today} />}>
-          <p className="text-[13px] text-ink-secondary">{formatMonth(thisMonth)}</p>
-          <div className="mt-2 grid grid-cols-7 gap-1.5" aria-label="Attendance this month">
-            {e.attendance
-              .filter((a) => a.date.startsWith(thisMonth))
-              .map((a) => (
-                <span
-                  key={a.date}
-                  title={`${formatShortDate(a.date)}: ${attendanceLabels[a.status].label}${a.checkIn ? ` ${a.checkIn}` : ""}`}
-                  className={cn("grid aspect-square place-items-center rounded-lg text-[11px]", attendanceLabels[a.status].dot, a.status === "holiday" ? "text-ink-secondary" : "text-white")}
-                >
-                  {Number(a.date.slice(8, 10))}
-                </span>
-              ))}
-          </div>
-          <DetailList
-            className="mt-3"
-            items={[
-              { label: "Present", value: `${e.month.present} of ${e.month.workingDays} days` },
-              { label: "Half days", value: e.month.halfDay || undefined },
-              { label: "Leave", value: e.month.leave || undefined },
-              { label: "Absent", value: e.month.absent ? <span className="text-danger">{e.month.absent}</span> : undefined },
-              { label: "Late arrivals", value: e.month.late ? <span className="text-warning">{e.month.late}</span> : undefined },
-            ]}
+      {me.role === "owner" && e.original && (
+        <div className="mb-4">
+          <StaffEditor
+            key={`${e.fullName}|${e.mobile}|${e.designation}|${e.vehicleId ?? ""}`}
+            person={{ id: e.id, name: e.fullName, mobile: e.mobile, designation: e.designation, isDriver: e.role === "driver", vehicleId: e.vehicleId, vehicleLabel: e.vehicle }}
+            vehicles={ownVehicles}
           />
-        </SectionCard>
+        </div>
+      )}
 
+      <div className="grid gap-4 lg:grid-cols-3">
         {e.target ? (
           <SectionCard title={`Targets · ${formatMonth(e.target.month)}`}>
             <div className="space-y-4">

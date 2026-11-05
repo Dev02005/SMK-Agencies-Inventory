@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { OwnerOnly } from "@/components/auth/owner-only";
-import { LorryDue, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
+import { LorryProgress } from "@/components/lorries/lorry-progress";
 import { ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { DataOrigin } from "@/components/ui/data-origin";
 import { PageHeader } from "@/components/ui/page-header";
-import { getLorries, getProducts, getToday } from "@/lib/data";
-import { lorryLeft } from "@/lib/lorries";
-import { describeQuantities } from "@/lib/quantities";
+import { getLorries, getProducts } from "@/lib/data";
+import { soldBills } from "@/lib/lorries";
 
 export const metadata: Metadata = { title: "Lorry stock" };
 
@@ -27,17 +27,17 @@ export default function LorryStockPage() {
 }
 
 async function Lorries() {
-  const [lorries, products, today] = await Promise.all([getLorries(), getProducts(), getToday()]);
+  const [lorries, products] = await Promise.all([getLorries(), getProducts()]);
   const selling = lorries.filter((l) => !l.sold);
   if (selling.length === 0) return <SectionCard>No lorry is selling right now.</SectionCard>;
   return (
     <div className="space-y-4">
       {selling.map((l) => (
-        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} today={today} />}>
+        <SectionCard key={l.id} title={<LorryTitle lorry={l} />} action={<LorryStateChip lorry={l} />}>
           <LorryMeta lorry={l} />
-          <LorryItems lorry={l} products={products} />
-          {l.sale && <p className="mt-2 text-[15px] font-medium text-ink">Left on it: {describeQuantities(lorryLeft(l).filter((x) => x.qty > 0), products) || "nothing"}</p>}
-          <LorryDue lorry={l} today={today} />
+          <div className="mt-4">
+            <LorryProgress loaded={l.lines} sold={(pid) => l.sale?.lines.find((x) => x.productId === pid)?.qty ?? 0} products={products} bills={soldBills(l)} />
+          </div>
           <p className="mt-2 text-[13px]">
             <Link href={`/sales/lorries/${l.id}`} className="text-link hover:underline">
               Update the sale ›

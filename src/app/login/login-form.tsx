@@ -2,10 +2,10 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useId, useState, useTransition } from "react";
+import { Suspense, useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, inputClass } from "@/components/ui/field";
-import { PasswordInput } from "@/components/ui/password-input";
+import { CODE_LENGTH, CodeInput } from "@/components/ui/code-input";
 import { rememberSignedIn } from "@/lib/roles";
 import { lookUpLogin, signIn } from "./actions";
 
@@ -13,7 +13,7 @@ type Person = { name: string; initials: string; designation: string };
 
 /**
  * Two steps, on any phone or computer: the mobile number (or email) first, then, with the person greeted by the
- * name saved for that number, their password. The session lasts until 12 AM India time, then everyone signs in again.
+ * name saved for that number, their 6-digit sign-in code (000000 until they set their own in Settings › Account). The session lasts until 12 AM India time, then everyone signs in again.
  */
 export function LoginForm() {
   const id = useId();
@@ -21,6 +21,7 @@ export function LoginForm() {
   const [loginId, setLoginId] = useState("");
   const [person, setPerson] = useState<Person | null>(null);
   const [password, setPassword] = useState("");
+  const codeRef = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -39,16 +40,17 @@ export function LoginForm() {
     });
   }
 
-  function signInNow() {
-    if (!password || pending) return;
+  function signInNow(code = password) {
+    if (code.length !== CODE_LENGTH || pending) return;
     setProblem(null);
     // Read here rather than with useSearchParams, so the form itself is part of the instant first paint.
     const next = new URLSearchParams(window.location.search).get("next") ?? undefined;
     startTransition(async () => {
-      const result = await signIn(loginId, password, next);
+      const result = await signIn(loginId, code, next);
       if (!result.ok) {
-        setProblem("That password is wrong. Try again.");
+        setProblem("That code is wrong. Try again.");
         setPassword("");
+        codeRef.current?.focus();
         return;
       }
       // Their own role's screens from the first page.
@@ -114,19 +116,24 @@ export function LoginForm() {
               <ArrowLeft size={14} strokeWidth={2} aria-hidden /> Not you? Change number
             </button>
           </div>
-          {/* Lets password managers file the password under the right login. */}
+          {/* Lets password managers file the code under the right login. */}
           <input type="text" name="username" autoComplete="username" value={loginId} readOnly hidden />
-          <Field label="Password" htmlFor={`${id}-password`} error={problem ?? undefined}>
-            <PasswordInput
-              id={`${id}-password`}
+          <Field label="6-digit code" htmlFor={`${id}-code`} hint={problem ? undefined : "Enter your 6-digit sign-in code"} error={problem ?? undefined}>
+            <CodeInput
+              id={`${id}-code`}
+              ref={codeRef}
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              aria-invalid={Boolean(problem) || undefined}
+              onValueChange={(code) => {
+                setPassword(code);
+                if (code) setProblem(null);
+              }}
+              onComplete={(code) => signInNow(code)}
+              invalid={Boolean(problem)}
               autoFocus
             />
           </Field>
-          <Button type="submit" disabled={!password || pending} className="w-full">
+          <Button type="submit" disabled={password.length !== CODE_LENGTH || pending} className="w-full">
             {pending ? "Signing in…" : "Sign in"}
           </Button>
         </>

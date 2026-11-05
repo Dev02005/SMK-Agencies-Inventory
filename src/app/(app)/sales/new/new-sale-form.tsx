@@ -23,7 +23,8 @@ import {
 } from "@/lib/sales";
 import type { Party, Product } from "@/lib/data/types";
 import { FirmPicker, type FirmChoice } from "@/components/forms/firm-picker";
-import { DestinationField, RentDriverField } from "./destination-field";
+import { filledCharges, OtherCharges, unnamedCharge, type OtherCharge } from "@/components/forms/other-charges";
+import { DestinationField } from "./destination-field";
 import { NewCustomer } from "./new-customer";
 import { partyOptions } from "@/lib/party-options";
 import { useViewAs } from "@/lib/roles";
@@ -42,7 +43,15 @@ export type SaleParty = {
 type Line = { key: number; productId: string; qty: string; rate: string };
 
 /** A vehicle to pick for delivery: "Lorry AP 30 TB 1186", with its model, driver or owner as the hint. */
-export type VehicleChoice = { id: string; label: string; hint?: string; /** Who usually drives it (our vehicles). */ driverId?: string };
+export type VehicleChoice = {
+  id: string;
+  label: string;
+  hint?: string;
+  /** Who usually drives it (our vehicles). */
+  driverId?: string;
+  /** A rented vehicle's own driver, filled in when it is chosen. */
+  driver?: { name: string; mobile?: string };
+};
 
 const num = (value: string) => {
   const n = parseFloat(value);
@@ -58,7 +67,8 @@ const transportHelp: Record<TransportMode, string> = {
 export function NewSaleForm({
   firms,
   primaryFirmId,
-  products,
+  products: allProducts,
+  stock,
   parties,
   godowns,
   ownVehicles,
@@ -66,13 +76,14 @@ export function NewSaleForm({
   nextBillNo,
   destinations,
   ownDrivers,
-  rentDrivers,
   today,
 }: {
   /** The owner's firms. A sale is billed from the primary firm unless it is changed for this one bill. */
   firms: FirmChoice[];
   primaryFirmId: string;
   products: Product[];
+  /** What is in stock at each godown (more than zero); a bill offers only what its godown has. */
+  stock: { godownId: string; productId: string; qty: number }[];
   parties: SaleParty[];
   /** The godown the bill's bags come out of. Company lorries are sold as a whole under Sales › Lorry sales, not billed here. */
   godowns: { id: string; name: string }[];
@@ -86,8 +97,6 @@ export function NewSaleForm({
   destinations: string[];
   /** Our own drivers, for FOR deliveries. */
   ownDrivers: { id: string; name: string }[];
-  /** Saved drivers of rented vehicles, for RENT deliveries. */
-  rentDrivers: string[];
   /** "YYYY-MM-DD", worked out on the server so it matches between server and browser. */
   today: string;
 }) {
@@ -105,44 +114,61 @@ export function NewSaleForm({
   const [partyId, setPartyId] = useState("");
   // What was typed in the party search when New customer was picked; null while the New customer form is closed.
   const [newCustomer, setNewCustomer] = useState<string | null>(null);
+  // The party chosen before New customer was opened, put back if it is cancelled.
+  const [beforeNew, setBeforeNew] = useState("");
+  // What is typed in the New customer form, kept if the bill switches to Cash customer instead.
+  const [draft, setDraft] = useState({ name: "", mobile: "" });
   const [invoiceDate, setInvoiceDate] = useState(today);
-  const [billNo, setBillNo] = useState(String(nextBillNo));
-  const [lines, setLines] = useState<Line[]>([{ key: 1, productId: products[0].id, qty: "", rate: "" }]);
+  // The next number in the one series godown and lorry bills share; not typed, so it always follows on.
+  const billNo = String(nextBillNo);
+  // What the chosen godown has: only its brands and types can be billed from it, never more than it holds.
+  const stockAt = (godownId: string, productId: string) => stock.find((s) => s.godownId === godownId && s.productId === productId)?.qty ?? 0;
+  const stockedAt = (godownId: string) => allProducts.filter((p) => stockAt(godownId, p.id) > 0);
+  const [lines, setLines] = useState<Line[]>(() => [{ key: 1, productId: (stockedAt(godowns[0]?.id ?? "")[0] ?? allProducts[0]).id, qty: "", rate: "" }]);
   const [nextKey, setNextKey] = useState(2);
   const [discountMode, setDiscountMode] = useState<DiscountMode>("amount");
   const [discountValue, setDiscountValue] = useState("");
   const [loadFrom, setLoadFrom] = useState(godowns[0]?.id ?? "");
   const loadFromKnown = godowns.some((g) => g.id === loadFrom);
+  const products = stockedAt(loadFrom);
+  const godownEmpty = loadFromKnown && products.length === 0;
   const [transportMode, setTransportMode] = useState<TransportMode>("FOR");
   const [ownVehicleId, setOwnVehicleId] = useState("");
   const [rentedVehicleId, setRentedVehicleId] = useState("");
-  // FOR: one of our drivers (the vehicle's usual driver to start with); RENT: the rented vehicle's driver.
+  // FOR: one of our drivers (the vehicle's usual driver to start with). RENT: the rented vehicle's own driver, which
+  // comes with the vehicle and isn't chosen separately.
   const [ownDriverId, setOwnDriverId] = useState("");
-  const [rentDriver, setRentDriver] = useState("");
+  const rentDriver = rentedVehicles.find((v) => v.id === rentedVehicleId)?.driver;
   const [customerVehicle, setCustomerVehicle] = useState("");
-  const [transportCharge, setTransportCharge] = useState("");
-  const [otherCharge, setOtherCharge] = useState("");
+  // The vehicle's other costs, each with a name ("Toll", "Hamali"…): kept with the sale, never added to the bill.
+  const [vehicleCosts, setVehicleCosts] = useState<OtherCharge[]>([]);
+  // RENT: what the rented vehicle's driver is paid per bag; not on the bill either.
+  const [freightPerBag, setFreightPerBag] = useState("");
   const [destination, setDestination] = useState("");
-  const [memo, setMemo] = useState("");
+  // A cash (walk-in) customer has no saved party: their name and phone number are taken on the bill.
+  const [cashName, setCashName] = useState("");
+  const [cashMobile, setCashMobile] = useState("");
   const [remarks, setRemarks] = useState("");
   const [reason, setReason] = useState("");
   const toast = useToast();
 
-  const productById = (productId: string) => products.find((p) => p.id === productId) ?? products[0];
+  const productById = (productId: string) => allProducts.find((p) => p.id === productId) ?? products[0] ?? allProducts[0];
+  const overStock = lines.find((l) => num(l.qty) > stockAt(loadFrom, l.productId));
   const party = partyList.find((p) => p.id === partyId);
 
   // EX: the customer's own vehicle, so nothing is charged on top of the items. Only FOR (our vehicle) charges
-  // transport; any mode but EX may add an optional "Other" charge. Rent and unloading are not put on bills.
+  // transport. The vehicle's other costs (FOR or RENT) and a rented vehicle's freight are ours: never on the bill.
   const charged = transportMode !== "EX";
   const totals = computeTotals({
     lines: lines.map((l) => ({ qty: num(l.qty), rate: num(l.rate) })),
     discountMode,
     discountValue: num(discountValue),
     transportMode,
-    transportCharge: transportMode === "FOR" ? num(transportCharge) : 0,
+    transportCharge: 0,
     unloadingCharge: 0,
-    otherCharge: charged ? num(otherCharge) : 0,
+    otherCharge: 0,
   });
+  const costs = charged ? filledCharges(vehicleCosts) : [];
   const credit = party && pricing ? checkCredit(party.creditLimit, party.outstanding, totals.total) : null;
 
   const quantities = lines.reduce(
@@ -155,6 +181,7 @@ export function NewSaleForm({
     },
     { cement: { qty: 0, mt: 0 }, steel: { qty: 0, mt: 0 } },
   );
+  const freight = transportMode === "RENT" ? num(freightPerBag) * quantities.cement.qty : 0;
 
   const isOwner = role === "owner";
   const discountOverLimit = totals.discountPercent > maxDiscountPercent[role];
@@ -165,10 +192,20 @@ export function NewSaleForm({
 
   const missing = !party
     ? "Choose a party to continue."
+    : party.kind === "cash" && cashName.trim().length < 2
+      ? "Enter the cash customer's name."
+    : party.kind === "cash" && cashMobile.length !== 10
+      ? "Enter the cash customer's 10-digit phone number."
+    : charged && unnamedCharge(vehicleCosts)
+      ? "Enter a name for each vehicle cost."
     : pricing && !(Number.isInteger(billNumber) && billNumber > 0)
       ? "Enter the bill no."
       : !loadFromKnown
       ? "Choose the godown the bags are loaded from."
+      : godownEmpty
+      ? "This godown has no stock. Choose another godown."
+      : overStock
+      ? `Only ${formatNumber(stockAt(loadFrom, overStock.productId))} ${unitLabel[productById(overStock.productId).unit]} of ${productById(overStock.productId).name} at this godown.`
       : !hasLines
       ? pricing
         ? "Enter a quantity and rate for at least one item."
@@ -184,7 +221,30 @@ export function NewSaleForm({
     .filter(Boolean)
     .join(" · ");
 
+  /**
+   * New customer: the bill leaves the party it was on (so the Cash customer's name and phone don't show beside this
+   * form), taking any name typed for a cash customer into the new customer's form.
+   */
+  function openNewCustomer(typed: string) {
+    const fromCash = party?.kind === "cash";
+    setBeforeNew(partyId);
+    setPartyId("");
+    const name = typed.trim() || (fromCash ? cashName.trim() : "");
+    setDraft({ name, mobile: fromCash ? cashMobile : "" });
+    setNewCustomer(name);
+  }
+
   function chooseParty(next: string, picked = partyList.find((p) => p.id === next)) {
+    // Picking a party closes the New customer form, so the two never show together; switching to Cash customer
+    // keeps the name and number typed there.
+    if (newCustomer !== null) {
+      setNewCustomer(null);
+      setBeforeNew("");
+      if (picked?.kind === "cash") {
+        if (draft.name.trim()) setCashName(draft.name.trim());
+        if (draft.mobile) setCashMobile(draft.mobile);
+      }
+    }
     // The destination follows the party's town unless it was typed by hand.
     if (!destination || destination === (party?.place ?? "")) setDestination(picked?.place ?? "");
     setPartyId(next);
@@ -194,8 +254,15 @@ export function NewSaleForm({
     setLines((current) => current.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
+  /** A new godown: items it doesn't have move to the first one it does. */
+  function chooseGodown(next: string) {
+    setLoadFrom(next);
+    const there = stockedAt(next);
+    setLines((current) => current.map((l) => (stockAt(next, l.productId) > 0 || !there[0] ? l : { ...l, productId: there[0].id, rate: "" })));
+  }
+
   function addLine() {
-    const product = products[0];
+    const product = products[0] ?? allProducts[0];
     setLines((current) => [...current, { key: nextKey, productId: product.id, qty: "", rate: "" }]);
     setNextKey((k) => k + 1);
   }
@@ -257,14 +324,19 @@ export function NewSaleForm({
               onChange={chooseParty}
               options={partyOptions(partyList)}
               searchable
-              action={{ label: "New customer", onPick: setNewCustomer }}
+              action={{ label: "New customer", onPick: openNewCustomer }}
             />
           </Field>
           {newCustomer !== null && (
             <NewCustomer
               parties={partyList}
               typed={newCustomer}
-              onCancel={() => setNewCustomer(null)}
+              typedMobile={party?.kind === "cash" || partyList.find((p) => p.id === beforeNew)?.kind === "cash" ? cashMobile : undefined}
+              onDraft={setDraft}
+              onCancel={() => {
+                setNewCustomer(null);
+                if (beforeNew) setPartyId(beforeNew);
+              }}
               onDone={(picked, added) => {
                 if (added) setPartyList((list) => [...list, picked]);
                 chooseParty(picked.id, picked);
@@ -273,11 +345,30 @@ export function NewSaleForm({
               }}
             />
           )}
+          {party?.kind === "cash" && newCustomer === null && (
+            <div className="grid gap-3 rounded-2xl bg-card-subtle p-4 sm:grid-cols-2">
+              <Field label="Customer name" htmlFor={`${id}-cash-name`}>
+                <input id={`${id}-cash-name`} className={inputClass} maxLength={60} autoCapitalize="words" value={cashName} onChange={(e) => setCashName(e.target.value)} />
+              </Field>
+              <Field label="Phone number" htmlFor={`${id}-cash-mobile`}>
+                <AffixInput
+                  id={`${id}-cash-mobile`}
+                  prefix="+91"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={cashMobile}
+                  onChange={(e) => setCashMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                />
+              </Field>
+            </div>
+          )}
           {credit && <CreditPanel credit={credit} billTotal={totals.total} isOwner={isOwner} />}
           <div className={cn("grid gap-4", pricing && "grid-cols-2")}>
             {pricing && (
-              <Field label="Bill no." htmlFor={`${id}-bill`} hint="Next in the series; change it if needed">
-                <input id={`${id}-bill`} className={inputClass} inputMode="numeric" value={billNo} onChange={(e) => setBillNo(e.target.value.replace(/\D/g, ""))} />
+              <Field label="Bill no." htmlFor={`${id}-bill`} hint="Next in the series (godown and lorry bills share it)">
+                <output id={`${id}-bill`} className={cn(inputClass, "flex items-center bg-card-subtle tabular-nums")}>
+                  {billNo}
+                </output>
               </Field>
             )}
             <Field label="Bill date" htmlFor={`${id}-date`}>
@@ -294,10 +385,14 @@ export function NewSaleForm({
               label="Load from"
               placeholder="Choose a godown"
               value={loadFrom}
-              onChange={setLoadFrom}
-              options={godowns.map((g) => ({ value: g.id, label: g.name }))}
+              onChange={chooseGodown}
+              options={godowns.map((g) => {
+                const items = stockedAt(g.id).length;
+                return { value: g.id, label: g.name, hint: items ? `${items} ${items === 1 ? "item" : "items"} in stock` : "No stock" };
+              })}
             />
           </Field>
+          {godownEmpty && <p className="mt-3 rounded-2xl bg-warning-soft px-4 py-3 text-[15px] text-ink">This godown has no stock right now. Choose another godown.</p>}
           <ul className="divide-y divide-hairline">
             {lines.map((line, index) => {
               const product = productById(line.productId);
@@ -309,7 +404,7 @@ export function NewSaleForm({
                     <div className="min-w-0 flex-1">
                       <ProductPicker
                         label={`Item ${index + 1}`}
-                        products={products}
+                        products={products.length ? products : allProducts}
                         value={line.productId}
                         onChange={(v) => {
                           const next = productById(v);
@@ -332,7 +427,8 @@ export function NewSaleForm({
                     <Field
                       label="Quantity"
                       htmlFor={`${id}-qty-${line.key}`}
-                      hint={qty > 0 ? `${formatNumber(toMT(qty, product.unit), 3)} MT` : undefined}
+                      hint={`${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit]} in stock${qty > 0 ? ` · ${formatNumber(toMT(qty, product.unit), 3)} MT` : ""}`}
+                      error={qty > stockAt(loadFrom, product.id) ? `Only ${formatNumber(stockAt(loadFrom, product.id))} ${unitLabel[product.unit]} at this godown` : undefined}
                     >
                       <AffixInput
                         id={`${id}-qty-${line.key}`}
@@ -459,41 +555,48 @@ export function NewSaleForm({
                 />
               </Field>
             )}
-            {transportMode === "RENT" && <RentDriverField value={rentDriver} onChange={setRentDriver} drivers={rentDrivers} />}
+            {transportMode === "RENT" && (
+              <Field label="Driver" htmlFor={`${id}-rent-driver`} hint={rentedVehicleId ? (rentDriver ? "Comes with the rented vehicle" : "No driver saved for this vehicle") : "Filled in when you choose the vehicle"}>
+                <div
+                  id={`${id}-rent-driver`}
+                  aria-live="polite"
+                  className={cn(inputClass, "flex items-center justify-between gap-3 bg-card-subtle", !rentDriver && "text-ink-tertiary")}
+                >
+                  <span className="truncate">{rentDriver?.name ?? "—"}</span>
+                  {rentDriver?.mobile && (
+                    <a href={`tel:+91${rentDriver.mobile}`} className="shrink-0 text-[15px] tabular-nums text-link hover:underline">
+                      +91 {rentDriver.mobile}
+                    </a>
+                  )}
+                </div>
+              </Field>
+            )}
             <DestinationField value={destination} onChange={setDestination} destinations={destinations} />
           </div>
-          {charged && pricing && (
-            <div className="grid grid-cols-2 gap-3">
-              {transportMode === "FOR" && (
-                <Field label="Transport" htmlFor={`${id}-transport`}>
-                  <AffixInput
-                    id={`${id}-transport`}
-                    inputMode="decimal"
-                    prefix="₹"
-                    placeholder="0"
-                    value={transportCharge}
-                    onChange={(e) => setTransportCharge(e.target.value)}
-                  />
-                </Field>
-              )}
-              <Field label="Other" htmlFor={`${id}-other`} hint="Optional">
-                <AffixInput
-                  id={`${id}-other`}
-                  inputMode="decimal"
-                  prefix="₹"
-                  placeholder="0"
-                  value={otherCharge}
-                  onChange={(e) => setOtherCharge(e.target.value)}
-                />
-              </Field>
-            </div>
+          {transportMode === "RENT" && (
+            <Field
+              label="Freight per bag"
+              htmlFor={`${id}-freight`}
+              hint={
+                num(freightPerBag) > 0 && quantities.cement.qty > 0
+                  ? `${formatNumber(quantities.cement.qty)} bags × ${formatINR(num(freightPerBag))} = ${formatINR(freight)} to the driver · not on the bill`
+                  : "What the rented vehicle's driver is paid for each bag · not on the bill"
+              }
+            >
+              <AffixInput id={`${id}-freight`} prefix="₹" suffix="/ bag" inputMode="decimal" placeholder="0" value={freightPerBag} onChange={(e) => setFreightPerBag(e.target.value)} />
+            </Field>
+          )}
+          {charged && (
+            <OtherCharges
+              value={vehicleCosts}
+              onChange={setVehicleCosts}
+              title="Vehicle other costs"
+              hint="Not added to the bill. Name each one, like Toll or Hamali."
+            />
           )}
         </section>
 
         <section className="surface space-y-4 p-5">
-          <Field label="Paper memo number" htmlFor={`${id}-memo`} hint="Number from the paper bill book, if any">
-            <input id={`${id}-memo`} className={inputClass} value={memo} onChange={(e) => setMemo(e.target.value)} />
-          </Field>
           <Field label="Remarks" htmlFor={`${id}-remarks`}>
             <textarea
               id={`${id}-remarks`}
@@ -535,7 +638,6 @@ export function NewSaleForm({
               <dl className="mt-4 space-y-2.5 text-[15px]">
                 <SummaryRow label="Items" value={formatINR(totals.subtotal)} />
                 {totals.discount > 0 && <SummaryRow label="Discount" value={`− ${formatINR(totals.discount)}`} />}
-                {totals.charges > 0 && <SummaryRow label="Charges" value={formatINR(totals.charges)} />}
               </dl>
               <div className="mt-4 border-t border-hairline pt-4">
                 <p className="text-[13px] text-ink-secondary">Total</p>
@@ -544,6 +646,17 @@ export function NewSaleForm({
                 </p>
                 {quantityLine && <p className="mt-1 text-[13px] text-ink-secondary">{quantityLine}</p>}
               </div>
+              {(costs.length > 0 || freight > 0) && (
+                <div className="mt-4 rounded-2xl bg-card-subtle p-3">
+                  <p className="text-[13px] font-medium text-ink">Vehicle costs · not on the bill</p>
+                  <dl className="mt-1.5 space-y-1 text-[13px]">
+                    {freight > 0 && <SummaryRow label="Freight to driver" value={formatINR(freight)} />}
+                    {costs.map((c, i) => (
+                      <SummaryRow key={i} label={c.name || "Other cost"} value={formatINR(c.amount)} />
+                    ))}
+                  </dl>
+                </div>
+              )}
             </>
           )}
           {missing && <p className="mt-4 text-[13px] text-ink-secondary">{missing}</p>}

@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { DriverHome } from "@/components/home/driver-home";
 import { FieldHome } from "@/components/home/field-home";
 import { GodownHome } from "@/components/home/godown-home";
 import { OwnerHome } from "@/components/home/owner-home";
@@ -7,7 +6,7 @@ import { RoleHome } from "@/components/home/role-home";
 import { ListSkeleton } from "@/components/ui/blocks";
 import { getProfiles } from "@/lib/data";
 
-/** Each role has its own home screen; "View as" in the profile menu switches between them in sample mode. */
+/** Each role has its own home screen; everyone sees their own role's. */
 export default function HomePage() {
   return (
     <Suspense fallback={<ListSkeleton rows={4} />}>
@@ -29,7 +28,8 @@ async function Homes() {
         office: owner,
         field: <FieldHome profileId={first("field")} />,
         godown: <GodownHome />,
-        driver: <DriverHome profileId={first("driver")} />,
+        // Drivers don't sign in.
+        driver: null,
       }}
     />
   );

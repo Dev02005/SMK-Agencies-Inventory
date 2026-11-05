@@ -30,7 +30,7 @@ export function AppShell({
   notices: Promise<Notice[]>;
   children: ReactNode;
 }) {
-  const [role, setRole] = useViewAs();
+  const [role] = useViewAs();
   const signedIn = useSignedIn();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -52,9 +52,7 @@ export function AppShell({
             people={people}
             role={role}
             signedInId={signedIn?.id}
-            canViewAs={(signedIn?.role ?? "owner") === "owner"}
             notices={notices}
-            onRoleChange={setRole}
             onQuickAdd={() => setQuickAddOpen(true)}
           />
         </Suspense>
@@ -71,7 +69,7 @@ export function AppShell({
   );
 }
 
-/** The top bar for the signed-in person; when the owner previews another role, that role's first person. */
+/** The top bar for the signed-in person. */
 function TopBarFor({
   people,
   role,
@@ -81,9 +79,7 @@ function TopBarFor({
   people: Promise<Profile[]>;
   role: Role;
   signedInId?: string;
-  canViewAs: boolean;
   notices: Promise<Notice[]>;
-  onRoleChange: (role: Role) => void;
   onQuickAdd: () => void;
 }) {
   const profiles = use(people);

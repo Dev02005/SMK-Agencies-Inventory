@@ -48,7 +48,7 @@ export default function SettingsPage() {
       <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-secondary">You and this device</h2>
       <ul className="surface divide-y divide-hairline overflow-hidden">
         <ItemRow
-          item={{ href: "/settings/account", title: "Account", description: "Your sign-in, password and automatic sign-out", icon: CircleUserRound, live: true, tone: "blue" }}
+          item={{ href: "/settings/account", title: "Account", description: "Your name, photo, sign-in and automatic sign-out", icon: CircleUserRound, live: true, tone: "blue" }}
         />
         <li>
           <InstallRow />
