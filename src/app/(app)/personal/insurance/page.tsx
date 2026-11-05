@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { AddPanel } from "@/components/forms/add-panel";
 import { SimpleForm } from "@/components/forms/simple-form";
-import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { ListSkeleton, SampleChip } from "@/components/ui/blocks";
 import { Chip } from "@/components/ui/chip";
 import { DataTable } from "@/components/ui/data-table";
 import { ExportMenu } from "@/components/ui/export-menu";
@@ -38,10 +39,7 @@ function InsuranceContent() {
             <ExportMenu title={"Insurance"} />
           </>
         } />
-      <Suspense fallback={<ListSkeleton rows={5} />}>
-        <Policies />
-      </Suspense>
-      <SectionCard title="Add a policy" className="mt-4">
+      <AddPanel label="Add insurance" title="Add insurance">
         <SimpleForm
           thing="policy"
           submitLabel="Add policy"
@@ -59,7 +57,10 @@ function InsuranceContent() {
             { name: "nextDue", label: "Next due date", type: "date" },
           ]}
         />
-      </SectionCard>
+      </AddPanel>
+      <Suspense fallback={<ListSkeleton rows={5} />}>
+        <Policies />
+      </Suspense>
     </>
   );
 }

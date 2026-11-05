@@ -9,13 +9,13 @@ import { useDateFilter } from "@/components/ui/date-filter";
 import { FilterChips, SearchInput } from "@/components/ui/filters";
 import type { SaleWithParty } from "@/lib/data";
 import type { Product, SaleStatus } from "@/lib/data/types";
-import { inDateFilter } from "@/lib/date-filter";
+import { inDateFilter, salesPresets } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { billName, saleStatus } from "@/lib/labels";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
 
 export function SalesList({ sales, products }: { sales: SaleWithParty[]; products: Product[] }) {
-  const dates = useDateFilter();
+  const dates = useDateFilter(salesPresets);
   const [status, setStatus] = useState<SaleStatus | "all">("all");
   const [query, setQuery] = useState("");
 
@@ -44,7 +44,7 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
         />
       </div>
 
-      <DataTools title="Godown sales" />
+      <DataTools title="Godown sales" presets={salesPresets} />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:gap-4">
           <FilterChips

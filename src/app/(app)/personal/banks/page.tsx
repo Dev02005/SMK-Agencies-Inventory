@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { Landmark } from "lucide-react";
 import { Suspense } from "react";
+import { AddPanel } from "@/components/forms/add-panel";
 import { BankEntriesTable } from "@/components/money/bank-views";
-import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { getBankAccounts, getBankEntries } from "@/lib/data";
 import { formatINR } from "@/lib/format";
 import { isPersonalUnlocked } from "@/lib/personal-lock";
 import { PersonalSection } from "../personal-section";
+import { PersonalBankForm } from "./personal-bank-form";
 
 export const metadata: Metadata = { title: "Personal banks" };
 
@@ -22,7 +24,10 @@ export default function PersonalBanksPage() {
 function PersonalBanksContent() {
   return (
     <>
-      <PageHeader title="Personal banks" subtitle="Kept separate from the business accounts" actions={<SampleChip />} />
+      <PageHeader title="Personal banks" subtitle="Your own accounts, kept separate from the business accounts" />
+      <AddPanel label="Add bank" title="Add bank">
+        <PersonalBankForm />
+      </AddPanel>
       <Suspense fallback={<ListSkeleton rows={5} />}>
         <Accounts />
       </Suspense>
@@ -35,6 +40,7 @@ async function Accounts() {
   if (!(await isPersonalUnlocked())) return null;
   const accounts = await getBankAccounts("personal");
   const entries = await Promise.all(accounts.map((a) => getBankEntries(a.id)));
+  if (accounts.length === 0) return <SectionCard>No personal bank accounts yet. Use Add bank to add one.</SectionCard>;
   return (
     <div className="space-y-6">
       {accounts.map((a, i) => (

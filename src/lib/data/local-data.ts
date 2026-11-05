@@ -284,22 +284,40 @@ function isAccount(a: unknown): a is BankAccount {
 
 let accounts: BankAccount[] = [];
 
-/** The firms' real business accounts in place of the sample ones; the owner's personal (sample) accounts stay. */
+/**
+ * The firms' real business accounts in place of the sample ones, and the owner's own personal accounts (an account
+ * with "scope": "personal" in banks.json, added under Personal › Banks). No sample personal account is ever shown.
+ */
 export function withLocalBanks(sample: BankAccount[]): BankAccount[] {
-  if (accounts.length === 0) return sample;
-  const business = accounts.map((a) => ({
+  const real = accounts.map((a) => ({
     id: a.id,
     bank: a.bank.trim(),
     name: isText(a.name) ? a.name.trim() : a.bank.trim(),
     accountNo: a.accountNo.trim(),
-    scope: "business" as const,
+    scope: a.scope === "personal" ? ("personal" as const) : ("business" as const),
     openingBalance: Number(a.openingBalance) || 0,
     firmId: a.firmId,
     ifsc: a.ifsc?.trim().toUpperCase(),
     branch: a.branch?.trim(),
     original: true,
   }));
-  return [...business, ...sample.filter((a) => a.scope === "personal")];
+  const business = real.some((a) => a.scope === "business") ? real.filter((a) => a.scope === "business") : sample.filter((a) => a.scope === "business");
+  return [...business, ...real.filter((a) => a.scope === "personal")];
+}
+
+/** Adds one of the owner's personal accounts to banks.json (Personal › Banks › Add bank); call it only inside saving(). */
+export function addLocalPersonalBank(account: Omit<BankAccount, "id" | "scope" | "original" | "firmId">): BankAccount {
+  const file = (readRecord("banks.json") as Record<string, unknown> | undefined) ?? {};
+  const list = Array.isArray(file.accounts) ? (file.accounts as BankAccount[]) : [];
+  const saved: BankAccount = { ...account, id: `acc-personal-${Date.now().toString(36)}`, scope: "personal" };
+  const next = [...list, saved];
+  writeRecord("banks.json", {
+    ...file,
+    about: "The firms' business bank accounts (Money > Banks) and the owner's personal ones (scope personal; Personal > Banks). Account numbers are private. openingBalance is the balance on the day the books start.",
+    accounts: next,
+  });
+  accounts = next.filter(isAccount);
+  return { ...saved, original: true };
 }
 
 // ── Parties added in the app (Parties › New party, New sale › New customer): local-data/customers.json ────────────

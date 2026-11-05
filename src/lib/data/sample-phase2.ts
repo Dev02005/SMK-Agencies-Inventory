@@ -29,7 +29,6 @@ export const OFFICE = "office";
 const sampleAccounts: BankAccount[] = [
   { id: "acc-sbi", bank: "State Bank of India", name: "SBI current · Polaki", accountNo: "•••• 4521", scope: "business", openingBalance: 450000 },
   { id: "acc-ubi", bank: "Union Bank of India", name: "Union Bank current", accountNo: "•••• 0917", scope: "business", openingBalance: 120000 },
-  { id: "acc-home", bank: "State Bank of India", name: "SBI savings (personal)", accountNo: "•••• 3308", scope: "personal", openingBalance: 235000 },
 ];
 
 export let bankAccounts: BankAccount[];
@@ -278,13 +277,8 @@ export function buildPhase2(book: SampleBook) {
   const documents = allDocuments.filter((d) => d.kind !== "Vehicle" || VAN);
 
   /** Entries in the personal bank account (the business accounts are worked out from receipts and payments). */
-  const personalBankEntries: BankEntry[] = [
-    { id: "pb-1", accountId: "acc-home", date: at("2026-10-05"), amount: -25000, description: "Chit instalment, Sri Lakshmi Chits" },
-    { id: "pb-2", accountId: "acc-home", date: at("2026-10-06"), amount: 12000, description: "Rent received, Shop 2" },
-    { id: "pb-3", accountId: "acc-home", date: at("2026-10-12"), amount: -6400, description: "School fees" },
-    { id: "pb-4", accountId: "acc-home", date: at("2026-10-15"), amount: 50000, description: "Drawings from business (SBI current)" },
-    { id: "pb-5", accountId: "acc-home", date: at("2026-10-20"), amount: -18750, description: "Household and groceries" },
-  ];
+  // The owner's personal accounts are real ones only (Personal › Banks), so no sample entries for them.
+  const personalBankEntries: BankEntry[] = [];
 
   /** Business bank entries that aren't receipts, payments, expenses or cash deposits. */
   const businessBankExtras: BankEntry[] = [

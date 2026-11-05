@@ -10,6 +10,12 @@ import { addDaysISO, formatDate, formatMonth } from "@/lib/format";
  */
 export type DatePreset = "all" | "today" | "7d" | "month";
 
+/**
+ * For the sales lists: Today first, so the page (and what it prints or downloads) is the day's sales unless another
+ * choice is picked; printing on 5 Nov gives 5 Nov.
+ */
+export const salesPresets: DatePreset[] = ["today", "all", "7d", "month"];
+
 export const presetLabels: Record<DatePreset, string> = { all: "All dates", today: "Today", "7d": "Last 7 days", month: "This month" };
 
 export const defaultPresets: DatePreset[] = ["all", "today", "7d", "month"];

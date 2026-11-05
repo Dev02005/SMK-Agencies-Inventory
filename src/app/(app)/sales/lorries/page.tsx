@@ -12,10 +12,10 @@ import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { getFirms, getLorries, getProducts } from "@/lib/data";
-import { inDateFilter } from "@/lib/date-filter";
+import { inDateFilter, salesPresets } from "@/lib/date-filter";
 import { cn } from "@/lib/cn";
 import { formatDate, formatINR } from "@/lib/format";
-import { isSavedLorry, lorryCost, lorryLeft, lorrySaleValue, lorryState, lorryStateChip, type LorryState } from "@/lib/lorries";
+import { isSavedLorry, lorryCost, lorryLeft, lorrySaleValue, lorryState, type LorryState } from "@/lib/lorries";
 import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities } from "@/lib/quantities";
 
@@ -46,10 +46,12 @@ export default function LorrySalesPage({ searchParams }: PageProps<"/sales/lorri
 }
 
 async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorries">["searchParams"] }) {
-  const [all, products, dates, firms, params] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams), getFirms(), searchParams]);
+  const [all, products, dates, firms, params] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams, salesPresets), getFirms(), searchParams]);
   // Two lists: lorries still selling (the default) and lorries sold out.
   const show: LorryState = params.show === "sold" ? "sold" : "selling";
-  const dated = all.filter((l) => inDateFilter(l.invoiceDate, dates));
+  // The sale bills dated in the period; a lorry shows when it was bought then or sold any of these.
+  const billsIn = (l: (typeof all)[number]) => soldBills(l).filter((b) => inDateFilter(b.date, dates));
+  const dated = all.filter((l) => dates.kind === "all" || inDateFilter(l.invoiceDate, dates) || billsIn(l).length > 0);
   const count = (state: LorryState) => dated.filter((l) => lorryState(l) === state).length;
   const lorries = dated.filter((l) => lorryState(l) === show);
   // Each tab keeps the other filters (dates) in its link.
@@ -79,25 +81,14 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorri
           </Link>
         ))}
       </nav>
-      <DataTools title="Lorry sales" />
+      <DataTools title="Lorry sales" presets={salesPresets} />
+      {/* What Download gives: the lorry sale bills in the chosen dates, only lorry sales. */}
       <ExportTable
-        title="Lorry sales"
-        columns={["Truck number", "Company", "Bought on", "Status", "Bought for", "Sale invoice", "Sale value", "Margin", "Sold out on"]}
-        rows={lorries.map((l) => {
-          const cost = lorryCost(l);
-          const value = l.sold?.value ?? lorrySaleValue(l);
-          return [
-            l.lorryNo,
-            l.companyName,
-            formatDate(l.invoiceDate),
-            lorryStateChip[lorryState(l)].label,
-            cost ? formatINR(cost) : "",
-            l.sale?.invoiceNo ?? "",
-            value ? formatINR(value) : "",
-            l.sold && cost ? formatINR(l.sold.value - cost) : "",
-            l.sold ? formatDate(l.sold.on) : "",
-          ];
-        })}
+        title="Lorry sale bills"
+        columns={["Date", "Bill no.", "Truck number", "Company", "Sold to", "Bags", "Amount"]}
+        rows={lorries.flatMap((l) =>
+          billsIn(l).map((b) => [b.date ? formatDate(b.date) : "", b.billNo, l.lorryNo, l.companyName, b.soldTo ?? "", b.qty, formatINR(b.amount)]),
+        )}
       />
       {lorries.length === 0 && (
         <SectionCard>
@@ -123,7 +114,7 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorri
               {cost && l.sold ? <Figure label="Margin" value={formatINR(l.sold.value - cost)} tone={l.sold.value >= cost ? "good" : "danger"} /> : null}
             </dl>
             <div className="mt-4">
-              <LorryProgress loaded={l.lines} sold={(pid) => l.sale?.lines.find((x) => x.productId === pid)?.qty ?? 0} products={products} bills={soldBills(l)} />
+              <LorryProgress loaded={l.lines} sold={(pid) => l.sale?.lines.find((x) => x.productId === pid)?.qty ?? 0} products={products} bills={billsIn(l)} />
             </div>
             {lorryMissing(l).length > 0 && (
               <p className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger">Missing: {lorryMissing(l).join(", ")}</p>

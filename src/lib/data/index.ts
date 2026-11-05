@@ -14,7 +14,7 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank } from "./local-data";
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
@@ -936,6 +936,16 @@ export async function getBankAccounts(scope: "business" | "personal" = "business
   return phase2.bankAccounts
     .filter((a) => a.scope === scope)
     .map((a) => ({ ...a, balance: bankEntries(a.id).at(-1)?.balance ?? a.openingBalance }));
+}
+
+/** Adds one of the owner's personal bank accounts (Personal › Banks › Add bank), saved in the records. */
+export async function addPersonalBankAccount(account: { bank: string; name: string; accountNo: string; ifsc?: string; branch?: string; openingBalance: number }) {
+  return saving(() => {
+    const saved = addLocalPersonalBank(account);
+    base2.loadPhase2();
+    builtFor = "";
+    return saved;
+  });
 }
 
 export async function getBankEntries(accountId: string) {

@@ -18,9 +18,6 @@ export default function BanksPage() {
         actions={
           <>
             <DataOrigin of="banks" />
-            <ButtonLink href="/money/banks/new" variant="secondary">
-              New bank entry
-            </ButtonLink>
             <ButtonLink href="/money/banks/add">Add bank</ButtonLink>
           </>
         }
