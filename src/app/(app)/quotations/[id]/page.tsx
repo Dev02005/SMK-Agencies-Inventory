@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import { PrintButton } from "@/components/print/print-button";
 import { Letterhead, PrintFooter, PrintSheet } from "@/components/print/print-sheet";
 import { BackLink, ListSkeleton } from "@/components/ui/blocks";
+import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { SampleActionButton } from "@/components/ui/sample-action";
 import { getFirm, getProfiles, getQuotation } from "@/lib/data";
 import { formatDate, formatINR, rupeesInWords } from "@/lib/format";
 import { quotationStatus } from "@/lib/labels";
@@ -45,12 +45,9 @@ async function QuotationDocument({ params }: { params: PageProps<"/quotations/[i
           <Chip tone={status.tone}>{status.label}</Chip>
         </div>
         <div className="flex flex-wrap gap-2">
-          <SampleActionButton message="Sample mode: this quotation would become a sale with the same items and rates.">
+          <ButtonLink href="/sales/new">
             Convert to sale
-          </SampleActionButton>
-          <SampleActionButton message="Sample mode: the PDF would be sent on WhatsApp once messaging is connected.">
-            Share PDF
-          </SampleActionButton>
+          </ButtonLink>
           <PrintButton />
         </div>
       </div>

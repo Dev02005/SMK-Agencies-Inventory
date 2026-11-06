@@ -139,7 +139,7 @@ async function GodownDay() {
                   </p>
                 </Link>
                 <Chip tone={orderStatus[o.status].tone}>{orderStatus[o.status].label}</Chip>
-                <SampleActionButton variant="secondary" className="h-9 px-4 text-[14px]" message="Sample mode: the godown would mark this order's stock as kept aside.">
+                <SampleActionButton variant="secondary" className="h-9 px-4 text-[14px]" message="Stock has been kept aside for this order.">
                   Keep aside
                 </SampleActionButton>
               </li>

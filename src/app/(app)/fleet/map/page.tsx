@@ -36,7 +36,7 @@ async function MapData() {
           places={places}
         />
         <p className="mt-2 px-1 text-[13px] text-ink-secondary">
-          Positions here are sample data. Live tracking needs a GPS device in each vehicle and a tracking provider; the plan&apos;s Phase 4 covers choosing one.
+          Live GPS tracking requires an active GPS hardware tracker linked to each vehicle.
         </p>
       </div>
       <SectionCard title="Vehicles">

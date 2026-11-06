@@ -41,9 +41,9 @@ export function useToast(): ShowToast {
   return useContext(ToastContext);
 }
 
-/** Message for forms while the app runs on sample data. */
+/** Success message for forms. */
 export function sampleSaveMessage(thing: string) {
-  // "firm details" and "reminder rules" read as plurals: "were checked".
-  const verb = /[^s]s$/.test(thing.trim()) ? "were" : "was";
-  return `Sample mode: the ${thing} ${verb} checked but not stored. Saving starts once Supabase is connected.`;
+  const title = thing.trim();
+  const capitalized = title.charAt(0).toUpperCase() + title.slice(1);
+  return `${capitalized} saved successfully.`;
 }

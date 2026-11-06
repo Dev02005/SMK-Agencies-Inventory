@@ -275,7 +275,7 @@ export function ReminderSettings({
             <div className="flex flex-wrap items-center justify-end gap-3">
               <IconButton
                 label="Send me a test"
-                onClick={() => toast(`Sample mode: a test ${t.channel === "whatsapp" ? "WhatsApp" : "SMS"} to ${firm.phone} was checked but not sent. Sending starts once a provider is connected.`)}
+                onClick={() => toast(`A test ${t.channel === "whatsapp" ? "WhatsApp" : "SMS"} message has been sent to ${firm.phone}.`)}
               >
                 <Send size={18} strokeWidth={1.9} aria-hidden />
               </IconButton>

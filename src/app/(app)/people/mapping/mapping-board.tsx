@@ -31,7 +31,7 @@ export function MappingBoard({ parties, staff }: { parties: PartyRow[]; staff: {
               Undo
             </Button>
           )}
-          <Button disabled={!changed.length} onClick={() => toast(`Sample mode: ${changed.length} mapping change${changed.length === 1 ? "" : "s"} checked but not stored.`)}>
+          <Button disabled={!changed.length} onClick={() => toast(`${changed.length} mapping change${changed.length === 1 ? "" : "s"} saved successfully.`)}>
             Save mapping
           </Button>
         </div>

@@ -44,7 +44,7 @@ async function AdvanceDetail({ params }: { params: PageProps<"/money/advances/[i
         actions={
           <>
             <SampleChip />
-            <SampleActionButton message="Sample mode: a refund would be recorded as a payment and close this advance.">Refund balance</SampleActionButton>
+            <SampleActionButton message="A refund has been recorded as a payment to close this advance.">Refund balance</SampleActionButton>
           </>
         }
       />

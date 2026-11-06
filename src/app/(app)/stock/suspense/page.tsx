@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { SimpleForm } from "@/components/forms/simple-form";
 import { ListSkeleton, SampleChip, SectionCard } from "@/components/ui/blocks";
+import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { SampleActionButton } from "@/components/ui/sample-action";
 import { getMyGodowns, getProducts, getSuspenseLoads, getVehicles } from "@/lib/data";
 import { inDateFilter } from "@/lib/date-filter";
 import { productOptions } from "@/lib/product-options";
@@ -62,9 +62,9 @@ async function Loads({ searchParams }: { searchParams: PageProps<"/stock/suspens
               Left {l.godownName} on {formatDate(l.date)} · {l.vehicle}
             </p>
             <p className="mt-2 text-[15px] text-ink">{l.note}</p>
-            <SampleActionButton variant="primary" className="mt-4" message="Sample mode: picking the party here would make the bill for this load.">
+            <ButtonLink href="/sales/new" className="mt-4">
               Assign to a party
-            </SampleActionButton>
+            </ButtonLink>
           </SectionCard>
         ))}
         {done.length > 0 && (

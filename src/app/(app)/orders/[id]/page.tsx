@@ -6,7 +6,7 @@ import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/c
 import { ButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
-import { SampleActionButton } from "@/components/ui/sample-action";
+import { ConfirmOrderButton, CancelOrderButton } from "./order-status-buttons";
 import { getGodowns, getOrder, getProducts } from "@/lib/data";
 import { formatDate, formatINR } from "@/lib/format";
 import { orderSourceLabels, orderStatus } from "@/lib/labels";
@@ -47,9 +47,8 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
         }
         actions={
           <>
-            <SampleChip />
             {order.status === "new" && (
-              <SampleActionButton message="Sample mode: the order would be confirmed and the godown told to keep the stock aside.">Confirm order</SampleActionButton>
+              <ConfirmOrderButton orderId={order.id} />
             )}
             {open && <ButtonLink href="/sales/new">Make bill and send</ButtonLink>}
           </>
@@ -100,9 +99,7 @@ async function OrderDetail({ params }: { params: PageProps<"/orders/[id]">["para
             ]}
           />
           {open && (
-            <SampleActionButton variant="plain" className="mt-3 text-danger" message="Sample mode: cancelling asks for a reason and frees any stock kept aside.">
-              Cancel order
-            </SampleActionButton>
+            <CancelOrderButton orderId={order.id} />
           )}
         </SectionCard>
       </div>

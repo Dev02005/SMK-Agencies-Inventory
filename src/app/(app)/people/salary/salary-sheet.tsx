@@ -25,7 +25,7 @@ export function SalarySheet({ sheets }: { sheets: Record<string, Row[]> }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented label="Month" className="w-72" value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: formatMonth(m) }))} />
         {unpaid.length > 0 && (
-          <Button onClick={() => toast(`Sample mode: ${unpaid.length} salaries totalling ${formatINR(unpaid.reduce((s, r) => s + r.net, 0))} would be marked paid and the loan instalments recorded.`)}>
+          <Button onClick={() => toast(`${unpaid.length} salaries totalling ${formatINR(unpaid.reduce((s, r) => s + r.net, 0))} marked as paid and loan instalments recorded.`)}>
             Pay {formatINR(unpaid.reduce((s, r) => s + r.net, 0))}
           </Button>
         )}

@@ -7,7 +7,6 @@ import { BackLink, DetailList, ListSkeleton, SampleChip, SectionCard } from "@/c
 import { IconButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
-import { SampleActionButton } from "@/components/ui/sample-action";
 import { RoleGuard } from "@/components/ui/sub-nav";
 import { getFirms, getGodowns, getNextBillNo, getProducts, getProfile, getSale } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
@@ -15,6 +14,7 @@ import { billName, saleStatus, transportLabels } from "@/lib/labels";
 import { lineQty } from "@/lib/quantities";
 import { toMT, unitLabel } from "@/lib/sales";
 import { ConfirmRequest, type RequestLine } from "./confirm-request";
+import { CancelSaleButton } from "./cancel-sale-button";
 
 export const metadata: Metadata = { title: "Bill" };
 
@@ -161,9 +161,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
               ]}
             />
             {sale.status === "saved" && (
-              <SampleActionButton variant="plain" className="mt-3 text-danger" message="Sample mode: cancelling asks for a reason and keeps the bill in the audit history.">
-                Cancel this bill
-              </SampleActionButton>
+              <CancelSaleButton saleId={sale.id} billNo={sale.billNo} />
             )}
           </SectionCard>
         </div>

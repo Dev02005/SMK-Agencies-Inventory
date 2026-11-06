@@ -2,17 +2,19 @@
 
 import { Plus, X } from "lucide-react";
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ProductPicker } from "@/components/forms/product-picker";
 import { Button } from "@/components/ui/button";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { Product } from "@/lib/data/types";
-import { formatINR } from "@/lib/format";
-import { unitLabel } from "@/lib/sales";
+import { formatINR, formatNumber } from "@/lib/format";
+import { toMT, unitLabel } from "@/lib/sales";
+import { createQuotationAction } from "../actions";
 
 type Client = { id: string; name: string; place?: string; gstin?: string; mobile?: string; email?: string };
 type Line = { key: number; productId: string; qty: string; rate: string };
@@ -57,6 +59,9 @@ export function QuotationForm({
       ? "Enter a quantity for at least one item."
       : null;
 
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
   function chooseClient(value: string) {
     setClientId(value);
     const c = clients.find((x) => x.id === value);
@@ -67,8 +72,43 @@ export function QuotationForm({
     setEmail(c?.email ?? "");
   }
 
-  function save() {
-    if (!missing) toast(sampleSaveMessage(`quotation ${quoteNo}`));
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    const validLines = lines
+      .filter((l) => l.productId && num(l.qty) > 0)
+      .map((l) => {
+        const p = product(l.productId);
+        const unit = p?.unit ?? "bag";
+        const unitTxt = unitLabel[unit] || unit;
+        return {
+          productId: l.productId,
+          description: p?.name ?? "Item",
+          qty: num(l.qty),
+          qtyLabel: `${formatNumber(num(l.qty))} ${unitTxt}${toMT(num(l.qty), unit) > 0 ? ` (${formatNumber(toMT(num(l.qty), unit), 3)} MT)` : ""}`,
+          rate: num(l.rate),
+        };
+      });
+
+    const result = await createQuotationAction({
+      quoteNo,
+      date,
+      clientName: clientName.trim(),
+      clientGstin: gstin.trim() || undefined,
+      site: site.trim() || undefined,
+      contact: contact.trim() || undefined,
+      email: email.trim() || undefined,
+      status: "sent",
+      lines: validLines,
+      terms: terms.split("\n").map((t) => t.trim()).filter(Boolean),
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast(result.error ?? "Failed to save quotation");
+      return;
+    }
+    toast(`Quotation ${quoteNo} saved successfully`);
+    router.push("/quotations");
   }
 
   return (

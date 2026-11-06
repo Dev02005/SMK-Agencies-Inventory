@@ -2,16 +2,18 @@
 
 import { Camera } from "lucide-react";
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { ExpenseHead } from "@/lib/data/types";
 import { formatINR } from "@/lib/format";
 import { expenseHeadLabels } from "@/lib/labels";
+import { createExpenseAction } from "../../actions";
 
 type TagKind = "none" | "vehicle" | "employee" | "godown";
 
@@ -36,9 +38,32 @@ export function ExpenseForm({
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
 
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
   const value = parseFloat(amount) || 0;
   const missing = !head ? "Choose the expense head." : value <= 0 ? "Enter the amount." : !description.trim() ? "Say what it was for." : null;
-  const save = () => !missing && toast(sampleSaveMessage("expense"));
+
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    const result = await createExpenseAction({
+      date,
+      head: head!,
+      amount: value,
+      paidFrom: from.startsWith("bank:") ? from.replace("bank:", "") : "cash",
+      description: description.trim(),
+      tag: tagKind !== "none" && tag ? { kind: tagKind, label: tag } : undefined,
+      hasPhoto: Boolean(photo),
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast(result.error ?? "Failed to save expense");
+      return;
+    }
+    toast("Expense recorded successfully");
+    router.push("/money/expenses");
+  }
 
   return (
     <form

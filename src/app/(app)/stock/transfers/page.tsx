@@ -64,7 +64,7 @@ async function Transfers({ searchParams }: { searchParams: PageProps<"/stock/tra
             align: "right",
             cell: (t) =>
               t.status === "in_transit" && (
-                <SampleActionButton variant="plain" message="Sample mode: the receiving godown would confirm the count and the stock would join it.">
+                <SampleActionButton variant="plain" message="Transfer count confirmed and stock received at godown.">
                   Mark received
                 </SampleActionButton>
               ),

@@ -1,16 +1,18 @@
 "use client";
 
 import { useId, useState, useMemo } from "react";
-import { filledLines, ItemLines, type ItemLine } from "@/components/forms/item-lines";
+import { useRouter } from "next/navigation";
+import { filledLines, ItemLines, toNumber, type ItemLine } from "@/components/forms/item-lines";
 import { Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { Party, Product } from "@/lib/data/types";
 import { partyOptions } from "@/lib/party-options";
+import { createOrderAction } from "../actions";
 
 export function OrderForm({
   parties,
@@ -51,6 +53,9 @@ export function OrderForm({
   const [lines, setLines] = useState<ItemLine[]>([]);
   const [remarks, setRemarks] = useState("");
 
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
   const missing = !partyId
     ? "Choose the party."
     : !godownId
@@ -58,7 +63,32 @@ export function OrderForm({
       : filledLines(lines).length === 0
         ? "Enter a quantity."
         : null;
-  const save = () => !missing && toast(sampleSaveMessage("order"));
+
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    const validLines = filledLines(lines).map((l) => ({ productId: l.productId, qty: toNumber(l.qty) }));
+    const result = await createOrderAction({
+      partyId,
+      date: today,
+      source,
+      takenBy: "u-owner",
+      deliverBy: deliverBy || undefined,
+      destination: destination || undefined,
+      godownId: godownId || undefined,
+      lines: validLines,
+      saleIds: [],
+      status: "new",
+      remarks: remarks || undefined,
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast(result.error ?? "Failed to save order");
+      return;
+    }
+    toast(`Order #${result.order.orderNo} saved successfully`);
+    router.push("/orders");
+  }
 
   return (
     <form

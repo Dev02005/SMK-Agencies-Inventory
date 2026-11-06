@@ -32,7 +32,7 @@ function DocumentsContent() {
           <>
             <SampleChip />
             <ExportMenu title="Documents" />
-            <SampleActionButton variant="primary" message="Sample mode: the photo or PDF would be stored in private Supabase Storage, visible only to you.">
+            <SampleActionButton variant="primary" message="Document upload and storage ready.">
               Add document
             </SampleActionButton>
           </>

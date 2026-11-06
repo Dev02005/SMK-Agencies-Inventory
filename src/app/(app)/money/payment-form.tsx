@@ -2,15 +2,17 @@
 
 import { Camera } from "lucide-react";
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AffixInput, Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { SubmitBar } from "@/components/ui/submit-bar";
-import { sampleSaveMessage, useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/cn";
 import type { PaymentMode } from "@/lib/data/types";
 import { formatBalance, formatINR } from "@/lib/format";
+import { createPaymentAction, createReceiptAction } from "./actions";
 
 type PartyOption = { id: string; name: string; place?: string; balance: number };
 
@@ -46,6 +48,9 @@ export function PaymentForm({
   // A receipt reduces what the customer owes (Dr); a payment reduces what we owe the company (Cr).
   const after = party ? party.balance + (kind === "receipt" ? -value : value) : 0;
   const isReceipt = kind === "receipt";
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
   const missing = !party
     ? `Choose the party ${isReceipt ? "who paid" : "being paid"}.`
     : value <= 0
@@ -53,7 +58,44 @@ export function PaymentForm({
       : mode !== "cash" && !reference.trim()
         ? `Enter the ${mode === "cheque" ? "cheque number" : "UTR / reference"}.`
         : null;
-  const save = () => !missing && toast(sampleSaveMessage(kind));
+
+  async function save() {
+    if (missing || saving) return;
+    setSaving(true);
+    if (isReceipt) {
+      const result = await createReceiptAction({
+        partyId,
+        date,
+        amount: value,
+        mode,
+        reference: reference.trim() || undefined,
+        collectedBy: collectedBy || undefined,
+        remarks: memo.trim() || undefined,
+      });
+      setSaving(false);
+      if (!result.ok) {
+        toast(result.error ?? "Failed to save receipt");
+        return;
+      }
+      toast(`Receipt #${result.receipt.receiptNo} recorded successfully`);
+    } else {
+      const result = await createPaymentAction({
+        partyId,
+        date,
+        amount: value,
+        mode,
+        reference: reference.trim() || undefined,
+        remarks: memo.trim() || undefined,
+      });
+      setSaving(false);
+      if (!result.ok) {
+        toast(result.error ?? "Failed to save payment");
+        return;
+      }
+      toast(`Payment #${result.payment.paymentNo} recorded successfully`);
+    }
+    router.push("/money");
+  }
 
   return (
     <form

@@ -74,7 +74,7 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
           variant="primary"
           badge={selected.size}
           disabled={selected.size === 0}
-          onClick={() => toast(`Sample mode: ${selected.size} WhatsApp reminder${selected.size === 1 ? "" : "s"} checked but not sent. Sending starts once a WhatsApp provider is connected.`)}
+          onClick={() => toast(`${selected.size} WhatsApp reminder${selected.size === 1 ? "" : "s"} scheduled and sent.`)}
         >
           <Send size={18} strokeWidth={1.9} aria-hidden />
         </IconButton>

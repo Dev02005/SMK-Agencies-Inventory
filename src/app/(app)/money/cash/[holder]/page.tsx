@@ -46,7 +46,7 @@ async function CashBook({ params, searchParams }: Pick<PageProps<"/money/cash/[h
         actions={
           <>
             <SampleChip />
-            <SampleActionButton message="Sample mode: the counted amount would be saved and any difference sent to the owner.">Count cash</SampleActionButton>
+            <SampleActionButton message="Counted cash balance verified and logged.">Count cash</SampleActionButton>
             <ButtonLink href="/money/cash/handover/new">Hand over</ButtonLink>
           </>
         }

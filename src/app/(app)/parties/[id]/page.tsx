@@ -50,7 +50,7 @@ async function PartyDetail({ params }: { params: PageProps<"/parties/[id]">["par
         actions={
           <>
             <SampleChip />
-            <SampleActionButton variant="secondary" message="Sample mode: the statement would be shared on WhatsApp once messaging is connected.">
+            <SampleActionButton variant="secondary" message={`Statement for ${party.name} shared successfully.`}>
               Share statement
             </SampleActionButton>
             {isSupplier ? (

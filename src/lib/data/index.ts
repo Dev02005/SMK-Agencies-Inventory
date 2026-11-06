@@ -14,11 +14,11 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, clearStandardProducts, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalGodown, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalGodown, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank, localPurchases, saveLocalPurchase, localSales, saveLocalSale, localStockMovements, saveLocalStockMovements, updateLocalStockMovements } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, clearStandardProducts, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalGodown, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalGodown, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank, localPurchases, saveLocalPurchase, localSales, saveLocalSale, localStockMovements, saveLocalStockMovements, updateLocalStockMovements, localOrders, saveLocalOrder, localQuotations, saveLocalQuotation, localExpenses, saveLocalExpense, localReceipts, saveLocalReceipt, localPayments, saveLocalPayment } from "./local-data";
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
-import type { Ageing, BankEntry, CashHolder, Chit, Godown, LedgerEntry, Lorry, Party, Product, Profile, Purchase, Rental, Sale, SaleLine, SaleStatus, StockMovement, StockSource, TransportMode } from "./types";
+import type { Ageing, BankEntry, CashHolder, Chit, Expense, Godown, LedgerEntry, Lorry, Order, OrderStatus, Party, Payment, Product, Profile, Purchase, Quotation, Receipt, Rental, Role, Sale, SaleLine, SaleStatus, StockMovement, StockSource, TransportMode } from "./types";
 
 export type * from "./types";
 
@@ -400,7 +400,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
         credit: 0,
       }),
     );
-  sample.receipts
+  [...localReceipts(), ...sample.receipts]
     .filter((r) => r.partyId === partyId)
     .forEach((r) =>
       rows.push({
@@ -425,7 +425,7 @@ function ledgerFor(partyId: string): LedgerEntry[] {
         credit: p.total,
       }),
     );
-  sample.payments
+  [...localPayments(), ...sample.payments]
     .filter((p) => p.partyId === partyId)
     .forEach((p) =>
       rows.push({
@@ -696,7 +696,7 @@ export async function approveSale(input: ApproveSaleInput): Promise<Sale> {
 
 export async function rejectSale(saleId: string, reason?: string): Promise<Sale> {
   return saving(() => {
-    const all = localSales();
+    const all = [...localSales(), ...sample.sales];
     const sale = all.find((s) => s.id === saleId);
     if (!sale) throw new Error("Sale not found");
 
@@ -744,14 +744,25 @@ export async function getSale(id: string): Promise<SaleWithParty | undefined> {
   return sale && { ...sale, partyName: partyName(sale.partyId) };
 }
 
-export async function getQuotations() {
+export async function getQuotations(): Promise<Quotation[]> {
   await live();
-  return [...sample.quotations].sort((a, b) => b.date.localeCompare(a.date));
+  const combined = [...localQuotations(), ...sample.quotations];
+  return combined.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export async function getQuotation(id: string) {
+export async function getQuotation(id: string): Promise<Quotation | undefined> {
   await live();
-  return sample.quotations.find((q) => q.id === id);
+  const combined = [...localQuotations(), ...sample.quotations];
+  return combined.find((q) => q.id === id);
+}
+
+export async function addQuotation(input: Omit<Quotation, "id">): Promise<Quotation> {
+  return saving(() => {
+    const id = `q-${Date.now()}`;
+    const quotation: Quotation = { ...input, id };
+    saveLocalQuotation(quotation);
+    return quotation;
+  });
 }
 
 /** Standard terms printed on every new quotation; editable per quotation. */
@@ -849,18 +860,42 @@ export async function getPurchase(id: string) {
   return purchase && { ...purchase, companyName: partyName(purchase.companyId) };
 }
 
-export async function getReceipts() {
+export async function getReceipts(): Promise<(Receipt & { partyName: string })[]> {
   await live();
-  return sample.receipts
+  const all = [...localReceipts(), ...sample.receipts];
+  return all
     .map((r) => ({ ...r, partyName: partyName(r.partyId) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.receiptNo - a.receiptNo);
 }
 
-export async function getPayments() {
+export async function addReceipt(input: Omit<Receipt, "id" | "receiptNo">): Promise<Receipt> {
+  return saving(() => {
+    const existing = [...localReceipts(), ...sample.receipts];
+    const receiptNo = existing.reduce((max, r) => Math.max(max, r.receiptNo), 0) + 1;
+    const id = `rec-${Date.now()}`;
+    const receipt: Receipt = { ...input, id, receiptNo };
+    saveLocalReceipt(receipt);
+    return receipt;
+  });
+}
+
+export async function getPayments(): Promise<(Payment & { partyName: string })[]> {
   await live();
-  return sample.payments
+  const all = [...localPayments(), ...sample.payments];
+  return all
     .map((p) => ({ ...p, partyName: partyName(p.partyId) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.paymentNo - a.paymentNo);
+}
+
+export async function addPayment(input: Omit<Payment, "id" | "paymentNo">): Promise<Payment> {
+  return saving(() => {
+    const existing = [...localPayments(), ...sample.payments];
+    const paymentNo = existing.reduce((max, p) => Math.max(max, p.paymentNo), 0) + 1;
+    const id = `pay-${Date.now()}`;
+    const payment: Payment = { ...input, id, paymentNo };
+    saveLocalPayment(payment);
+    return payment;
+  });
 }
 
 // ── Stock ────────────────────────────────────────────────────────────────────
@@ -1090,14 +1125,26 @@ export async function getVehicleNames() {
   return base2.vehicleNames;
 }
 
-export async function getExpenses() {
+export async function getExpenses(): Promise<(Expense & { paidFromLabel: string })[]> {
   await live();
-  return [...phase2.expenses]
+  const all = [...localExpenses(), ...phase2.expenses];
+  return all
     .map((e) => ({
       ...e,
       paidFromLabel: e.paidFrom === "cash" ? `Cash · ${holderName(e.paidBy ?? phase2.OFFICE)}` : holderName(`bank:${e.paidFrom}`),
     }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.expenseNo - a.expenseNo);
+}
+
+export async function addExpense(input: Omit<Expense, "id" | "expenseNo">): Promise<Expense> {
+  return saving(() => {
+    const existing = [...localExpenses(), ...phase2.expenses];
+    const expenseNo = existing.reduce((max, e) => Math.max(max, e.expenseNo), 0) + 1;
+    const id = `exp-${Date.now()}`;
+    const expense: Expense = { ...input, id, expenseNo };
+    saveLocalExpense(expense);
+    return expense;
+  });
 }
 
 // ── Advances and cement commitments ─────────────────────────────────────────
@@ -1496,10 +1543,11 @@ export async function getSalarySheet(month: string) {
 export async function getOrders() {
   await live();
   const visible = await visibleGodowns();
-  return phase3.orders
+  const allOrders = [...localOrders(), ...phase3.orders];
+  return allOrders
     .filter((o) => canSee(visible, o.godownId))
     .map((o) => {
-      const bills = o.saleIds.map((id) => sample.sales.find((s) => s.id === id)).filter((s): s is Sale => Boolean(s));
+      const bills = o.saleIds.map((id) => [...localSales(), ...sample.sales].find((s) => s.id === id)).filter((s): s is Sale => Boolean(s));
       const dispatchedQty = (productId: string) => bills.flatMap((b) => b.lines).filter((l) => l.productId === productId).reduce((s, l) => s + l.qty, 0);
       return {
         ...o,
@@ -1509,6 +1557,32 @@ export async function getOrders() {
         lines: o.lines.map((l) => ({ ...l, dispatched: dispatchedQty(l.productId) })),
       };
     });
+}
+
+export async function addOrder(input: Omit<Order, "id" | "orderNo">): Promise<Order> {
+  return saving(() => {
+    const existing = [...localOrders(), ...phase3.orders];
+    const orderNo = existing.reduce((max, o) => Math.max(max, o.orderNo), 0) + 1;
+    const id = `ord-${Date.now()}`;
+    const order: Order = {
+      ...input,
+      id,
+      orderNo,
+    };
+    saveLocalOrder(order);
+    return order;
+  });
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
+  return saving(() => {
+    const all = [...localOrders(), ...phase3.orders];
+    const found = all.find((o) => o.id === id);
+    if (!found) throw new Error("Order not found");
+    const updated: Order = { ...found, status };
+    saveLocalOrder(updated);
+    return updated;
+  });
 }
 
 export async function getOrder(id: string) {

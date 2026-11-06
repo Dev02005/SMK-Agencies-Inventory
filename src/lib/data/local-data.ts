@@ -1,7 +1,7 @@
 import "server-only";
 import { mobileOf } from "@/lib/mobile";
 import { readRecord, writeRecord } from "./store";
-import type { BankAccount, Chit, EmployeeDetails, Godown, Lorry, Party, Product, Profile, Purchase, Rental, Role, Sale, StockMovement, VehicleKind } from "./types";
+import type { BankAccount, Chit, EmployeeDetails, Expense, Godown, Lorry, Order, Party, Payment, Product, Profile, Purchase, Quotation, Receipt, Rental, Role, Sale, StockMovement, VehicleKind } from "./types";
 
 /**
  * The firm's own records (staff, godowns, suppliers, products, banks and vehicles, and the parties, lorries, chits,
@@ -583,6 +583,72 @@ export function updateLocalStockMovements(fn: (movements: StockMovement[]) => vo
   writeStockMovements();
 }
 
+// ── Receipts, Payments, Expenses, Quotations, Orders: local-data/*.json ───────────────────────
+let receipts: Receipt[] = [];
+export const localReceipts = () => receipts;
+function writeReceipts() {
+  writeRecord("receipts.json", { about: "Receipts recorded in the app.", receipts });
+}
+export function saveLocalReceipt(receipt: Receipt): Receipt {
+  const at = receipts.findIndex((r) => r.id === receipt.id);
+  if (at >= 0) receipts[at] = receipt;
+  else receipts.unshift(receipt);
+  writeReceipts();
+  return receipt;
+}
+
+let payments: Payment[] = [];
+export const localPayments = () => payments;
+function writePayments() {
+  writeRecord("payments.json", { about: "Payments recorded in the app.", payments });
+}
+export function saveLocalPayment(payment: Payment): Payment {
+  const at = payments.findIndex((p) => p.id === payment.id);
+  if (at >= 0) payments[at] = payment;
+  else payments.unshift(payment);
+  writePayments();
+  return payment;
+}
+
+let expenses: Expense[] = [];
+export const localExpenses = () => expenses;
+function writeExpenses() {
+  writeRecord("expenses.json", { about: "Expenses recorded in the app.", expenses });
+}
+export function saveLocalExpense(expense: Expense): Expense {
+  const at = expenses.findIndex((e) => e.id === expense.id);
+  if (at >= 0) expenses[at] = expense;
+  else expenses.unshift(expense);
+  writeExpenses();
+  return expense;
+}
+
+let quotations: Quotation[] = [];
+export const localQuotations = () => quotations;
+function writeQuotations() {
+  writeRecord("quotations.json", { about: "Quotations recorded in the app.", quotations });
+}
+export function saveLocalQuotation(quotation: Quotation): Quotation {
+  const at = quotations.findIndex((q) => q.id === quotation.id);
+  if (at >= 0) quotations[at] = quotation;
+  else quotations.unshift(quotation);
+  writeQuotations();
+  return quotation;
+}
+
+let orders: Order[] = [];
+export const localOrders = () => orders;
+function writeOrders() {
+  writeRecord("orders.json", { about: "Orders recorded in the app.", orders });
+}
+export function saveLocalOrder(order: Order): Order {
+  const at = orders.findIndex((o) => o.id === order.id);
+  if (at >= 0) orders[at] = order;
+  else orders.unshift(order);
+  writeOrders();
+  return order;
+}
+
 // ── The owner's chits and rents (Personal): local-data/chits.json, local-data/rents.json ───────────────────────────
 
 const isMonth = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}$/.test(v);
@@ -931,6 +997,11 @@ export function loadLocal() {
     .map((s) => ({ ...s, original: true }));
   stockMovements = (listIn("stock-movements.json", "movements") as StockMovement[])
     .filter((m) => m && isText(m.id));
+  receipts = (listIn("receipts.json", "receipts") as Receipt[]).filter((r) => r && isText(r.id));
+  payments = (listIn("payments.json", "payments") as Payment[]).filter((p) => p && isText(p.id));
+  expenses = (listIn("expenses.json", "expenses") as Expense[]).filter((e) => e && isText(e.id));
+  quotations = (listIn("quotations.json", "quotations") as Quotation[]).filter((q) => q && isText(q.id));
+  orders = (listIn("orders.json", "orders") as Order[]).filter((o) => o && isText(o.id));
 }
 
 loadLocal();
