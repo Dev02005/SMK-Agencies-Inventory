@@ -9,8 +9,11 @@ import {
   Eye,
   EyeOff,
   Info,
+  LoaderCircle,
   Lock,
+  Phone,
   Search,
+  ShieldCheck,
   User,
   X,
 } from "lucide-react";
@@ -34,23 +37,17 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
   const id = useId();
   const router = useRouter();
 
-  // Find owner or default person
-  const defaultPerson =
-    people.find((p) => p.role === "owner" || p.fullName.toLowerCase().includes("kamesh")) ??
-    people[0] ??
-    null;
-
-  // Step 1 = Account / Mobile selection; Step 2 = PIN code entry
+  // Step 1 = Enter mobile number & fetch account; Step 2 = Display confirmed name & enter 6-digit PIN
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Step 1 state
-  const [selectedPerson, setSelectedPerson] = useState<SignInPerson | null>(defaultPerson);
-  const [isCustomInput, setIsCustomInput] = useState(false);
-  const [customLoginId, setCustomLoginId] = useState("");
+  // Step 1 state: mobile number is primary
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [useDirectoryView, setUseDirectoryView] = useState(false);
+  const [selectedPerson, setSelectedPerson] = useState<SignInPerson | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Confirmed person for Step 2
+  // Step 2 state: confirmed account fetched from database
   const [confirmedPerson, setConfirmedPerson] = useState<{
     name: string;
     initials: string;
@@ -58,7 +55,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     loginId: string;
   } | null>(null);
 
-  // Step 2 state (PIN)
+  // Step 2 PIN state
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -67,31 +64,20 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
 
   const [pending, startTransition] = useTransition();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  // Check remembered login on mount
+  // Check remembered mobile login on mount
   useEffect(() => {
     try {
       const remembered = localStorage.getItem("ska_remembered_login");
       if (remembered) {
-        const found = people.find(
-          (p) =>
-            p.mobile === remembered ||
-            p.fullName.toLowerCase() === remembered.toLowerCase() ||
-            p.id === remembered,
-        );
-        if (found) {
-          setSelectedPerson(found);
-          setIsCustomInput(false);
-        } else {
-          setCustomLoginId(remembered);
-          setIsCustomInput(true);
-        }
+        setMobileNumber(remembered.replace(/\D/g, "").slice(-10) || remembered);
       }
     } catch {
       // localStorage not available
     }
-  }, [people]);
+  }, []);
 
   // Click outside listener for dropdown
   useEffect(() => {
@@ -111,44 +97,18 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     if (step === 2) {
       const timer = setTimeout(() => passwordInputRef.current?.focus(), 80);
       return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(() => mobileInputRef.current?.focus(), 80);
+      return () => clearTimeout(timer);
     }
   }, [step]);
 
-  // Step 1: Proceed to PIN
-  function handleContinueToPin() {
+  // Step 1: Look up account by mobile number from database
+  function handleFetchAccount() {
     setProblem(null);
 
-    if (isCustomInput) {
-      const trimmed = customLoginId.trim();
-      if (!trimmed) {
-        setProblem("Please enter your mobile number or username.");
-        return;
-      }
-
-      startTransition(async () => {
-        const result = await lookUpLogin(trimmed);
-        if (result.ok) {
-          setConfirmedPerson({
-            name: result.name,
-            initials: result.initials,
-            designation: result.designation,
-            loginId: trimmed,
-          });
-          setStep(2);
-        } else {
-          setProblem(
-            result.reason === "too-many"
-              ? "Too many attempts from this device. Please wait 10 minutes."
-              : "No account found with that number. Please check or choose from the list.",
-          );
-        }
-      });
-    } else {
-      if (!selectedPerson) {
-        setProblem("Please select an account.");
-        return;
-      }
-
+    // If using the staff directory picker
+    if (useDirectoryView && selectedPerson) {
       setConfirmedPerson({
         name: selectedPerson.fullName,
         initials: getInitials(selectedPerson.fullName),
@@ -156,10 +116,44 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
         loginId: selectedPerson.mobile || selectedPerson.fullName,
       });
       setStep(2);
+      return;
     }
+
+    const trimmed = mobileNumber.trim().replace(/[\s+-]/g, "");
+    if (!trimmed) {
+      setProblem("Please enter your registered 10-digit mobile number.");
+      mobileInputRef.current?.focus();
+      return;
+    }
+
+    if (trimmed.length < 5) {
+      setProblem("Please enter a valid 10-digit mobile number.");
+      mobileInputRef.current?.focus();
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await lookUpLogin(trimmed);
+      if (result.ok) {
+        setConfirmedPerson({
+          name: result.name,
+          initials: result.initials,
+          designation: result.designation,
+          loginId: trimmed,
+        });
+        setStep(2);
+      } else {
+        setProblem(
+          result.reason === "too-many"
+            ? "Too many attempts from this device. Please wait 10 minutes."
+            : `No staff account found for +91 ${trimmed}. Please check the number or contact Kamesh Potnuru.`,
+        );
+        mobileInputRef.current?.focus();
+      }
+    });
   }
 
-  // Step 2: Sign in with PIN
+  // Step 2: Sign in with 6-digit PIN
   function handleSignIn() {
     setProblem(null);
     if (!confirmedPerson) {
@@ -220,12 +214,12 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
       {/* Title & Subtitle */}
       <div>
         <h1 className="font-serif text-[32px] sm:text-[38px] font-semibold tracking-tight text-[#0f172a]">
-          {step === 1 ? "Welcome back" : "Enter your PIN"}
+          {step === 1 ? "Sign in" : `Welcome, ${confirmedPerson?.name.split(" ")[0]}`}
         </h1>
         <p className="mt-1.5 text-[14.5px] text-[#64748b]">
           {step === 1
-            ? "Choose your staff account or enter your mobile number."
-            : "Enter your 6-digit sign-in code to open your dashboard."}
+            ? "Enter your registered mobile number to fetch your account."
+            : "Enter your 6-digit security PIN to access the dashboard."}
         </p>
       </div>
 
@@ -240,8 +234,8 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           <div className="flex-1">
             <p className="font-semibold text-[#0f172a]">Sign-in PIN Help</p>
             <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#475569]">
-              Default PIN for all staff accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
-              If you updated your PIN and forgot it, please contact the administrator (Kamesh Potnuru) to reset it.
+              Default PIN for all accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
+              If you updated your PIN and forgot it, please contact the proprietor (Kamesh Potnuru) to reset it.
             </p>
           </div>
           <button
@@ -266,165 +260,191 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
         </div>
       )}
 
-      {/* STEP 1: Select User / Enter Mobile */}
+      {/* STEP 1: Enter Mobile Number & Fetch Account */}
       {step === 1 ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleContinueToPin();
+            handleFetchAccount();
           }}
           className="mt-7 space-y-5"
         >
-          <div className="relative" ref={dropdownRef}>
-            <label
-              htmlFor={isCustomInput ? `${id}-custom-login` : undefined}
-              className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
-            >
-              LOGIN ACCOUNT / MOBILE
-            </label>
+          {!useDirectoryView ? (
+            /* Primary Mobile Number Input */
+            <div>
+              <label
+                htmlFor={`${id}-mobile`}
+                className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+              >
+                REGISTERED MOBILE NUMBER
+              </label>
 
-            {!isCustomInput ? (
-              /* Dropdown trigger */
-              <div>
+              <div className="relative">
+                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#64748b] font-medium text-[15px]">
+                  <Phone className="size-[17px] text-[#94a3b8]" />
+                  <span>+91</span>
+                </div>
+                <input
+                  id={`${id}-mobile`}
+                  ref={mobileInputRef}
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  value={mobileNumber}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setMobileNumber(cleaned);
+                    if (problem) setProblem(null);
+                  }}
+                  placeholder="Enter 10-digit mobile number"
+                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-20 pr-4 text-[16px] text-[#0f172a] font-medium tracking-wide shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="mt-2 flex justify-between items-center text-[12px] px-1">
+                <span className="text-[#94a3b8]">Owner / Staff 10-digit number</span>
                 <button
                   type="button"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
-                  aria-expanded={isDropdownOpen}
-                  aria-haspopup="listbox"
+                  onClick={() => {
+                    setUseDirectoryView(true);
+                    setSelectedPerson(people[0] ?? null);
+                    if (problem) setProblem(null);
+                  }}
+                  className="font-medium text-[#0068d1] hover:underline cursor-pointer"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
-                    <div className="min-w-0 flex items-center gap-2">
-                      <span className="text-[15px] font-medium text-[#0f172a] truncate">
-                        {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
-                      </span>
-                      {selectedPerson?.designation && (
-                        <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
-                          {selectedPerson.designation}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
-                      isDropdownOpen ? "rotate-180" : ""
-                    }`}
-                    aria-hidden
-                  />
+                  Or pick from staff directory →
                 </button>
+              </div>
+            </div>
+          ) : (
+            /* Secondary Directory Dropdown View */
+            <div className="relative" ref={dropdownRef}>
+              <label
+                className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+              >
+                SELECT STAFF ACCOUNT
+              </label>
 
-                {/* Dropdown menu */}
-                {isDropdownOpen && (
-                  <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden animate-fade-up">
-                    {people.length > 5 && (
-                      <div className="p-2 border-b border-[#f1f5f9]">
-                        <div className="relative flex items-center">
-                          <Search className="size-4 text-[#94a3b8] absolute left-3 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search staff name..."
-                            className="w-full h-9 pl-9 pr-3 text-[13.5px] rounded-xl bg-[#f8fafc] border border-transparent focus:border-[#0068d1]/30 focus:outline-none"
-                            autoFocus
-                          />
-                        </div>
-                      </div>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                aria-expanded={isDropdownOpen}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="text-[15px] font-medium text-[#0f172a] truncate">
+                      {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
+                    </span>
+                    {selectedPerson?.designation && (
+                      <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                        {selectedPerson.designation}
+                      </span>
                     )}
-
-                    <ul className="max-h-[260px] overflow-y-auto divide-y divide-[#f8fafc] p-1.5" role="listbox">
-                      {filteredPeople.map((p) => {
-                        const isSelected = selectedPerson?.id === p.id;
-                        return (
-                          <li
-                            key={p.id}
-                            role="option"
-                            aria-selected={isSelected}
-                            onClick={() => {
-                              setSelectedPerson(p);
-                              setIsDropdownOpen(false);
-                              setSearchQuery("");
-                              if (problem) setProblem(null);
-                            }}
-                            className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
-                              isSelected ? "bg-[#0068d1]/10 text-[#0068d1]" : "hover:bg-[#f8fafc] text-[#0f172a]"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="grid size-8 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[12px] font-bold text-white shrink-0">
-                                {getInitials(p.fullName)}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="text-[14px] font-medium truncate">{p.fullName}</p>
-                                <p className="text-[11.5px] text-[#64748b]">
-                                  {p.designation || (p.role === "owner" ? "Admin" : p.role)} · {p.mobile}
-                                </p>
-                              </div>
-                            </div>
-                            {isSelected && <Check className="size-4 text-[#0068d1] shrink-0" />}
-                          </li>
-                        );
-                      })}
-                    </ul>
-
-                    <div className="p-2 border-t border-[#f1f5f9] bg-[#fafafc]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsCustomInput(true);
-                          setIsDropdownOpen(false);
-                          setCustomLoginId("");
-                        }}
-                        className="w-full py-1.5 px-2 text-[12.5px] font-semibold text-[#0068d1] hover:underline text-center cursor-pointer"
-                      >
-                        + Enter another mobile number or username
-                      </button>
-                    </div>
                   </div>
-                )}
-              </div>
-            ) : (
-              /* Custom text input */
-              <div className="space-y-1.5">
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
-                  <input
-                    id={`${id}-custom-login`}
-                    type="text"
-                    value={customLoginId}
-                    onChange={(e) => {
-                      setCustomLoginId(e.target.value);
-                      if (problem) setProblem(null);
-                    }}
-                    placeholder="Enter 10-digit mobile number or name"
-                    className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-24 text-[14.5px] text-[#0f172a] shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomInput(false)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer"
-                  >
-                    List view
-                  </button>
                 </div>
+                <ChevronDown
+                  className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
+                    isDropdownOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden
+                />
+              </button>
+
+              {/* Dropdown menu */}
+              {isDropdownOpen && (
+                <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden animate-fade-up">
+                  {people.length > 5 && (
+                    <div className="p-2 border-b border-[#f1f5f9]">
+                      <div className="relative flex items-center">
+                        <Search className="size-4 text-[#94a3b8] absolute left-3 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search staff name..."
+                          className="w-full h-9 pl-9 pr-3 text-[13.5px] rounded-xl bg-[#f8fafc] border border-transparent focus:border-[#0068d1]/30 focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <ul className="max-h-[260px] overflow-y-auto divide-y divide-[#f8fafc] p-1.5" role="listbox">
+                    {filteredPeople.map((p) => {
+                      const isSelected = selectedPerson?.id === p.id;
+                      return (
+                        <li
+                          key={p.id}
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            setSelectedPerson(p);
+                            setIsDropdownOpen(false);
+                            setSearchQuery("");
+                            if (problem) setProblem(null);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                            isSelected ? "bg-[#0068d1]/10 text-[#0068d1]" : "hover:bg-[#f8fafc] text-[#0f172a]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="grid size-8 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[12px] font-bold text-white shrink-0">
+                              {getInitials(p.fullName)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-[14px] font-medium truncate">{p.fullName}</p>
+                              <p className="text-[11.5px] text-[#64748b]">
+                                {p.designation || (p.role === "owner" ? "Admin" : p.role)} · {p.mobile}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="size-4 text-[#0068d1] shrink-0" />}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              <div className="mt-2 flex justify-end text-[12px] px-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseDirectoryView(false);
+                    if (problem) setProblem(null);
+                  }}
+                  className="font-medium text-[#0068d1] hover:underline cursor-pointer"
+                >
+                  ← Back to mobile number entry
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* CONTINUE BUTTON */}
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || (!useDirectoryView && mobileNumber.trim().length < 5)}
             className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <span>{pending ? "Checking account…" : "Continue"}</span>
-            {!pending && <ArrowRight className="size-4.5" />}
+            {pending ? (
+              <>
+                <LoaderCircle className="size-4.5 animate-spin" />
+                <span>Fetching account from database…</span>
+              </>
+            ) : (
+              <>
+                <span>Continue</span>
+                <ArrowRight className="size-4.5" />
+              </>
+            )}
           </button>
         </form>
       ) : (
-        /* STEP 2: Enter PIN */
+        /* STEP 2: Confirmed Account Fetched from Database + Enter PIN */
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -432,24 +452,29 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           }}
           className="mt-6 space-y-5"
         >
-          {/* Confirmed Person Card */}
+          {/* Confirmed Person Card from Database */}
           {confirmedPerson && (
-            <div className="rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] p-3.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="grid size-10 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[13px] font-bold text-white shrink-0 shadow-sm">
+            <div className="rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] p-4 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="grid size-11 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] via-[#0284c7] to-[#38bdf8] text-[14px] font-bold text-white shrink-0 shadow-sm">
                   {confirmedPerson.initials}
-                </span>
+                </div>
                 <div className="min-w-0">
-                  <p className="text-[14.5px] font-semibold text-[#0f172a] truncate">
-                    {confirmedPerson.name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[15px] font-bold text-[#0f172a] truncate">
+                      {confirmedPerson.name}
+                    </p>
+                    <ShieldCheck className="size-4 text-[#10b981] shrink-0" aria-label="Verified staff" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
                     {confirmedPerson.designation && (
                       <span className="text-[11px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
                         {confirmedPerson.designation}
                       </span>
                     )}
-                    <span className="text-[12px] text-[#64748b] truncate">{confirmedPerson.loginId}</span>
+                    <span className="text-[12px] text-[#64748b] truncate">
+                      +91 {confirmedPerson.loginId}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -461,7 +486,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                   setPassword("");
                   setProblem(null);
                 }}
-                className="text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer shrink-0 px-2 py-1"
+                className="text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer shrink-0 px-2.5 py-1.5 rounded-lg hover:bg-[#0068d1]/5"
               >
                 Change
               </button>
@@ -535,7 +560,14 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
             disabled={pending || password.length !== CODE_LENGTH}
             className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            <span>{pending ? "Signing in…" : "Sign in"}</span>
+            {pending ? (
+              <>
+                <LoaderCircle className="size-4.5 animate-spin" />
+                <span>Signing in…</span>
+              </>
+            ) : (
+              <span>Sign in</span>
+            )}
           </button>
 
           {/* Back button */}
@@ -550,7 +582,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
               className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#64748b] hover:text-[#0f172a] cursor-pointer"
             >
               <ArrowLeft size={14} />
-              <span>Back to choose account</span>
+              <span>Back to change mobile number</span>
             </button>
           </div>
         </form>
