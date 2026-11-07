@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Suspense, use, useState, type ReactNode } from "react";
+import { Suspense, use, useEffect, useState, type ReactNode } from "react";
+import { cn } from "@/lib/cn";
 import type { Profile, Role } from "@/lib/data/types";
 import type { Notice } from "@/lib/notices";
 import { useSignedIn, useViewAs } from "@/lib/roles";
@@ -15,7 +16,7 @@ import { TopBar } from "./top-bar";
 
 /**
  * Phone (< 768px): frosted top bar + bottom tab bar.
- * Tablet (768–1023px): icon-only sidebar. Desktop (≥ 1024px): full 240px sidebar.
+ * Tablet (768–1023px): icon-only sidebar. Desktop (≥ 1024px): full or collapsible sidebar.
  */
 export function AppShell({
   people,
@@ -33,6 +34,24 @@ export function AppShell({
   const [role] = useViewAs();
   const signedIn = useSignedIn();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ska_sidebar_collapsed");
+      if (saved !== null) setSidebarCollapsed(saved === "true");
+    } catch {}
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("ska_sidebar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  }
 
   return (
     <div className="min-h-dvh">
@@ -43,10 +62,10 @@ export function AppShell({
         Skip to content
       </a>
       {/* The URL is request data under Cache Components, so the active-item highlight streams in; the fallback is the same nav without it. */}
-      <Suspense fallback={<Sidebar pathname="" role={role} firmName={firmName} />}>
-        <SidebarForPath role={role} firmName={firmName} />
+      <Suspense fallback={<Sidebar pathname="" role={role} firmName={firmName} collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />}>
+        <SidebarForPath role={role} firmName={firmName} collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
       </Suspense>
-      <div className="md:pl-[72px] lg:pl-60 print:pl-0">
+      <div className={cn("transition-all duration-200 print:pl-0", sidebarCollapsed ? "md:pl-[72px]" : "md:pl-[72px] lg:pl-64")}>
         <Suspense fallback={<div className="frosted sticky top-0 z-30 h-14 border-b border-black/[0.05] pt-[env(safe-area-inset-top)] print:hidden" />}>
           <TopBarFor
             people={people}
@@ -87,8 +106,26 @@ function TopBarFor({
   return <TopBar user={user} role={role} {...rest} />;
 }
 
-function SidebarForPath({ role, firmName }: { role: Role; firmName: string }) {
-  return <Sidebar pathname={usePathname()} role={role} firmName={firmName} />;
+function SidebarForPath({
+  role,
+  firmName,
+  collapsed,
+  onToggleCollapse,
+}: {
+  role: Role;
+  firmName: string;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
+  return (
+    <Sidebar
+      pathname={usePathname()}
+      role={role}
+      firmName={firmName}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    />
+  );
 }
 
 function TabBarForPath({ role }: { role: Role }) {
