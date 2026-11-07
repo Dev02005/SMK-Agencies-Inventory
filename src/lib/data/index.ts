@@ -400,6 +400,29 @@ function ledgerFor(partyId: string): LedgerEntry[] {
         credit: 0,
       }),
     );
+
+  // Lorry sales to this party
+  localLorries().forEach((l) => {
+    (l.sale?.bills ?? []).forEach((b) => {
+      const isThisParty = b.partyId === partyId || (Boolean(b.soldTo) && b.soldTo?.trim().toLowerCase() === party.name.trim().toLowerCase());
+      if (isThisParty && b.amount > 0) {
+        rows.push({
+          date: b.date ?? l.invoiceDate,
+          kind: "sale",
+          ref: `Bill ${b.billNo} (Lorry ${l.lorryNo})`,
+          href: `/sales/lorries/${l.id}`,
+          narration: b.lines
+            .map((bl) => {
+              const p = sample.products.find((prod) => prod.id === bl.productId);
+              return `${bl.qty} ${p?.name ?? "bags"}`;
+            })
+            .join(", ") + ` · off lorry ${l.lorryNo}`,
+          debit: b.amount,
+          credit: 0,
+        });
+      }
+    });
+  });
   [...localReceipts(), ...sample.receipts]
     .filter((r) => r.partyId === partyId)
     .forEach((r) =>

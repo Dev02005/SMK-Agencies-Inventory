@@ -11,7 +11,7 @@ import { DataOrigin } from "@/components/ui/data-origin";
 import { DataTools } from "@/components/ui/data-tools";
 import { ExportTable } from "@/components/ui/export-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { getFirms, getLorries, getProducts } from "@/lib/data";
+import { getFirms, getLorries, getParties, getProducts } from "@/lib/data";
 import { inDateFilter, salesPresets } from "@/lib/date-filter";
 import { cn } from "@/lib/cn";
 import { formatDate, formatINR } from "@/lib/format";
@@ -46,7 +46,27 @@ export default function LorrySalesPage({ searchParams }: PageProps<"/sales/lorri
 }
 
 async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorries">["searchParams"] }) {
-  const [all, products, dates, firms, params] = await Promise.all([getLorries(), getProducts(), pageDateFilter(searchParams, salesPresets), getFirms(), searchParams]);
+  const [all, products, dates, firms, params, allParties] = await Promise.all([
+    getLorries(),
+    getProducts(),
+    pageDateFilter(searchParams, salesPresets),
+    getFirms(),
+    searchParams,
+    getParties(),
+  ]);
+
+  const parties = allParties
+    .filter((p) => p.kind === "cash" || p.kind === "customer" || p.kind === "sub_dealer")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      place: p.place,
+      kind: p.kind,
+      creditLimit: p.creditLimit,
+      outstanding: Math.max(p.balance, 0),
+      mobile: p.mobile,
+    }));
+
   // Two lists: lorries still selling (the default) and lorries sold out.
   const show: LorryState = params.show === "sold" ? "sold" : "selling";
   // The sale bills dated in the period; a lorry shows when it was bought then or sold any of these.
@@ -85,9 +105,22 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorri
       {/* What Download gives: the lorry sale bills in the chosen dates, only lorry sales. */}
       <ExportTable
         title="Lorry sale bills"
-        columns={["Date", "Bill no.", "Truck number", "Company", "Sold to", "Bags", "Amount"]}
+        columns={["Date", "Bill no.", "Truck number", "Company", "Customer", "Place", "Phone", "Bags", "Amount"]}
         rows={lorries.flatMap((l) =>
-          billsIn(l).map((b) => [b.date ? formatDate(b.date) : "", b.billNo, l.lorryNo, l.companyName, b.soldTo ?? "", b.qty, formatINR(b.amount)]),
+          billsIn(l).map((b) => {
+            const p = parties.find((x) => x.id === b.partyId || (b.soldTo && x.name.toLowerCase() === b.soldTo.toLowerCase()));
+            return [
+              b.date ? formatDate(b.date) : "",
+              b.billNo,
+              l.lorryNo,
+              l.companyName,
+              p?.name ?? b.cashName ?? b.soldTo ?? "",
+              p?.place ?? b.place ?? "",
+              p?.mobile ?? b.cashMobile ?? "",
+              b.qty,
+              formatINR(b.amount),
+            ];
+          }),
         )}
       />
       {lorries.length === 0 && (
@@ -114,7 +147,7 @@ async function Lorries({ searchParams }: { searchParams: PageProps<"/sales/lorri
               {cost && l.sold ? <Figure label="Margin" value={formatINR(l.sold.value - cost)} tone={l.sold.value >= cost ? "good" : "danger"} /> : null}
             </dl>
             <div className="mt-4">
-              <LorryProgress loaded={l.lines} sold={(pid) => l.sale?.lines.find((x) => x.productId === pid)?.qty ?? 0} products={products} bills={billsIn(l)} />
+              <LorryProgress loaded={l.lines} sold={(pid) => l.sale?.lines.find((x) => x.productId === pid)?.qty ?? 0} products={products} bills={billsIn(l)} parties={parties} />
             </div>
             {lorryMissing(l).length > 0 && (
               <p className="mt-3 rounded-xl bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger">Missing: {lorryMissing(l).join(", ")}</p>

@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import type { Lorry, Product } from "@/lib/data/types";
 import { formatINR, formatNumber } from "@/lib/format";
+import type { SaleParty } from "@/app/(app)/sales/new/new-sale-form";
 import { chargesTotal, OtherCharges, toChargeRows, unnamedCharge, type OtherCharge } from "@/components/forms/other-charges";
 import { billUsed, emptyBill, num, SoldInBills, type BillRow } from "./sold-in-bills";
 import { updateLorrySale } from "../../../purchases/lorries/actions";
@@ -23,7 +24,19 @@ const text = (n: number | undefined) => (n ? String(n) : "");
  * is left on the lorry; the tick boxes, charges received (each other charge named), and whether it is sold out. It can be saved while still
  * selling and updated again later; marking it sold out ends the reminder.
  */
-export function LorrySaleForm({ lorry, products, today, nextBillNo }: { lorry: Lorry; products: Product[]; today: string; nextBillNo: number }) {
+export function LorrySaleForm({
+  lorry,
+  products,
+  today,
+  nextBillNo,
+  parties = [],
+}: {
+  lorry: Lorry;
+  products: Product[];
+  today: string;
+  nextBillNo: number;
+  parties?: SaleParty[];
+}) {
   const id = useId();
   const router = useRouter();
   const toast = useToast();
@@ -33,7 +46,25 @@ export function LorrySaleForm({ lorry, products, today, nextBillNo }: { lorry: L
     const toQty = (lines: { productId: string; qty: number }[]) => Object.fromEntries(lines.map((l) => [l.productId, l.qty ? String(l.qty) : ""]));
     const sale = lorry.sale;
     const was = sale?.updatedOn ?? today;
-    if (sale?.bills?.length) return sale.bills.map((b, i) => ({ key: i + 1, date: b.date ?? was, billNo: b.billNo, soldTo: b.soldTo ?? "", qty: toQty(b.lines), amount: String(b.amount) }));
+    if (sale?.bills?.length)
+      return sale.bills.map((b, i) => {
+        const matched = parties.find(
+          (p) => p.id === b.partyId || (b.soldTo && p.name.trim().toLowerCase() === b.soldTo.trim().toLowerCase()),
+        );
+        return {
+          key: i + 1,
+          date: b.date ?? was,
+          billNo: b.billNo,
+          partyId: b.partyId ?? matched?.id ?? "",
+          soldTo: b.soldTo ?? matched?.name ?? "",
+          cashName: b.cashName ?? (matched?.kind === "cash" ? b.soldTo : ""),
+          cashMobile: b.cashMobile ?? matched?.mobile ?? "",
+          place: b.place ?? matched?.place ?? "",
+          customMode: Boolean(b.soldTo && !matched && !b.partyId),
+          qty: toQty(b.lines),
+          amount: String(b.amount),
+        };
+      });
     if (sale?.drops?.length) return sale.drops.map((d, i) => ({ ...emptyBill(i + 1, was), soldTo: d.place, qty: toQty(d.lines), amount: sale.drops!.length === 1 && sale.invoiceValue ? String(sale.invoiceValue) : "" }));
     if (sale?.lines.some((l) => l.qty > 0)) return [{ key: 1, date: was, billNo: sale.invoiceNo ?? "", soldTo: "", qty: toQty(sale.lines), amount: sale.invoiceValue ? String(sale.invoiceValue) : "" }];
     return [emptyBill(1, today)];
@@ -83,7 +114,17 @@ export function LorrySaleForm({ lorry, products, today, nextBillNo }: { lorry: L
     if (missing || pending) return;
     startTransition(async () => {
       const result = await updateLorrySale(lorry.id, {
-        bills: used.map((b) => ({ date: b.date, billNo: b.billNo, soldTo: b.soldTo, amount: num(b.amount), lines: lorry.lines.map((l) => ({ productId: l.productId, qty: num(b.qty[l.productId]) })) })),
+        bills: used.map((b) => ({
+          date: b.date,
+          billNo: b.billNo,
+          partyId: b.partyId,
+          soldTo: b.soldTo,
+          cashName: b.cashName,
+          cashMobile: b.cashMobile,
+          place: b.place,
+          amount: num(b.amount),
+          lines: lorry.lines.map((l) => ({ productId: l.productId, qty: num(b.qty[l.productId]) })),
+        })),
         invoiceValue,
         invoicePaperKept: paperKept,
         unloadingCharges: unloadingPaid,
@@ -111,7 +152,7 @@ export function LorrySaleForm({ lorry, products, today, nextBillNo }: { lorry: L
         save();
       }}
     >
-      <SoldInBills loaded={lorry.lines} products={products} bills={bills} onChange={setBills} today={today} seriesNext={nextBillNo} />
+      <SoldInBills loaded={lorry.lines} products={products} bills={bills} onChange={setBills} today={today} seriesNext={nextBillNo} parties={parties} />
 
       <section className="surface space-y-4 p-5">
         <div className="space-y-1">

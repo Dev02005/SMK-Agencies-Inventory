@@ -71,6 +71,16 @@ export const DEVICE_LORRY_KEY = "ska-lorry-book";
 /** A lorry's sale bills for the "Sold from this lorry" list: date, number, buyer, bags and amount, oldest first. */
 export function soldBills(l: Pick<Lorry, "sale">) {
   return (l.sale?.bills ?? [])
-    .map((b) => ({ date: b.date, billNo: b.billNo, soldTo: b.soldTo, qty: b.lines.reduce((s, x) => s + x.qty, 0), amount: b.amount }))
+    .map((b) => ({
+      date: b.date,
+      billNo: b.billNo,
+      soldTo: b.soldTo,
+      partyId: b.partyId,
+      cashName: b.cashName,
+      cashMobile: b.cashMobile,
+      place: b.place,
+      qty: b.lines.reduce((s, x) => s + x.qty, 0),
+      amount: b.amount,
+    }))
     .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
 }

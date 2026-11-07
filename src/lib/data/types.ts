@@ -295,7 +295,17 @@ export type Lorry = {
   sale?: {
     lines: { productId: string; qty: number }[];
     /** Each sale bill from the lorry: its number, who bought, how much of each item and its amount. `lines` is their total, `invoiceValue` their amounts added up. */
-    bills?: { date?: string; billNo: string; soldTo?: string; lines: { productId: string; qty: number }[]; amount: number }[];
+    bills?: {
+      date?: string;
+      billNo: string;
+      partyId?: string;
+      soldTo?: string;
+      cashName?: string;
+      cashMobile?: string;
+      place?: string;
+      lines: { productId: string; qty: number }[];
+      amount: number;
+    }[];
     /** Before bills: where it sold, place by place. Read only, to open older updates as bills. */
     drops?: { place: string; lines: { productId: string; qty: number }[] }[];
     /** Other charges received, each with its name; `other` is their total. */

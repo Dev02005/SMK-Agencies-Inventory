@@ -97,7 +97,17 @@ export async function saveLorryPurchase(input: LorryInput): Promise<LorryResult>
 export type LorrySaleInput = {
   /** Each sale bill from the lorry: its number, who bought, how much of each item and the bill's amount. */
   /** `billNo`: a bill already saved keeps its number; a new bill sends "" and is numbered next in the series on save. */
-  bills: { date: string; billNo: string; soldTo: string; lines: { productId: string; qty: number }[]; amount: number }[];
+  bills: {
+    date: string;
+    billNo: string;
+    partyId?: string;
+    soldTo: string;
+    cashName?: string;
+    cashMobile?: string;
+    place?: string;
+    lines: { productId: string; qty: number }[];
+    amount: number;
+  }[];
   /** The sale's total invoice value: the bills added up, or what the owner typed in. */
   invoiceValue: number;
   invoicePaperKept: boolean;
@@ -140,15 +150,19 @@ export async function updateLorrySale(id: string, input: LorrySaleInput): Promis
     const asked = text(bill?.billNo, 20);
     const billNo = lorry.sale?.bills?.some((b) => b.billNo === asked) || (asked && asked === lorry.sale?.invoiceNo && !lorry.sale?.bills?.length) ? asked : "";
     const name = billNo ? `bill ${billNo}` : "the new bill";
+    const partyId = text(bill?.partyId, 40) || undefined;
     const soldTo = text(bill?.soldTo, 60) || undefined;
+    const cashName = text(bill?.cashName, 60) || undefined;
+    const cashMobile = text(bill?.cashMobile, 20) || undefined;
+    const place = text(bill?.place, 60) || undefined;
     const amount = money(bill?.amount);
     if (amount === null) return { ok: false, problem: "Enter each bill's amount in rupees." };
-    if (billLines.length === 0 && amount === 0 && !soldTo) continue;
+    if (billLines.length === 0 && amount === 0 && !soldTo && !partyId) continue;
     if (billLines.length === 0) return { ok: false, problem: `Enter how much is on ${name}.` };
     if (amount === 0) return { ok: false, problem: `Enter the amount of ${name}.` };
     const date = isDate(bill?.date) && bill.date >= lorry.invoiceDate ? bill.date : undefined;
     if (bill?.date && !date) return { ok: false, problem: `${name[0].toUpperCase()}${name.slice(1)} can't be dated before the lorry's invoice date.` };
-    bills.push({ date, billNo, soldTo, lines: billLines, amount });
+    bills.push({ date, billNo, partyId, soldTo, cashName, cashMobile, place, lines: billLines, amount });
   }
   // What is sold of each item: the bills added up, never more than came on the lorry.
   const lines: NonNullable<Lorry["sale"]>["lines"] = [];

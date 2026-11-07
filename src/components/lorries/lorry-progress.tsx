@@ -1,9 +1,21 @@
+import Link from "next/link";
 import type { Product } from "@/lib/data/types";
 import { cn } from "@/lib/cn";
 import { formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { unitLabel } from "@/lib/sales";
+import type { SaleParty } from "@/app/(app)/sales/new/new-sale-form";
 
-export type SoldBill = { date?: string; billNo: string; soldTo?: string; qty: number; amount: number };
+export type SoldBill = {
+  date?: string;
+  billNo: string;
+  partyId?: string;
+  soldTo?: string;
+  cashName?: string;
+  cashMobile?: string;
+  place?: string;
+  qty: number;
+  amount: number;
+};
 
 /**
  * What a company lorry has sold: one bar per item ("150 bags left of 600", the filled part sold), then the sale bills
@@ -14,6 +26,7 @@ export function LorryProgress({
   sold,
   products,
   bills,
+  parties,
 }: {
   /** What came on the lorry. */
   loaded: { productId: string; qty: number }[];
@@ -22,6 +35,8 @@ export function LorryProgress({
   products: Product[];
   /** The sale bills so far; no list when there are none. */
   bills?: SoldBill[];
+  /** Available customer and party list for customer matching */
+  parties?: SaleParty[];
 }) {
   const product = (pid: string) => products.find((p) => p.id === pid);
   return (
@@ -59,17 +74,59 @@ export function LorryProgress({
         <div>
           <p className="text-[15px] font-semibold text-ink">Sold from this lorry</p>
           <ul className="mt-1 divide-y divide-hairline">
-            {bills.map((b, i) => (
-              <li key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-baseline gap-3 py-2 text-[15px]">
-                <span className="w-14 text-[13px] text-ink-secondary">{b.date ? formatShortDate(b.date) : ""}</span>
-                <span className="truncate text-ink">
-                  Bill {b.billNo}
-                  {b.soldTo && <span className="text-ink-secondary"> · {b.soldTo}</span>}
-                </span>
-                <span className="tabular-nums text-ink-secondary">{formatNumber(b.qty)} bags</span>
-                <span className="font-medium tabular-nums text-ink">{formatINR(b.amount)}</span>
-              </li>
-            ))}
+            {bills.map((b, i) => {
+              const party = parties?.find(
+                (p) => p.id === b.partyId || (b.soldTo && p.name.trim().toLowerCase() === b.soldTo.trim().toLowerCase()),
+              );
+              const displayName = party?.name ?? b.cashName ?? b.soldTo;
+              const displayPlace = party?.place ?? b.place;
+              const displayMobile = party?.mobile ?? b.cashMobile;
+
+              return (
+                <li key={i} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-[15px]">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold tabular-nums text-ink">Bill #{b.billNo}</span>
+                      {b.date && <span className="text-[12px] text-ink-secondary">· {formatShortDate(b.date)}</span>}
+                      {party ? (
+                        <Link href={`/parties/${party.id}`} className="font-medium text-link hover:underline">
+                          {party.name}
+                        </Link>
+                      ) : displayName ? (
+                        <span className="font-medium text-ink">{displayName}</span>
+                      ) : (
+                        <span className="text-ink-secondary italic">Spot sale</span>
+                      )}
+                      {party?.kind && (
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
+                          {party.kind === "sub_dealer" ? "Sub-dealer" : "Customer"}
+                        </span>
+                      )}
+                      {party && party.outstanding > 0 && (
+                        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning tabular-nums">
+                          Bal {formatINR(party.outstanding)}
+                        </span>
+                      )}
+                    </div>
+                    {(displayPlace || displayMobile) && (
+                      <div className="flex flex-wrap items-center gap-2 text-[12px] text-ink-secondary mt-0.5">
+                        {displayPlace && <span>{displayPlace}</span>}
+                        {displayPlace && displayMobile && <span>·</span>}
+                        {displayMobile && (
+                          <a href={`tel:+91${displayMobile}`} className="hover:text-ink hover:underline">
+                            +91 {displayMobile}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="block font-semibold tabular-nums text-ink">{formatINR(b.amount)}</span>
+                    <span className="block text-[12px] tabular-nums text-ink-secondary">{formatNumber(b.qty)} bags</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

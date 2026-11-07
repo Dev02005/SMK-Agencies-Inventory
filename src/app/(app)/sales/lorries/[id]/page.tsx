@@ -5,7 +5,7 @@ import { OwnerPage } from "@/components/auth/owner-only";
 import { LorryCost, LorryItems, LorryMeta, LorryStateChip, LorryTitle } from "@/components/lorries/lorry-bits";
 import { BackLink, ListSkeleton, SectionCard } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
-import { getFirms, getLorries, getNextBillNo, getProducts, getToday } from "@/lib/data";
+import { getFirms, getLorries, getNextBillNo, getParties, getProducts, getToday } from "@/lib/data";
 import { isSavedLorry } from "@/lib/lorries";
 import { LorrySaleForm } from "./lorry-sale-form";
 
@@ -27,9 +27,29 @@ export default function LorrySalePage({ params }: PageProps<"/sales/lorries/[id]
 
 async function Lorry({ params }: { params: PageProps<"/sales/lorries/[id]">["params"] }) {
   const { id } = await params;
-  const [lorries, products, firms, today, nextBillNo] = await Promise.all([getLorries(), getProducts(), getFirms(), getToday(), getNextBillNo()]);
+  const [lorries, products, firms, today, nextBillNo, allParties] = await Promise.all([
+    getLorries(),
+    getProducts(),
+    getFirms(),
+    getToday(),
+    getNextBillNo(),
+    getParties(),
+  ]);
   const lorry = lorries.find((l) => l.id === id);
   if (!lorry) notFound();
+
+  const parties = allParties
+    .filter((p) => p.kind === "cash" || p.kind === "customer" || p.kind === "sub_dealer")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      place: p.place,
+      kind: p.kind,
+      creditLimit: p.creditLimit,
+      outstanding: Math.max(p.balance, 0),
+      mobile: p.mobile,
+    }));
+
   return (
     <>
       <PageHeader title={<LorryTitle lorry={lorry} />} subtitle="Update what is sold from this lorry" actions={<LorryStateChip lorry={lorry} />} />
@@ -40,7 +60,7 @@ async function Lorry({ params }: { params: PageProps<"/sales/lorries/[id]">["par
           <LorryCost lorry={lorry} />
         </SectionCard>
         {isSavedLorry(lorry) ? (
-          <LorrySaleForm lorry={lorry} products={products} today={today} nextBillNo={nextBillNo} />
+          <LorrySaleForm lorry={lorry} products={products} today={today} nextBillNo={nextBillNo} parties={parties} />
         ) : (
           <SectionCard>Sample lorry: only lorries you enter can be updated.</SectionCard>
         )}
