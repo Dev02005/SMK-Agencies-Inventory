@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Suspense } from "react";
-import { BadgePercent, Receipt, ShieldCheck, Truck } from "lucide-react";
+import { Receipt, Truck, Warehouse } from "lucide-react";
 import { getFirm, getSignInPeople } from "@/lib/data";
 import { siteDescriptionFor, siteUrl } from "@/lib/site";
 import { LoginForm } from "./login-form";
@@ -175,43 +175,43 @@ export default async function LoginPage() {
             Godowns at Polaki &amp; Srikakulam · Direct Mill Supplies · {firm.phone} / 99636 84551
           </p>
 
-          {/* 3 Customer-Facing Benefit Cards */}
-          <div className="mt-8 space-y-3">
-            {/* Card 1: 100% Genuine Brands */}
-            <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
-              <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#38bdf8] shrink-0">
-                <ShieldCheck className="size-5" />
+          {/* 3 Reference Feature Cards (Matching Reference Image) */}
+          <div className="mt-8 space-y-3.5">
+            {/* Card 1: Multi-Godown Inventory */}
+            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
+              <div className="size-12 rounded-[16px] bg-[#0284c7]/20 border border-[#38bdf8]/35 flex items-center justify-center text-[#38bdf8] shrink-0">
+                <Warehouse className="size-[22px]" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">100% Genuine Certified Brands</p>
-                <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Direct authorized supply of UltraTech, Maha, Deccan &amp; Sagar Cements with certified ISI TMT Steel
+                <p className="text-[15.5px] font-bold text-white tracking-tight">Multi-Godown Inventory</p>
+                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                  Live stock tracking across Polaki, Srikakulam &amp; company depot godowns
                 </p>
               </div>
             </div>
 
-            {/* Card 2: Wholesale Rates & Clear Billing */}
-            <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
-              <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#4ade80] shrink-0">
-                <Receipt className="size-5" />
+            {/* Card 2: Wholesale & Retail Billing */}
+            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
+              <div className="size-12 rounded-[16px] bg-[#16a34a]/20 border border-[#4ade80]/35 flex items-center justify-center text-[#4ade80] shrink-0">
+                <Receipt className="size-[22px]" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">Wholesale Rates &amp; GST Invoices</p>
-                <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Direct competitive pricing for builders, contractors &amp; dealers with formal GST tax invoices
+                <p className="text-[15.5px] font-bold text-white tracking-tight">Wholesale &amp; Retail Billing</p>
+                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                  Instant counter sales, wholesale orders &amp; owner price approval workflow
                 </p>
               </div>
             </div>
 
-            {/* Card 3: Direct Mill & Site Delivery */}
-            <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
-              <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#fbbf24] shrink-0">
-                <Truck className="size-5" />
+            {/* Card 3: Mill Dispatches & Fleet */}
+            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
+              <div className="size-12 rounded-[16px] bg-[#d97706]/20 border border-[#fbbf24]/35 flex items-center justify-center text-[#fbbf24] shrink-0">
+                <Truck className="size-[22px]" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">Direct Mill &amp; Site Delivery</p>
-                <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Full-truckload mill dispatches and prompt local godown deliveries across Srikakulam district
+                <p className="text-[15.5px] font-bold text-white tracking-tight">Mill Dispatches &amp; Fleet</p>
+                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                  Direct mill lorry shipments, freight tracking &amp; driver cash management
                 </p>
               </div>
             </div>

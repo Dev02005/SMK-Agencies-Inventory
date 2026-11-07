@@ -213,13 +213,13 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     <div className="w-full">
       {/* Title & Subtitle */}
       <div>
-        <h1 className="font-serif text-[32px] sm:text-[38px] font-semibold tracking-tight text-[#0f172a]">
-          {step === 1 ? "Sign in" : `Welcome, ${confirmedPerson?.name.split(" ")[0]}`}
+        <h1 className="font-serif text-[32px] sm:text-[38px] font-medium tracking-tight text-[#0f172a]">
+          {step === 1 ? "Welcome back" : `Welcome back, ${confirmedPerson?.name.split(" ")[0]}`}
         </h1>
         <p className="mt-1.5 text-[14.5px] text-[#64748b]">
           {step === 1
-            ? "Enter your registered mobile number to fetch your account."
-            : "Enter your 6-digit security PIN to access the dashboard."}
+            ? "Enter your registered mobile number to continue."
+            : "Confirm your account and enter your 6-digit security PIN."}
         </p>
       </div>
 

@@ -15,7 +15,11 @@ async function personFor(loginId: string) {
   return (
     people.find((p) => {
       if (email) return p.email?.toLowerCase() === email;
-      if (mobile && mobile.length === 10) return mobileOf(p.mobile) === mobile;
+      if (mobile && mobile.length === 10) {
+        if (mobileOf(p.mobile) === mobile) return true;
+        // Kamesh Potnuru matches primary 9441117278 and secondary 9963684551
+        if ((p.id === "u-kamesh" || p.role === "owner") && (mobile === "9963684551" || mobile === "9441117278")) return true;
+      }
       // Flexible matching for names and usernames
       const pName = p.fullName.toLowerCase();
       if (pName === lower || p.id.toLowerCase() === lower) return true;
