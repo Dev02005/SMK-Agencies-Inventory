@@ -218,9 +218,9 @@ export default async function LoginPage() {
           </div>
         </div>
 
-        {/* BOTTOM FOOTER: Official Sri Kameswari Agencies footer (No D2W) */}
+        {/* BOTTOM FOOTER */}
         <div className="relative z-10 pt-4 text-[12px] text-slate-400/70 font-medium flex items-center justify-between">
-          <p>© 2026 {firm.name} · Polaki, Srikakulam</p>
+          <p>© 2026 D2W</p>
           <p className="hidden sm:block text-slate-500/60">Authorized Commercial Dealership</p>
         </div>
       </section>
