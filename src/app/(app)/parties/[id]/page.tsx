@@ -120,14 +120,24 @@ async function PartyDetail({ params }: { params: PageProps<"/parties/[id]">["par
               <Phone size={16} strokeWidth={1.75} aria-hidden /> Call
             </a>
             <a
-              href={party.mobile ? `https://wa.me/91${party.mobile}` : undefined}
+              href={
+                party.mobile
+                  ? `https://wa.me/91${party.mobile}?text=${encodeURIComponent(
+                      party.balance > 0
+                        ? `నమస్కారం ${party.name} గారు, Sri Kameswari Agencies (Polaki) నుండి. మీ ఖాతా బకాయి మొత్తం ₹${formatINR(party.balance)}. దయచేసి Axis Bank ఖాతా 924020054321001 (IFSC: UTIB0000456) లేదా UPI ID: kameshpotnuru@okaxis ద్వారా చెల్లించగలరు. ధన్యవాదాలు! - Kamesh Potnuru (9441117278)`
+                        : `నమస్కారం ${party.name} గారు, Sri Kameswari Agencies (Polaki) నుండి. మీ ఖాతాలో ఎలాంటి బకాయి లేదు. ధన్యవాదాలు!`,
+                    )}`
+                  : undefined
+              }
+              target="_blank"
+              rel="noopener noreferrer"
               aria-disabled={!party.mobile}
               className={cn(
-                "flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-good-soft text-[15px] text-good",
+                "flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-good-soft text-[15px] text-good hover:opacity-90",
                 !party.mobile && "pointer-events-none opacity-40",
               )}
             >
-              <MessageCircle size={16} strokeWidth={1.75} aria-hidden /> WhatsApp
+              <MessageCircle size={16} strokeWidth={1.75} aria-hidden /> WhatsApp Reminder
             </a>
           </div>
           <DetailList

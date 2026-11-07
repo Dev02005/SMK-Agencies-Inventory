@@ -1,4 +1,4 @@
-import { FileText, Package, Printer, Truck } from "lucide-react";
+import { FileText, MessageCircle, Package, Printer, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,7 +8,7 @@ import { IconButtonLink } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
-import { getFirms, getGodowns, getNextBillNo, getProducts, getProfile, getSale } from "@/lib/data";
+import { getFirms, getGodowns, getNextBillNo, getParty, getProducts, getProfile, getSale } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { billName, saleStatus, transportLabels } from "@/lib/labels";
 import { lineQty } from "@/lib/quantities";
@@ -33,10 +33,45 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
   const { id } = await params;
   const sale = await getSale(id);
   if (!sale) notFound();
-  const [products, godowns, createdBy, firms, nextBillNo] = await Promise.all([getProducts(), getGodowns(), getProfile(sale.createdBy), getFirms(), getNextBillNo()]);
+  const [products, godowns, createdBy, firms, nextBillNo, party] = await Promise.all([
+    getProducts(),
+    getGodowns(),
+    getProfile(sale.createdBy),
+    getFirms(),
+    getNextBillNo(),
+    getParty(sale.partyId),
+  ]);
   const firm = firms.find((f) => f.id === sale.firmId) ?? firms[0];
   const status = saleStatus[sale.status];
   const pending = sale.status === "pending_approval";
+
+  const waBillItems = sale.lines
+    .map((l) => {
+      const p = products.find((prod) => prod.id === l.productId);
+      return `  ▫️ ${p?.name || "Item"}: ${l.qty} ${p?.unit ?? "bags"} @ ₹${l.rate} = ₹${formatINR(l.qty * l.rate)}`;
+    })
+    .join("\n");
+
+  const waBillText = `📦 *SALE BILL #${sale.billNo}*
+━━━━━━━━━━━━━━━━━━━
+*${firm.name}*
+Polaki, Srikakulam Dist.
+
+నమస్కారం *${sale.partyName}* గారు,
+మీ సేల్స్ బిల్లు వివరాలు:
+
+• *Bill No:* #${sale.billNo}
+• *Date:* ${sale.billDate}
+• *Items:*
+${waBillItems}
+• *Total Bill Amount:* *₹${formatINR(sale.total)}*
+
+📞 సంప్రదించండి: *${firm.phone}* / 99636 84551
+━━━━━━━━━━━━━━━━━━━`;
+
+  const waBillLink = party?.mobile
+    ? `https://wa.me/91${party.mobile}?text=${encodeURIComponent(waBillText)}`
+    : undefined;
   const requestLines: RequestLine[] = sale.lines.map((l) => {
     const product = products.find((p) => p.id === l.productId);
     const unit = product?.unit ?? "bag";
@@ -64,14 +99,26 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
           </span>
         }
         actions={
-          <>
+          <div className="flex items-center gap-2">
             <SampleChip />
+            {sale.status === "saved" && party?.mobile && (
+              <a
+                href={waBillLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Send bill on WhatsApp"
+                aria-label="Send bill on WhatsApp"
+                className="grid size-10 place-items-center rounded-2xl bg-good-soft text-good hover:opacity-90 transition-opacity"
+              >
+                <MessageCircle size={19} strokeWidth={1.9} aria-hidden />
+              </a>
+            )}
             {sale.status === "saved" && (
               <IconButtonLink href={`/sales/${sale.id}/print`} label="Print bill" variant="primary">
                 <Printer size={19} strokeWidth={1.9} aria-hidden />
               </IconButtonLink>
             )}
-          </>
+          </div>
         }
       />
 

@@ -1,4 +1,4 @@
-import { BellRing, ChevronRight, CircleUserRound, DatabaseBackup, Landmark, MapPin, Package, ReceiptText, UserCog, Warehouse } from "lucide-react";
+import { BellRing, ChevronRight, CircleUserRound, DatabaseBackup, Landmark, MapPin, MessageSquare, Package, ReceiptText, UserCog, Warehouse } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SampleChip } from "@/components/ui/blocks";
@@ -19,7 +19,8 @@ const masters: Item[] = [
   { href: "/settings/lists", title: "Destinations & rent drivers", description: "The lists offered on New sale: add or delete", icon: MapPin, live: true, tone: "green" },
   { href: "/settings/users", title: "Users & roles", description: "Who can log in and what they see", icon: UserCog, live: true, tone: "blue", ownerOnly: true },
   { href: "/settings", title: "Expense heads", description: "Rent, driver payments, salaries… · editable once the database is connected", icon: ReceiptText, live: false, tone: "grey" },
-  { href: "/settings/reminders", title: "Reminder messages", description: "WhatsApp and SMS messages and when they go", icon: BellRing, live: true, tone: "green" },
+  { href: "/settings/whatsapp", title: "WhatsApp Bot & Reminders", description: "Automated payment receipts, balance reminders & 2-way Telugu bot", icon: MessageSquare, live: true, tone: "green" },
+  { href: "/settings/reminders", title: "Reminder messages", description: "WhatsApp and SMS message rules and schedules", icon: BellRing, live: true, tone: "teal" },
   { href: "/settings", title: "Backups", description: "Daily backups and restore checks · set up with the database", icon: DatabaseBackup, live: false, tone: "grey" },
 ];
 

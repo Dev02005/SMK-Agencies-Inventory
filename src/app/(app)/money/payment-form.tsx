@@ -13,8 +13,9 @@ import { cn } from "@/lib/cn";
 import type { PaymentMode } from "@/lib/data/types";
 import { formatBalance, formatINR } from "@/lib/format";
 import { createPaymentAction, createReceiptAction } from "./actions";
+import { SendReceiptModal } from "@/components/whatsapp/send-receipt-modal";
 
-type PartyOption = { id: string; name: string; place?: string; balance: number };
+type PartyOption = { id: string; name: string; place?: string; balance: number; mobile?: string };
 
 /**
  * Receipt (money in from a customer) or payment (money out to a company or lorry owner).
@@ -50,6 +51,16 @@ export function PaymentForm({
   const isReceipt = kind === "receipt";
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [savedReceiptForWhatsApp, setSavedReceiptForWhatsApp] = useState<{
+    receiptNo: number;
+    partyName: string;
+    partyMobile?: string;
+    amount: number;
+    mode: string;
+    date: string;
+    balanceAfter: number;
+    remarks?: string;
+  } | null>(null);
 
   const missing = !party
     ? `Choose the party ${isReceipt ? "who paid" : "being paid"}.`
@@ -78,6 +89,17 @@ export function PaymentForm({
         return;
       }
       toast(`Receipt #${result.receipt.receiptNo} recorded successfully`);
+      setSavedReceiptForWhatsApp({
+        receiptNo: result.receipt.receiptNo,
+        partyName: party?.name ?? "Customer",
+        partyMobile: party?.mobile,
+        amount: value,
+        mode,
+        date,
+        balanceAfter: after,
+        remarks: memo.trim() || undefined,
+      });
+      return;
     } else {
       const result = await createPaymentAction({
         partyId,
@@ -207,6 +229,23 @@ export function PaymentForm({
         summary={{ label: "Amount", value: formatINR(value) }}
         onSubmit={save}
       />
+
+      {savedReceiptForWhatsApp && (
+        <SendReceiptModal
+          receiptNo={savedReceiptForWhatsApp.receiptNo}
+          partyName={savedReceiptForWhatsApp.partyName}
+          partyMobile={savedReceiptForWhatsApp.partyMobile}
+          amount={savedReceiptForWhatsApp.amount}
+          mode={savedReceiptForWhatsApp.mode}
+          date={savedReceiptForWhatsApp.date}
+          balanceAfter={savedReceiptForWhatsApp.balanceAfter}
+          remarks={savedReceiptForWhatsApp.remarks}
+          onClose={() => {
+            setSavedReceiptForWhatsApp(null);
+            router.push("/money");
+          }}
+        />
+      )}
     </form>
   );
 }

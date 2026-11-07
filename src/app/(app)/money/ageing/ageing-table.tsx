@@ -2,7 +2,7 @@
 
 import { Send } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { StatCard, StatRow } from "@/components/ui/blocks";
 import { IconButton } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import type { Ageing } from "@/lib/data/types";
 import { formatINR, formatShortDate } from "@/lib/format";
+import { sendBatchRemindersAction } from "@/app/(app)/settings/whatsapp/actions";
 
 type Row = {
   id: string;
@@ -50,6 +51,24 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
       return next;
     });
 
+  const [pending, startTransition] = useTransition();
+
+  function handleSendBatchReminders() {
+    if (selected.size === 0) return;
+    startTransition(async () => {
+      const res = await sendBatchRemindersAction(Array.from(selected));
+      if (res.ok) {
+        toast(`${res.sentCount} WhatsApp reminder${res.sentCount === 1 ? "" : "s"} dispatched with bank & UPI details!`);
+        // If 1 party, open wa.me link directly
+        if (res.results.length === 1 && res.results[0].waLink) {
+          window.open(res.results[0].waLink, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        toast("Failed to dispatch reminders.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
       <StatRow>
@@ -70,11 +89,11 @@ export function AgeingTable({ rows }: { rows: Row[] }) {
           ]}
         />
         <IconButton
-          label="Send reminders"
+          label={pending ? "Sending..." : "Send reminders"}
           variant="primary"
           badge={selected.size}
-          disabled={selected.size === 0}
-          onClick={() => toast(`${selected.size} WhatsApp reminder${selected.size === 1 ? "" : "s"} scheduled and sent.`)}
+          disabled={selected.size === 0 || pending}
+          onClick={handleSendBatchReminders}
         >
           <Send size={18} strokeWidth={1.9} aria-hidden />
         </IconButton>

@@ -28,7 +28,7 @@ async function FormForToday() {
       kind="receipt"
       parties={parties
         .filter((p) => p.kind === "customer" || p.kind === "sub_dealer")
-        .map((p) => ({ id: p.id, name: p.name, place: p.place, balance: p.balance }))}
+        .map((p) => ({ id: p.id, name: p.name, place: p.place, balance: p.balance, mobile: p.mobile }))}
       staff={profiles.filter((p) => p.role !== "driver").map((p) => ({ id: p.id, name: p.fullName }))}
       today={todayISO()}
     />
