@@ -215,10 +215,10 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     <div className="w-full">
       {/* Title & Subtitle */}
       <div>
-        <h1 className="font-serif text-[32px] sm:text-[38px] font-medium tracking-tight text-[#0f172a]">
+        <h1 className="font-serif text-[26px] sm:text-[30px] font-medium tracking-tight text-[#0f172a]">
           {step === 1 ? "Welcome back" : `Welcome back, ${confirmedPerson?.name.split(" ")[0]}`}
         </h1>
-        <p className="mt-1.5 text-[14.5px] text-[#64748b]">
+        <p className="mt-1 text-[13px] text-[#64748b]">
           {step === 1
             ? "Enter your registered mobile number to continue."
             : "Confirm your account and enter your 6-digit security PIN."}
@@ -231,11 +231,11 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
 
       {/* Forgot Password guidance */}
       {showForgotNotice && (
-        <div className="mt-5 rounded-2xl bg-[#0068d1]/10 border border-[#0068d1]/20 p-4 text-[13px] text-[#0f172a] flex items-start gap-3">
-          <Info className="size-4.5 text-[#0068d1] shrink-0 mt-0.5" />
+        <div className="mt-3.5 rounded-xl bg-[#0068d1]/10 border border-[#0068d1]/20 p-3 text-[12.5px] text-[#0f172a] flex items-start gap-2.5">
+          <Info className="size-4 text-[#0068d1] shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold text-[#0f172a]">Sign-in PIN Help</p>
-            <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#475569]">
+            <p className="mt-0.5 text-[12px] leading-relaxed text-[#475569]">
               Default PIN for all accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
               If you updated your PIN and forgot it, please contact the proprietor (Kamesh Potnuru) to reset it.
             </p>
@@ -246,7 +246,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
             className="text-[#94a3b8] hover:text-[#0f172a] p-0.5 cursor-pointer"
             aria-label="Dismiss notice"
           >
-            <X className="size-4" />
+            <X className="size-3.5" />
           </button>
         </div>
       )}
@@ -255,9 +255,9 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
       {problem && (
         <div
           role="alert"
-          className="mt-5 rounded-2xl bg-danger-soft border border-danger/20 px-4 py-3 text-[13.5px] text-danger flex items-center gap-2.5"
+          className="mt-3.5 rounded-xl bg-danger-soft border border-danger/20 px-3.5 py-2.5 text-[13px] text-danger flex items-center gap-2"
         >
-          <AlertCircle className="size-4.5 shrink-0" />
+          <AlertCircle className="size-4 shrink-0" />
           <span>{problem}</span>
         </div>
       )}
@@ -269,21 +269,21 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
             e.preventDefault();
             handleFetchAccount();
           }}
-          className="mt-7 space-y-5"
+          className="mt-4 space-y-3.5"
         >
           {!useDirectoryView ? (
             /* Primary Mobile Number Input */
             <div>
               <label
                 htmlFor={`${id}-mobile`}
-                className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+                className="block text-[10px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-1.5"
               >
                 REGISTERED MOBILE NUMBER
               </label>
 
               <div className="relative">
-                <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#64748b] font-medium text-[15px]">
-                  <Phone className="size-[17px] text-[#94a3b8]" />
+                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#64748b] font-medium text-[14.5px]">
+                  <Phone className="size-4 text-[#94a3b8]" />
                   <span>+91</span>
                 </div>
                 <input
@@ -299,12 +299,12 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                     if (problem) setProblem(null);
                   }}
                   placeholder="Enter 10-digit mobile number"
-                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-20 pr-4 text-[16px] text-[#0f172a] font-medium tracking-wide shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+                  className="h-[46px] w-full rounded-xl border border-[#e2e8f0] bg-white pl-18 pr-4 text-[15px] text-[#0f172a] font-medium tracking-wide shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
 
-              <div className="mt-2 flex justify-between items-center text-[12px] px-1">
+              <div className="mt-1.5 flex justify-between items-center text-[11.5px] px-1">
                 <span className="text-[#94a3b8]">Owner / Staff 10-digit number</span>
                 <button
                   type="button"
@@ -323,7 +323,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
             /* Secondary Directory Dropdown View */
             <div className="relative" ref={dropdownRef}>
               <label
-                className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+                className="block text-[10px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-1.5"
               >
                 SELECT STAFF ACCOUNT
               </label>
@@ -331,24 +331,24 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
               <button
                 type="button"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                className="h-[46px] w-full rounded-xl border border-[#e2e8f0] bg-white px-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
                 aria-expanded={isDropdownOpen}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <User className="size-4 text-[#94a3b8] shrink-0" aria-hidden />
                   <div className="min-w-0 flex items-center gap-2">
-                    <span className="text-[15px] font-medium text-[#0f172a] truncate">
+                    <span className="text-[14.5px] font-medium text-[#0f172a] truncate">
                       {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
                     </span>
                     {selectedPerson?.designation && (
-                      <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                      <span className="shrink-0 text-[11px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
                         {selectedPerson.designation}
                       </span>
                     )}
                   </div>
                 </div>
                 <ChevronDown
-                  className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
+                  className={`size-4 text-[#94a3b8] shrink-0 transition-transform duration-200 ${
                     isDropdownOpen ? "rotate-180" : ""
                   }`}
                   aria-hidden
@@ -430,17 +430,17 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           <button
             type="submit"
             disabled={pending || (!useDirectoryView && mobileNumber.trim().length < 5)}
-            className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full h-[46px] rounded-xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[14.5px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
             {pending ? (
               <>
-                <LoaderCircle className="size-4.5 animate-spin" />
+                <LoaderCircle className="size-4 animate-spin" />
                 <span>Fetching account from database…</span>
               </>
             ) : (
               <>
                 <span>Continue</span>
-                <ArrowRight className="size-4.5" />
+                <ArrowRight className="size-4" />
               </>
             )}
           </button>
@@ -452,29 +452,29 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
             e.preventDefault();
             handleSignIn();
           }}
-          className="mt-6 space-y-5"
+          className="mt-3.5 space-y-3"
         >
           {/* Confirmed Person Card from Database */}
           {confirmedPerson && (
-            <div className="rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] p-4 flex items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink-900 text-gold-300 text-[14px] font-bold shrink-0 shadow-xs">
+            <div className="rounded-xl bg-[#f8fafc] border border-[#e2e8f0] p-2.5 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-ink-900 text-gold-300 text-[13px] font-bold shrink-0 shadow-xs">
                   {confirmedPerson.initials}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[15px] font-bold text-[#0f172a] truncate">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[14px] font-bold text-[#0f172a] truncate">
                       {confirmedPerson.name}
                     </p>
-                    <ShieldCheck className="size-4 text-[#10b981] shrink-0" aria-label="Verified staff" />
+                    <ShieldCheck className="size-3.5 text-[#10b981] shrink-0" aria-label="Verified staff" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-0.5">
                     {confirmedPerson.designation && (
-                      <span className="text-[11px] font-semibold text-gold-600 bg-gold-50 border border-gold-200/60 px-2 py-0.5 rounded-full">
+                      <span className="text-[10.5px] font-semibold text-gold-600 bg-gold-50 border border-gold-200/60 px-1.5 py-0.2 rounded-full">
                         {confirmedPerson.designation}
                       </span>
                     )}
-                    <span className="text-[12px] text-[#64748b] truncate">
+                    <span className="text-[11.5px] text-[#64748b] truncate">
                       +91 {confirmedPerson.loginId}
                     </span>
                   </div>
@@ -488,7 +488,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                   setPassword("");
                   setProblem(null);
                 }}
-                className="text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer shrink-0 px-2.5 py-1.5 rounded-lg hover:bg-[#0068d1]/5"
+                className="text-[11.5px] font-semibold text-[#0068d1] hover:underline cursor-pointer shrink-0 px-2 py-1 rounded-lg hover:bg-[#0068d1]/5"
               >
                 Change
               </button>
@@ -497,18 +497,18 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
 
           {/* 6-DIGIT PIN INPUT */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <label
                 htmlFor={`${id}-password`}
-                className="text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase"
+                className="text-[10px] font-bold tracking-[0.1em] text-[#64748b] uppercase"
               >
                 6-DIGIT SIGN-IN PIN
               </label>
-              <span className="text-[11px] text-[#94a3b8] font-medium">Default: 000000</span>
+              <span className="text-[10.5px] text-[#94a3b8] font-medium">Default: 000000</span>
             </div>
 
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-[#94a3b8]" />
               <input
                 id={`${id}-password`}
                 ref={passwordInputRef}
@@ -523,7 +523,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                 maxLength={CODE_LENGTH}
                 inputMode="numeric"
                 autoComplete="current-password"
-                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-12 text-[18px] text-[#0f172a] tracking-widest font-mono shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+                className="h-[46px] w-full rounded-xl border border-[#e2e8f0] bg-white pl-10 pr-11 text-[17px] text-[#0f172a] tracking-widest font-mono shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
               />
               <button
                 type="button"
@@ -531,26 +531,26 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                 aria-label={showPassword ? "Hide PIN" : "Show PIN"}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#475569] p-1 cursor-pointer transition-colors"
               >
-                {showPassword ? <EyeOff className="size-[19px]" /> : <Eye className="size-[19px]" />}
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
           </div>
 
           {/* REMEMBER ME & FORGOT PIN */}
-          <div className="flex items-center justify-between text-[13px] pt-1">
+          <div className="flex items-center justify-between text-[12px] pt-0.5">
             <label className="flex items-center gap-2 text-[#475569] cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="size-4 rounded border-[#cbd5e1] text-[#0068d1] accent-[#0068d1] focus:ring-[#0068d1] cursor-pointer"
+                className="size-3.5 rounded border-[#cbd5e1] text-[#0068d1] accent-[#0068d1] focus:ring-[#0068d1] cursor-pointer"
               />
-              <span className="text-[13.5px]">Remember me</span>
+              <span className="text-[12.5px]">Remember me</span>
             </label>
             <button
               type="button"
               onClick={() => setShowForgotNotice(true)}
-              className="font-medium text-[#0068d1] hover:underline focus:outline-none cursor-pointer text-[13px]"
+              className="font-medium text-[#0068d1] hover:underline focus:outline-none cursor-pointer text-[12px]"
             >
               Forgot PIN?
             </button>
@@ -560,11 +560,11 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           <button
             type="submit"
             disabled={pending || password.length !== CODE_LENGTH}
-            className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full h-[46px] rounded-xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[14.5px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
             {pending ? (
               <>
-                <LoaderCircle className="size-4.5 animate-spin" />
+                <LoaderCircle className="size-4 animate-spin" />
                 <span>Signing in…</span>
               </>
             ) : (
@@ -573,7 +573,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           </button>
 
           {/* Back button */}
-          <div className="text-center pt-1">
+          <div className="text-center pt-0.5">
             <button
               type="button"
               onClick={() => {
@@ -581,9 +581,9 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                 setPassword("");
                 setProblem(null);
               }}
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#64748b] hover:text-[#0f172a] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#64748b] hover:text-[#0f172a] cursor-pointer"
             >
-              <ArrowLeft size={14} />
+              <ArrowLeft size={13} />
               <span>Back to change mobile number</span>
             </button>
           </div>

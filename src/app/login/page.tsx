@@ -103,14 +103,14 @@ export default async function LoginPage() {
   };
 
   return (
-    <main className="min-h-dvh w-full flex flex-col lg:grid lg:grid-cols-12 bg-white">
+    <main className="h-dvh max-h-dvh w-full overflow-hidden flex flex-col lg:grid lg:grid-cols-12 bg-white selection:bg-[#0068d1] selection:text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(business).replace(/</g, "\u003c") }}
       />
 
       {/* LEFT COLUMN: Customer-Facing Brand Showcase with Geometric Wireframe (Dark Executive Theme) */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#061224] via-[#091b36] to-[#040d1a] text-white lg:col-span-7 xl:col-span-7 flex flex-col justify-between p-6 sm:p-10 lg:p-14 min-h-[500px] lg:min-h-dvh selection:bg-[#0068d1] selection:text-white">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#061224] via-[#091b36] to-[#040d1a] text-white lg:col-span-7 xl:col-span-7 flex flex-col justify-between p-5 sm:p-7 lg:p-7 xl:p-9 h-full max-h-dvh">
         {/* Ambient Radial Lighting */}
         <div
           className="absolute -top-32 -left-32 size-96 rounded-full bg-[#0068d1]/15 blur-3xl pointer-events-none"
@@ -122,95 +122,95 @@ export default async function LoginPage() {
         />
 
         {/* Geometric Spirograph Graphic in bottom right */}
-        <div className="absolute -bottom-24 -right-24 w-[480px] sm:w-[560px] text-white/30 pointer-events-none select-none">
+        <div className="absolute -bottom-28 -right-28 w-[420px] sm:w-[500px] text-white/25 pointer-events-none select-none">
           <SpirographMesh className="w-full h-auto" />
         </div>
 
         {/* TOP BRAND HEADER */}
-        <div className="relative z-10 flex items-center gap-3.5 sm:gap-4">
-          <div className="size-12 sm:size-13 rounded-2xl bg-gradient-to-tr from-[#ea580c] via-[#f59e0b] to-[#fbbf24] p-0.5 shadow-lg flex items-center justify-center shrink-0 border border-white/20">
-            <div className="size-full rounded-[14px] bg-[#0c1e38]/90 flex items-center justify-center p-1.5 backdrop-blur-sm">
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="size-10 sm:size-11 rounded-xl bg-gradient-to-tr from-[#ea580c] via-[#f59e0b] to-[#fbbf24] p-0.5 shadow-md flex items-center justify-center shrink-0 border border-white/20">
+            <div className="size-full rounded-[10px] bg-[#0c1e38]/90 flex items-center justify-center p-1 backdrop-blur-sm">
               <Image
                 src="/logo.png"
                 alt="SKA"
-                width={40}
-                height={40}
+                width={34}
+                height={34}
                 priority
                 className="object-contain"
               />
             </div>
           </div>
           <div>
-            <h2 className="text-[18px] sm:text-[20px] font-bold tracking-tight text-white leading-tight">
+            <h2 className="text-[17px] sm:text-[18px] font-bold tracking-tight text-white leading-tight">
               {firm.name}
             </h2>
-            <p className="text-[10px] sm:text-[11px] font-semibold tracking-[0.2em] text-[#38bdf8] uppercase mt-0.5">
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-[#38bdf8] uppercase">
               Cement &amp; Steel Wholesale &amp; Retail
             </p>
-            <p className="text-[12px] sm:text-[12.5px] text-white/75 font-medium mt-0.5">
+            <p className="text-[11.5px] text-white/75 font-medium">
               Proprietor: Kamesh Potnuru
             </p>
           </div>
         </div>
 
         {/* MIDDLE HERO CONTENT & CUSTOMER-FACING HIGHLIGHT CARDS */}
-        <div className="relative z-10 my-8 sm:my-10 lg:my-0 max-w-xl">
+        <div className="relative z-10 my-auto py-2 max-w-xl">
           {/* Eyebrow */}
-          <div className="inline-flex items-center gap-2 mb-3">
+          <div className="inline-flex items-center gap-1.5 mb-1.5">
             <span className="size-1.5 rounded-full bg-[#38bdf8]" />
-            <span className="text-[11px] font-bold tracking-[0.25em] text-[#38bdf8] uppercase">
+            <span className="text-[10px] sm:text-[10.5px] font-bold tracking-[0.22em] text-[#38bdf8] uppercase">
               DEALERSHIP PORTAL
             </span>
           </div>
 
           {/* Hero Headline */}
-          <h1 className="font-serif text-[34px] sm:text-[42px] xl:text-[46px] font-normal leading-[1.15] text-white tracking-tight">
+          <h1 className="font-serif text-[26px] sm:text-[32px] xl:text-[36px] font-normal leading-[1.12] text-white tracking-tight">
             Every shipment,{" "}
             <span className="italic font-serif text-[#93c5fd]">flawlessly</span> managed.
           </h1>
 
           {/* Location & Dealership Subtitle */}
-          <p className="mt-3.5 text-[13px] sm:text-[13.5px] leading-relaxed text-slate-300/80">
+          <p className="mt-2 text-[12px] sm:text-[12.5px] leading-relaxed text-slate-300/80 line-clamp-2">
             Authorized Dealer: UltraTech · Maha · Deccan · Sagar Cements · Premium TMT Steel &amp; MS Bars ·
             Godowns at Polaki &amp; Srikakulam · Direct Mill Supplies · {firm.phone} / 99636 84551
           </p>
 
           {/* 3 Reference Feature Cards (Matching Reference Image) */}
-          <div className="mt-8 space-y-3.5">
+          <div className="mt-3.5 sm:mt-5 space-y-2 sm:space-y-2.5">
             {/* Card 1: Multi-Godown Inventory */}
-            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-500/15 border border-sky-400/30 text-sky-400 shrink-0">
-                <Warehouse size={24} strokeWidth={2} aria-hidden />
+            <div className="rounded-xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-2.5 sm:p-3 backdrop-blur-md transition-all flex items-center gap-3.5 shadow-xs">
+              <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-sky-500/15 border border-sky-400/30 text-sky-400 shrink-0">
+                <Warehouse size={19} strokeWidth={2} aria-hidden />
               </div>
               <div>
-                <p className="text-[15.5px] font-bold text-white tracking-tight">Multi-Godown Inventory</p>
-                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                <p className="text-[13.5px] sm:text-[14px] font-bold text-white tracking-tight">Multi-Godown Inventory</p>
+                <p className="text-[11px] sm:text-[11.5px] text-slate-300/80 leading-snug mt-0.5">
                   Live stock tracking across Polaki, Srikakulam &amp; company depot godowns
                 </p>
               </div>
             </div>
 
             {/* Card 2: Wholesale & Retail Billing */}
-            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-400 shrink-0">
-                <Receipt size={24} strokeWidth={2} aria-hidden />
+            <div className="rounded-xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-2.5 sm:p-3 backdrop-blur-md transition-all flex items-center gap-3.5 shadow-xs">
+              <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-400 shrink-0">
+                <Receipt size={19} strokeWidth={2} aria-hidden />
               </div>
               <div>
-                <p className="text-[15.5px] font-bold text-white tracking-tight">Wholesale &amp; Retail Billing</p>
-                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                <p className="text-[13.5px] sm:text-[14px] font-bold text-white tracking-tight">Wholesale &amp; Retail Billing</p>
+                <p className="text-[11px] sm:text-[11.5px] text-slate-300/80 leading-snug mt-0.5">
                   Instant counter sales, wholesale orders &amp; owner price approval workflow
                 </p>
               </div>
             </div>
 
             {/* Card 3: Mill Dispatches & Fleet */}
-            <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-400 shrink-0">
-                <Truck size={24} strokeWidth={2} aria-hidden />
+            <div className="rounded-xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-2.5 sm:p-3 backdrop-blur-md transition-all flex items-center gap-3.5 shadow-xs">
+              <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-400 shrink-0">
+                <Truck size={19} strokeWidth={2} aria-hidden />
               </div>
               <div>
-                <p className="text-[15.5px] font-bold text-white tracking-tight">Mill Dispatches &amp; Fleet</p>
-                <p className="text-[12.5px] sm:text-[13px] text-slate-300/80 leading-snug mt-1">
+                <p className="text-[13.5px] sm:text-[14px] font-bold text-white tracking-tight">Mill Dispatches &amp; Fleet</p>
+                <p className="text-[11px] sm:text-[11.5px] text-slate-300/80 leading-snug mt-0.5">
                   Direct mill lorry shipments, freight tracking &amp; driver cash management
                 </p>
               </div>
@@ -219,15 +219,15 @@ export default async function LoginPage() {
         </div>
 
         {/* BOTTOM FOOTER */}
-        <div className="relative z-10 pt-4 text-[12px] text-slate-400/70 font-medium flex items-center justify-between">
+        <div className="relative z-10 pt-2 text-[11px] text-slate-400/70 font-medium flex items-center justify-between">
           <p>© 2026 D2W</p>
           <p className="hidden sm:block text-slate-500/60">Authorized Commercial Dealership</p>
         </div>
       </section>
 
       {/* RIGHT COLUMN: Clean White Sign-in Form */}
-      <section className="lg:col-span-5 xl:col-span-5 flex items-center justify-center p-6 sm:p-10 lg:p-14 bg-[#fafafc] lg:bg-white">
-        <div className="w-full max-w-[420px] sm:max-w-[440px]">
+      <section className="lg:col-span-5 xl:col-span-5 flex items-center justify-center p-5 sm:p-7 lg:p-7 xl:p-9 bg-[#fafafc] lg:bg-white h-full max-h-dvh overflow-hidden">
+        <div className="w-full max-w-[380px] sm:max-w-[400px]">
           <Suspense fallback={<LoginFormSkeleton />}>
             <LoginPanel />
           </Suspense>
