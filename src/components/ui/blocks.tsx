@@ -3,19 +3,24 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { usesSampleData } from "@/lib/supabase/config";
 import { Chip } from "./chip";
-export { IconBadge, iconBadgeClass, type IconBadgeTone, type IconBadgeSize } from "./icon-badge";
+export { IconBadge, iconBadgeClass, Squircle, type IconBadgeTone, type IconBadgeSize } from "./icon-badge";
 
 import type { LucideIcon } from "lucide-react";
 
 const iconToneStyles: Record<string, string> = {
-  accent: "bg-accent-soft text-accent",
-  good: "bg-good-soft text-good",
-  danger: "bg-danger-soft text-danger",
-  warning: "bg-warning-soft text-warning",
-  teal: "bg-teal-soft text-teal",
-  purple: "bg-purple-soft text-purple",
-  dark: "bg-[#0c192c] text-white",
-  neutral: "bg-hairline text-ink-secondary",
+  gold: "bg-gold-50 text-gold-600 border border-gold-200/60",
+  dark: "bg-ink-900 text-gold-300 shadow-xs",
+  emerald: "bg-emerald-50 text-emerald-600 border border-emerald-200/60",
+  good: "bg-emerald-50 text-emerald-600 border border-emerald-200/60",
+  rose: "bg-rose-50 text-rose-600 border border-rose-200/60",
+  danger: "bg-rose-50 text-rose-600 border border-rose-200/60",
+  sky: "bg-sky-50 text-sky-600 border border-sky-200/60",
+  accent: "bg-gold-50 text-gold-600 border border-gold-200/60",
+  amber: "bg-amber-50 text-amber-600 border border-amber-200/60",
+  warning: "bg-amber-50 text-amber-600 border border-amber-200/60",
+  teal: "bg-sky-50 text-sky-600 border border-sky-200/60",
+  purple: "bg-purple-soft text-purple border border-purple-200/60",
+  neutral: "bg-card-subtle text-ink-secondary border border-hairline",
 };
 
 /** White card with a title row and an optional action link on the right. */
@@ -29,7 +34,7 @@ export function SectionCard({
 }: {
   title?: ReactNode;
   icon?: LucideIcon;
-  iconTone?: "accent" | "good" | "danger" | "warning" | "teal" | "purple" | "dark" | "neutral";
+  iconTone?: "gold" | "dark" | "emerald" | "good" | "rose" | "danger" | "sky" | "accent" | "amber" | "warning" | "teal" | "purple" | "neutral";
   action?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -39,10 +44,10 @@ export function SectionCard({
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title && (
-            <h2 className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.3px] text-ink">
+            <h2 className="flex items-center gap-3 text-[17px] font-semibold tracking-[-0.3px] text-ink">
               {Icon ? (
-                <span className={cn("grid size-7 place-items-center rounded-lg shrink-0", iconToneStyles[iconTone])}>
-                  <Icon size={14} strokeWidth={2.2} aria-hidden />
+                <span className={cn("grid h-9 w-9 place-items-center rounded-xl shrink-0", iconToneStyles[iconTone])}>
+                  <Icon size={17} strokeWidth={2.2} aria-hidden />
                 </span>
               ) : (
                 <span className="block h-[18px] w-1 shrink-0 rounded-full bg-[linear-gradient(180deg,var(--accent),var(--teal))]" />

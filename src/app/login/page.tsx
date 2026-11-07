@@ -179,8 +179,8 @@ export default async function LoginPage() {
           <div className="mt-8 space-y-3.5">
             {/* Card 1: Multi-Godown Inventory */}
             <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="size-12 rounded-[16px] bg-[#0284c7]/20 border border-[#38bdf8]/35 flex items-center justify-center text-[#38bdf8] shrink-0">
-                <Warehouse className="size-[22px]" strokeWidth={2} />
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-sky-500/15 border border-sky-400/30 text-sky-400 shrink-0">
+                <Warehouse size={24} strokeWidth={2} aria-hidden />
               </div>
               <div>
                 <p className="text-[15.5px] font-bold text-white tracking-tight">Multi-Godown Inventory</p>
@@ -192,8 +192,8 @@ export default async function LoginPage() {
 
             {/* Card 2: Wholesale & Retail Billing */}
             <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="size-12 rounded-[16px] bg-[#16a34a]/20 border border-[#4ade80]/35 flex items-center justify-center text-[#4ade80] shrink-0">
-                <Receipt className="size-[22px]" strokeWidth={2} />
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-400 shrink-0">
+                <Receipt size={24} strokeWidth={2} aria-hidden />
               </div>
               <div>
                 <p className="text-[15.5px] font-bold text-white tracking-tight">Wholesale &amp; Retail Billing</p>
@@ -205,8 +205,8 @@ export default async function LoginPage() {
 
             {/* Card 3: Mill Dispatches & Fleet */}
             <div className="rounded-[22px] bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-4 backdrop-blur-md transition-all flex items-center gap-4 shadow-sm">
-              <div className="size-12 rounded-[16px] bg-[#d97706]/20 border border-[#fbbf24]/35 flex items-center justify-center text-[#fbbf24] shrink-0">
-                <Truck className="size-[22px]" strokeWidth={2} />
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/15 border border-amber-400/30 text-amber-400 shrink-0">
+                <Truck size={24} strokeWidth={2} aria-hidden />
               </div>
               <div>
                 <p className="text-[15.5px] font-bold text-white tracking-tight">Mill Dispatches &amp; Fleet</p>

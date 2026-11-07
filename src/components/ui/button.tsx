@@ -3,7 +3,7 @@ import { LoaderCircle, type LucideIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "plain" | "ghost" | "danger" | "gold";
+export type ButtonVariant = "primary" | "secondary" | "plain" | "ghost" | "danger" | "gold" | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
@@ -21,7 +21,8 @@ const variants: Record<ButtonVariant, string> = {
   plain: "h-auto px-0 text-[15px] text-link hover:underline bg-transparent",
   ghost: "text-ink-secondary hover:bg-hairline hover:text-ink bg-transparent",
   danger: "bg-danger text-white hover:bg-danger/90 shadow-xs",
-  gold: "bg-amber-500/10 text-amber-600 border border-amber-500/30 hover:bg-amber-500/20",
+  gold: "bg-gold-50 text-gold-600 border border-gold-200 hover:bg-gold-100 shadow-xs",
+  outline: "border border-hairline bg-card text-ink hover:bg-hairline/60 shadow-xs",
 };
 
 function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", className?: string) {
@@ -89,7 +90,8 @@ const iconVariants: Record<ButtonVariant, string> = {
   plain: "text-accent hover:bg-accent-soft bg-transparent",
   ghost: "text-ink-tertiary hover:bg-hairline hover:text-ink bg-transparent",
   danger: "bg-danger-soft text-danger hover:bg-danger hover:text-white",
-  gold: "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20",
+  gold: "bg-gold-50 text-gold-600 hover:bg-gold-100",
+  outline: "border border-hairline bg-card text-ink hover:bg-hairline/60 shadow-xs",
 };
 
 /** Signature squircle icon button */
@@ -155,5 +157,40 @@ export function IconButtonLink({
       className={iconButtonClass(variant, size, className)}
       {...props}
     />
+  );
+}
+
+/**
+ * Data table action icon button matching ICON_STYLES.md Section 6.
+ * Standard size={16}, subtle hover state on table rows.
+ */
+export function TableActionButton({
+  icon: Icon,
+  title,
+  onClick,
+  className,
+  size = 16,
+  ...props
+}: {
+  icon: LucideIcon;
+  title: string;
+  onClick?: () => void;
+  className?: string;
+  size?: number;
+} & Omit<ComponentProps<"button">, "title">) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={cn(
+        "cursor-pointer rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-ink-900",
+        className,
+      )}
+      {...props}
+    >
+      <Icon size={size} strokeWidth={2} aria-hidden />
+    </button>
   );
 }

@@ -43,12 +43,12 @@ export function ConfirmDelete({
         title={`Delete ${what}`}
         className={cn(
           compact
-            ? "grid size-9 shrink-0 place-items-center rounded-full text-ink-secondary hover:bg-danger-soft hover:text-danger"
+            ? "cursor-pointer rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-rose-600"
             : "inline-flex items-center gap-1.5 text-[14px] font-medium text-danger hover:underline",
           className,
         )}
       >
-        <Trash2 size={compact ? 16 : 15} strokeWidth={1.9} aria-hidden />
+        <Trash2 size={16} strokeWidth={1.9} aria-hidden />
         {!compact && (label ?? "Delete")}
       </button>
     );

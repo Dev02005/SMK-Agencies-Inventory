@@ -458,7 +458,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
           {confirmedPerson && (
             <div className="rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] p-4 flex items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="grid size-11 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] via-[#0284c7] to-[#38bdf8] text-[14px] font-bold text-white shrink-0 shadow-sm">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink-900 text-gold-300 text-[14px] font-bold shrink-0 shadow-xs">
                   {confirmedPerson.initials}
                 </div>
                 <div className="min-w-0">
@@ -470,7 +470,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-0.5">
                     {confirmedPerson.designation && (
-                      <span className="text-[11px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                      <span className="text-[11px] font-semibold text-gold-600 bg-gold-50 border border-gold-200/60 px-2 py-0.5 rounded-full">
                         {confirmedPerson.designation}
                       </span>
                     )}

@@ -6,7 +6,7 @@ import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/lib/data/types";
-import { activeHref, sidebarGroups, toneClasses } from "@/lib/sections";
+import { activeHref, sidebarGroups } from "@/lib/sections";
 
 export function Sidebar({
   pathname,
@@ -89,7 +89,7 @@ export function Sidebar({
               <span className="line-clamp-1 text-[13.5px] font-bold tracking-tight text-white leading-tight">
                 {firmName}
               </span>
-              <span className="block text-[10px] font-semibold tracking-wider text-[#38bdf8] uppercase">
+              <span className="block text-[10px] font-semibold tracking-wider text-gold-400 uppercase">
                 DEALERSHIP PORTAL
               </span>
             </div>
@@ -174,14 +174,14 @@ export function Sidebar({
                           "group relative flex h-10 items-center gap-2.5 rounded-xl px-2.5 text-[14px] transition-all",
                           collapsed ? "justify-center px-1" : "justify-start",
                           isActive
-                            ? "bg-white/[0.14] font-semibold text-white shadow-xs"
-                            : "text-slate-300 hover:bg-white/[0.08] hover:text-white font-medium",
+                            ? "bg-white/10 font-semibold text-white shadow-xs"
+                            : "text-ink-200 hover:bg-white/5 hover:text-white font-medium",
                         )}
                       >
                         {/* Active Indicator Bar on Left */}
                         {isActive && (
                           <span
-                            className="absolute top-2 bottom-2 left-0 w-1 rounded-r-full bg-[#38bdf8] shadow-xs"
+                            className="absolute top-2 bottom-2 left-0 w-1 rounded-r-full bg-gold-400 shadow-xs"
                             aria-hidden="true"
                           />
                         )}
@@ -191,11 +191,19 @@ export function Sidebar({
                           className={cn(
                             "grid size-8 place-items-center rounded-xl shrink-0 transition-all",
                             isActive
-                              ? cn("shadow-xs", toneClasses[section.tone])
-                              : "bg-white/[0.06] text-slate-300 group-hover:bg-[#0068d1]/30 group-hover:text-[#38bdf8] group-hover:scale-105",
+                              ? "bg-white/10 text-gold-300 shadow-xs"
+                              : "bg-white/[0.04] text-ink-300 group-hover:bg-white/[0.08] group-hover:text-gold-200 group-hover:scale-105",
                           )}
                         >
-                          <Icon size={17} strokeWidth={isActive ? 2.2 : 1.85} aria-hidden />
+                          <Icon
+                            size={19}
+                            strokeWidth={isActive ? 2.2 : 1.85}
+                            className={cn(
+                              "shrink-0 transition-colors",
+                              isActive ? "text-gold-300" : "text-ink-300 group-hover:text-gold-200",
+                            )}
+                            aria-hidden
+                          />
                         </div>
 
                         {!collapsed && <span className="truncate">{section.title}</span>}
