@@ -1,4 +1,4 @@
-import { Printer } from "lucide-react";
+import { FileText, Package, Printer, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -81,7 +81,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
           <RoleGuard
             roles={["owner"]}
             fallback={
-              <SectionCard title="Items" className="lg:col-span-2">
+              <SectionCard title="Items" icon={Package} iconTone="accent" className="lg:col-span-2">
                 <ul className="divide-y divide-hairline">
                   {requestLines.map((l, i) => (
                     <li key={i} className="flex justify-between gap-4 py-3 text-[15px]">
@@ -105,7 +105,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
             />
           </RoleGuard>
         ) : (
-          <SectionCard title="Items" className="lg:col-span-2">
+          <SectionCard title="Items" icon={Package} iconTone="accent" className="lg:col-span-2">
             <ul className="divide-y divide-hairline">
               {sale.lines.map((l, i) => {
                 const product = products.find((p) => p.id === l.productId);
@@ -140,7 +140,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
         )}
 
         <div className="space-y-4">
-          <SectionCard title="Delivery">
+          <SectionCard title="Delivery" icon={Truck} iconTone="teal">
             <DetailList
               items={[
                 { label: "Load from", value: sale.source === "godown" ? godown?.name : `${sale.source === "lorry" ? "Lorry" : "Van"} ${sale.vehicleNo ?? ""}` },
@@ -150,7 +150,7 @@ async function SaleDetail({ params }: { params: PageProps<"/sales/[id]">["params
               ]}
             />
           </SectionCard>
-          <SectionCard title="Record">
+          <SectionCard title="Record" icon={FileText} iconTone="neutral">
             <DetailList
               items={[
                 { label: "Sales bill no.", value: sale.billNo ? `#${sale.billNo}` : "Pending assignment" },

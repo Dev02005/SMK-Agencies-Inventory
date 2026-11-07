@@ -1,4 +1,4 @@
-import { IndianRupee } from "lucide-react";
+import { CircleAlert, IndianRupee, Wallet } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
@@ -53,8 +53,8 @@ async function Dashboard() {
     <div className="grid gap-4 md:grid-cols-3">
       <section className="surface p-5 md:col-span-2 md:p-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
-            <IndianRupee size={16} strokeWidth={2} aria-hidden />
+          <span className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent shadow-xs">
+            <IndianRupee size={17} strokeWidth={2.2} aria-hidden />
           </span>
           <h2 className="text-[15px] text-ink-secondary">Today&apos;s sales</h2>
           <Link href="/sales/new" className="ml-auto text-[15px] text-link hover:underline">
@@ -70,7 +70,7 @@ async function Dashboard() {
         </p>
       </section>
 
-      <SectionCard title="Cash with staff">
+      <SectionCard title="Cash with staff" icon={Wallet} iconTone="good">
         <ul className="divide-y divide-hairline">
           {d.cashWithStaff.map((person) => (
             <li key={person.id} className="flex items-center gap-3 py-2.5">
@@ -100,6 +100,8 @@ async function Dashboard() {
 
       <SectionCard
         title="Needs your approval"
+        icon={CircleAlert}
+        iconTone="danger"
         action={<Chip tone={d.approvals.length ? "danger" : "neutral"}>{d.approvals.length}</Chip>}
         className="md:col-span-3 lg:col-span-2"
       >

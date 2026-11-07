@@ -3,15 +3,33 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { usesSampleData } from "@/lib/supabase/config";
 import { Chip } from "./chip";
+export { IconBadge, iconBadgeClass, type IconBadgeTone, type IconBadgeSize } from "./icon-badge";
+
+import type { LucideIcon } from "lucide-react";
+
+const iconToneStyles: Record<string, string> = {
+  accent: "bg-accent-soft text-accent",
+  good: "bg-good-soft text-good",
+  danger: "bg-danger-soft text-danger",
+  warning: "bg-warning-soft text-warning",
+  teal: "bg-teal-soft text-teal",
+  purple: "bg-purple-soft text-purple",
+  dark: "bg-[#0c192c] text-white",
+  neutral: "bg-hairline text-ink-secondary",
+};
 
 /** White card with a title row and an optional action link on the right. */
 export function SectionCard({
   title,
+  icon: Icon,
+  iconTone = "accent",
   action,
   className,
   children,
 }: {
   title?: ReactNode;
+  icon?: LucideIcon;
+  iconTone?: "accent" | "good" | "danger" | "warning" | "teal" | "purple" | "dark" | "neutral";
   action?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -21,7 +39,14 @@ export function SectionCard({
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title && (
-            <h2 className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.3px] text-ink before:block before:h-[18px] before:w-1 before:shrink-0 before:rounded-full before:bg-[linear-gradient(180deg,var(--accent),var(--teal))]">
+            <h2 className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.3px] text-ink">
+              {Icon ? (
+                <span className={cn("grid size-7 place-items-center rounded-lg shrink-0", iconToneStyles[iconTone])}>
+                  <Icon size={14} strokeWidth={2.2} aria-hidden />
+                </span>
+              ) : (
+                <span className="block h-[18px] w-1 shrink-0 rounded-full bg-[linear-gradient(180deg,var(--accent),var(--teal))]" />
+              )}
               {title}
             </h2>
           )}

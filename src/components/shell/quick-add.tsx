@@ -22,14 +22,14 @@ export function QuickAdd({ role, onClose }: { role: Role; onClose: () => void })
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/20" onClick={onClose} />
       <div className="animate-sheet-up absolute inset-x-0 bottom-0 rounded-t-sheet bg-card p-5 pb-[calc(20px+env(safe-area-inset-bottom))] shadow-sheet md:animate-fade-up md:inset-x-auto md:bottom-auto md:right-8 md:top-16 md:w-96 md:rounded-card md:shadow-raised">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[22px] font-semibold tracking-[-0.3px] text-ink">Add new</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.3px] text-ink">Quick add</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid size-8 place-items-center rounded-full bg-hairline text-ink-secondary"
+            className="grid size-8 place-items-center rounded-xl bg-hairline text-ink-secondary hover:bg-divider hover:text-ink transition-colors cursor-pointer"
           >
-            <X size={16} strokeWidth={2} aria-hidden />
+            <X size={15} strokeWidth={2.2} aria-hidden />
           </button>
         </div>
         <div className="grid grid-cols-3 gap-2">
@@ -40,12 +40,13 @@ export function QuickAdd({ role, onClose }: { role: Role; onClose: () => void })
                 key={item.label}
                 href={item.href}
                 onClick={onClose}
-                className="flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-center text-[13px] text-ink hover:bg-card-subtle"
+                className="group flex flex-col items-center gap-2 rounded-2xl p-2.5 text-center text-[13px] text-ink transition hover:bg-card-subtle"
               >
-                <span className={cn("grid size-11 place-items-center rounded-full", toneClasses[item.tone])}>
-                  <Icon size={21} strokeWidth={1.75} aria-hidden />
+                {/* Signature Squircle Icon Container */}
+                <span className={cn("grid size-12 place-items-center rounded-2xl shadow-xs transition-transform group-hover:scale-105", toneClasses[item.tone])}>
+                  <Icon size={22} strokeWidth={2} aria-hidden />
                 </span>
-                {item.label}
+                <span className="font-medium text-ink leading-tight">{item.label}</span>
               </Link>
             );
           })}

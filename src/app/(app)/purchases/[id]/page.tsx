@@ -1,3 +1,4 @@
+import { Package, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -44,7 +45,7 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
         actions={<SampleChip />}
       />
       <div className="grid gap-4 lg:grid-cols-3">
-        <SectionCard title="Items" className="lg:col-span-2">
+        <SectionCard title="Items" icon={Package} iconTone="accent" className="lg:col-span-2">
           <ul className="divide-y divide-hairline">
             {purchase.lines.map((l, i) => {
               const p = products.find((x) => x.id === l.productId);
@@ -64,7 +65,7 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
             <span className="text-[28px] font-semibold tabular-nums tracking-[-0.4px] text-ink">{formatINR(purchase.total)}</span>
           </div>
         </SectionCard>
-        <SectionCard title="Invoice and truck">
+        <SectionCard title="Invoice and truck" icon={Truck} iconTone="teal">
           <DetailList
             items={[
               { label: "Purchase receipt no.", value: `#${purchase.purchaseNo}` },

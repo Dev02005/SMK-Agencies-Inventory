@@ -1,4 +1,4 @@
-import { Truck } from "lucide-react";
+import { ClipboardList, Package, ShoppingCart, Truck } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ListSkeleton, SampleChip, SectionCard, StatCard, StatRow } from "@/components/ui/blocks";
@@ -52,7 +52,7 @@ async function GodownDay() {
       </StatRow>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SectionCard title="Load now">
+        <SectionCard title="Load now" icon={ClipboardList} iconTone="accent">
           {d.toLoad.length === 0 ? (
             <p className="py-2 text-[15px] text-ink-secondary">No bills waiting.</p>
           ) : (
@@ -74,14 +74,16 @@ async function GodownDay() {
           )}
         </SectionCard>
 
-        <SectionCard title="Company lorries today">
+        <SectionCard title="Company lorries today" icon={Truck} iconTone="warning">
           {d.lorriesToday.length === 0 ? (
             <p className="py-2 text-[15px] text-ink-secondary">None today.</p>
           ) : (
             <ul className="divide-y divide-hairline">
               {d.lorriesToday.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 py-3">
-                  <Truck size={20} strokeWidth={1.75} className="shrink-0 text-warning" aria-hidden />
+                  <span className="grid size-9 place-items-center rounded-xl bg-warning-soft text-warning shrink-0 shadow-xs">
+                    <Truck size={17} strokeWidth={2} aria-hidden />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[15px] text-ink">
                       {p.lorryNo} · {p.companyName}
@@ -100,7 +102,7 @@ async function GodownDay() {
         </SectionCard>
 
         {d.stock.map((g) => (
-          <SectionCard key={g.id} title={g.name}>
+          <SectionCard key={g.id} title={g.name} icon={Package} iconTone="teal">
             <ul className="divide-y divide-hairline">
               {g.items.map((i) => {
                 const low = isLowStock(i.qty, i.product.unit);
@@ -118,6 +120,8 @@ async function GodownDay() {
 
         <SectionCard
           title="Orders waiting to go"
+          icon={ShoppingCart}
+          iconTone="purple"
           className="lg:col-span-2"
           action={
             <Link href="/orders" className="text-[15px] text-link hover:underline">

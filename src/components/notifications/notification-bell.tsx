@@ -27,9 +27,9 @@ function BellLink({ unread }: { unread: number }) {
       href="/notifications"
       aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
       title="Notifications"
-      className="relative grid size-9 place-items-center rounded-full text-ink-secondary transition-colors hover:bg-hairline hover:text-ink"
+      className="relative grid size-9 place-items-center rounded-xl bg-card-subtle text-ink-secondary border border-hairline transition-all hover:bg-hairline hover:text-ink shadow-xs"
     >
-      <Bell size={20} strokeWidth={1.75} aria-hidden />
+      <Bell size={17} strokeWidth={2} aria-hidden />
       {unread > 0 && (
         <span
           aria-hidden

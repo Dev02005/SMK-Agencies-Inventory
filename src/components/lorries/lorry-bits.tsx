@@ -9,8 +9,10 @@ import { lineQty } from "@/lib/quantities";
 /** "AP 39 T 1234" with the lorry icon, marked when it is sample data. */
 export function LorryTitle({ lorry }: { lorry: Lorry }) {
   return (
-    <span className="flex items-center gap-2">
-      <Truck size={20} strokeWidth={1.75} className="text-warning" aria-hidden />
+    <span className="flex items-center gap-2.5">
+      <span className="grid size-7 place-items-center rounded-lg bg-warning-soft text-warning shrink-0 shadow-xs">
+        <Truck size={14} strokeWidth={2.2} aria-hidden />
+      </span>
       {lorry.lorryNo}
       <SampleTag record={lorry} />
     </span>

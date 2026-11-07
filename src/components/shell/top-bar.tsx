@@ -27,16 +27,17 @@ export function TopBar({
 
         <SearchBox role={role} className="hidden md:block" />
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2.5">
           <NotificationBell notices={notices} role={role} profileId={user.id} />
+          {/* Signature Squircle Quick Add Button */}
           <button
             type="button"
             onClick={onQuickAdd}
             aria-label="Quick add"
             title="Quick add"
-            className="grid size-9 place-items-center rounded-full bg-accent-soft text-accent transition-colors hover:bg-accent hover:text-white"
+            className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent transition-all hover:bg-accent hover:text-white shadow-xs active:scale-95 cursor-pointer"
           >
-            <Plus size={20} strokeWidth={2} aria-hidden />
+            <Plus size={17} strokeWidth={2.25} aria-hidden />
           </button>
           <ProfileMenu user={user} role={role} />
         </div>

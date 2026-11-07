@@ -53,9 +53,9 @@ async function FieldDay({ profileId }: { profileId: string }) {
           {actions.map((a) => {
             const Icon = a.icon;
             return (
-              <Link key={a.href} href={a.href} className="flex flex-col items-center gap-1.5 rounded-2xl py-2 text-center text-[12px] text-ink hover:bg-card-subtle">
-                <span className={cn("grid size-11 place-items-center rounded-full", a.tone)}>
-                  <Icon size={20} strokeWidth={1.75} aria-hidden />
+              <Link key={a.href} href={a.href} className="group flex flex-col items-center gap-1.5 rounded-2xl py-2 text-center text-[12px] text-ink hover:bg-card-subtle transition-all">
+                <span className={cn("grid size-11 place-items-center rounded-2xl shadow-xs transition-transform group-hover:scale-105", a.tone)}>
+                  <Icon size={20} strokeWidth={2} aria-hidden />
                 </span>
                 {a.label}
               </Link>
