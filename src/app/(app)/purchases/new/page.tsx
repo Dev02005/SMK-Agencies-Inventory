@@ -31,7 +31,7 @@ async function FormForToday() {
   ]);
   return (
     <PurchaseForm
-      key={`purchase-form-${nextPurchaseNo}-${Date.now()}`}
+      key={`purchase-form-${nextPurchaseNo}`}
       firms={firms.map((f) => ({ id: f.id, name: f.name, gstin: f.gstin }))}
       companies={parties.filter((p) => p.kind === "company").map((p) => ({ id: p.id, name: p.name, brands: p.brands }))}
       products={products.filter((p) => p.active)}

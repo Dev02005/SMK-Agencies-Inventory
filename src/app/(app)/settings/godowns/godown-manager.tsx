@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { Building2, Check, Package, Pencil, Plus, Search, Users, Warehouse, X, Layers, CheckSquare, Square } from "lucide-react";
 import { Chip } from "@/components/ui/chip";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
@@ -33,8 +33,10 @@ export function GodownManager({
   const [filterType, setFilterType] = useState<"all" | "own" | "company">("all");
 
   // Keep state synced when props revalidate
-  useMemo(() => {
-    setGodowns(initialGodowns);
+  useEffect(() => {
+    queueMicrotask(() => {
+      setGodowns(initialGodowns);
+    });
   }, [initialGodowns]);
 
   // Profiles eligible for in-charge (staff & office & godown, excluding owners if desired, but allow any staff/admin)

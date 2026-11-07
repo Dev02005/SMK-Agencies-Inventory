@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import type { Product } from "@/lib/data/types";
-import { formatINR, formatNumber } from "@/lib/format";
+import { formatINR } from "@/lib/format";
 import { checkCredit, unitLabel } from "@/lib/sales";
 import { partyOptions } from "@/lib/party-options";
 import type { SaleParty } from "@/app/(app)/sales/new/new-sale-form";

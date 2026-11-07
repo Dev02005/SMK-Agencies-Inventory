@@ -18,7 +18,7 @@ import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
-import type { Ageing, BankEntry, CashHolder, Chit, Expense, Godown, LedgerEntry, Lorry, Order, OrderStatus, Party, Payment, Product, Profile, Purchase, Quotation, Receipt, Rental, Role, Sale, SaleLine, SaleStatus, StockMovement, StockSource, TransportMode } from "./types";
+import type { Ageing, BankEntry, CashHolder, Chit, Expense, Godown, LedgerEntry, Lorry, Order, OrderStatus, Party, Payment, Product, Profile, Purchase, Quotation, Receipt, Rental, Sale, SaleLine, SaleStatus, StockMovement, StockSource, TransportMode } from "./types";
 
 export type * from "./types";
 

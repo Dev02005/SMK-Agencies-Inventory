@@ -1,10 +1,9 @@
-import { formatINR, formatShortDate } from "@/lib/format";
+import { formatINR } from "@/lib/format";
 import type {
   SendDailySummaryParams,
   SendInvoiceParams,
   SendReceiptParams,
   SendReminderParams,
-  WhatsAppConfig,
 } from "./types";
 
 /**

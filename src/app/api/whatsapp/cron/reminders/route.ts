@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAgeingReport, getParties } from "@/lib/data";
+import { getParties } from "@/lib/data";
 import { sendReminderWhatsApp } from "@/lib/whatsapp/service";
 
 /**
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const [parties, ageing] = await Promise.all([getParties(), getAgeingReport()]);
+    const parties = await getParties();
     const dueParties = parties.filter((p) => p.balance > 0 && p.mobile);
 
     const results: { party: string; status: string; waLink?: string }[] = [];
@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
       processed: results.length,
       results,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Cron reminders error:", err);
-    return NextResponse.json({ ok: false, error: err?.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

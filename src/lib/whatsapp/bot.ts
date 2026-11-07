@@ -1,6 +1,4 @@
 import {
-  getBankAccounts,
-  getDashboard,
   getFirm,
   getParties,
   getProducts,
@@ -255,10 +253,6 @@ _చెల్లించిన తర్వాత స్క్రీన్‌�
     text.includes("steel") ||
     text.includes("ధరలు")
   ) {
-    const products = await getProducts();
-    const cement = products.filter((p) => p.category === "cement");
-    const steel = products.filter((p) => p.category === "steel");
-
     return {
       recipientMobile: cleanPhone,
       recipientName: senderName,

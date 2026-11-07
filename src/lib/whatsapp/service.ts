@@ -137,8 +137,8 @@ export async function sendWhatsAppMessage({
         errorMessage = json.error?.message || "Meta API Error";
         status = "failed";
       }
-    } catch (e: any) {
-      errorMessage = e?.message || "Network Error sending via Meta API";
+    } catch (e: unknown) {
+      errorMessage = e instanceof Error ? e.message : "Network Error sending via Meta API";
       status = "failed";
     }
   }
@@ -265,32 +265,36 @@ export async function sendDailySummaryWhatsApp(overrideParams?: Partial<SendDail
 /**
  * Handles Webhook Inbound Payload from Meta WhatsApp API.
  */
-export async function handleMetaWebhook(payload: any) {
+export async function handleMetaWebhook(payload: Record<string, unknown>) {
   const config = await getWhatsAppConfig();
   if (!config.botAutoReply) return { status: "ignored_bot_disabled" };
 
   try {
-    const entry = payload?.entry?.[0];
-    const change = entry?.changes?.[0]?.value;
-    const message = change?.messages?.[0];
+    const entry = (payload?.entry as Array<Record<string, unknown>> | undefined)?.[0];
+    const changes = entry?.changes as Array<Record<string, unknown>> | undefined;
+    const changeValue = changes?.[0]?.value as Record<string, unknown> | undefined;
+    const messages = changeValue?.messages as Array<Record<string, unknown>> | undefined;
+    const message = messages?.[0];
 
     if (!message || message.type !== "text") return { status: "ignored_non_text" };
 
-    const from = message.from;
-    const body = message.text?.body;
+    const from = String(message.from || "");
+    const textObj = message.text as { body?: string } | undefined;
+    const body = textObj?.body;
     if (!from || !body) return { status: "missing_content" };
 
     // Record incoming message
+    const contacts = changeValue?.contacts as Array<{ profile?: { name?: string } }> | undefined;
     const incomingLog: WhatsAppMessage = {
-      id: `in-${Date.now()}-${message.id}`,
+      id: `in-${Date.now()}-${String(message.id || "")}`,
       recipientMobile: mobileOf(from),
-      recipientName: change?.contacts?.[0]?.profile?.name || "Customer",
+      recipientName: contacts?.[0]?.profile?.name || "Customer",
       kind: "bot_reply",
       direction: "inbound",
       body,
       status: "delivered",
       sentAt: new Date().toISOString(),
-      metaMessageId: message.id,
+      metaMessageId: String(message.id || ""),
     };
     await recordMessage(incomingLog);
 
@@ -307,8 +311,8 @@ export async function handleMetaWebhook(payload: any) {
     });
 
     return { status: "replied", recipient: from };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Meta Webhook processing error:", err);
-    return { status: "error", error: err?.message };
+    return { status: "error", error: err instanceof Error ? err.message : String(err) };
   }
 }

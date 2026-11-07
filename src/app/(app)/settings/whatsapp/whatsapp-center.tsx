@@ -1,28 +1,19 @@
 "use client";
 
 import {
-  AlertCircle,
-  Bell,
-  Bot,
   Building2,
   Check,
-  ChevronRight,
   Copy,
   ExternalLink,
   MessageSquare,
-  QrCode,
-  Receipt,
-  RefreshCw,
   Send,
-  Smartphone,
   Sparkles,
   Zap,
 } from "lucide-react";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
-import { AffixInput, Field, inputClass } from "@/components/ui/field";
+import { Field, inputClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
@@ -37,17 +28,13 @@ import {
 export function WhatsAppCenter({
   initialConfig,
   initialMessages,
-  firmName,
-  firmPhone,
 }: {
   initialConfig: WhatsAppConfig;
   initialMessages: WhatsAppMessage[];
-  firmName: string;
-  firmPhone: string;
 }) {
   const toast = useToast();
   const [config, setConfig] = useState<WhatsAppConfig>(initialConfig);
-  const [messages, setMessages] = useState<WhatsAppMessage[]>(initialMessages);
+  const [messages] = useState<WhatsAppMessage[]>(initialMessages);
   const [tab, setTab] = useState<"bot" | "templates" | "api" | "history">("bot");
   const [pending, startTransition] = useTransition();
 
@@ -426,7 +413,7 @@ export function WhatsAppCenter({
                   <select
                     id="test-kind"
                     value={testKind}
-                    onChange={(e) => setTestKind(e.target.value as any)}
+                    onChange={(e) => setTestKind(e.target.value as "receipt" | "reminder" | "summary")}
                     className={inputClass}
                   >
                     <option value="receipt">🧾 Payment Receipt (రసీదు)</option>
@@ -481,7 +468,7 @@ export function WhatsAppCenter({
               <select
                 id="provider-mode"
                 value={config.provider}
-                onChange={(e) => handleUpdate({ provider: e.target.value as any })}
+                onChange={(e) => handleUpdate({ provider: e.target.value as "click_to_chat" | "meta_cloud" })}
                 className={inputClass}
               >
                 <option value="click_to_chat">Direct WhatsApp (wa.me 1-Click - No API required)</option>

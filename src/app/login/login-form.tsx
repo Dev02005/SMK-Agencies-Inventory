@@ -72,7 +72,9 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     try {
       const remembered = localStorage.getItem("ska_remembered_login");
       if (remembered) {
-        setMobileNumber(remembered.replace(/\D/g, "").slice(-10) || remembered);
+        queueMicrotask(() => {
+          setMobileNumber(remembered.replace(/\D/g, "").slice(-10) || remembered);
+        });
       }
     } catch {
       // localStorage not available

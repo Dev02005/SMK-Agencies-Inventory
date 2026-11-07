@@ -3,7 +3,6 @@ import { Suspense } from "react";
 import { BackLink, ListSkeleton } from "@/components/ui/blocks";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleGuard } from "@/components/ui/sub-nav";
-import { getFirm } from "@/lib/data";
 import { getWhatsAppConfig, getWhatsAppMessages } from "@/lib/whatsapp/service";
 import { WhatsAppCenter } from "./whatsapp-center";
 
@@ -27,18 +26,10 @@ export default async function WhatsAppSettingsPage() {
 }
 
 async function WhatsAppSettingsData() {
-  const [config, messages, firm] = await Promise.all([
+  const [config, messages] = await Promise.all([
     getWhatsAppConfig(),
     getWhatsAppMessages(),
-    getFirm(),
   ]);
 
-  return (
-    <WhatsAppCenter
-      initialConfig={config}
-      initialMessages={messages}
-      firmName={firm.name}
-      firmPhone={firm.phone}
-    />
-  );
+  return <WhatsAppCenter initialConfig={config} initialMessages={messages} />;
 }

@@ -36,7 +36,11 @@ export function Sidebar({
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ska_sidebar_sections");
-      if (saved) setCollapsedGroups(JSON.parse(saved));
+      if (saved) {
+        queueMicrotask(() => {
+          setCollapsedGroups(JSON.parse(saved));
+        });
+      }
     } catch {}
   }, []);
 

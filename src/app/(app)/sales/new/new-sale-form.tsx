@@ -157,16 +157,18 @@ export function NewSaleForm({
   useEffect(() => {
     if (!godownAllowedProducts.length) return;
     const allowed = new Set(godownAllowedProducts.map((p) => p.id));
-    setLines((curr) => {
-      let changed = false;
-      const next = curr.map((l) => {
-        if (!l.productId || !allowed.has(l.productId)) {
-          changed = true;
-          return { ...l, productId: godownAllowedProducts[0].id, rate: "" };
-        }
-        return l;
+    queueMicrotask(() => {
+      setLines((curr) => {
+        let changed = false;
+        const next = curr.map((l) => {
+          if (!l.productId || !allowed.has(l.productId)) {
+            changed = true;
+            return { ...l, productId: godownAllowedProducts[0].id, rate: "" };
+          }
+          return l;
+        });
+        return changed ? next : curr;
       });
-      return changed ? next : curr;
     });
   }, [godownAllowedProducts]);
 
@@ -294,7 +296,7 @@ export function NewSaleForm({
     setReason("");
     setDiscountValue("");
     const defaultProduct = godownAllowedProducts[0] ?? allProducts[0];
-    setLines(defaultProduct ? [{ key: Date.now(), productId: defaultProduct.id, qty: "", rate: "" }] : []);
+    setLines(defaultProduct ? [{ key: 1, productId: defaultProduct.id, qty: "", rate: "" }] : []);
     setNextKey(2);
     setOwnVehicleId("");
     setRentedVehicleId("");

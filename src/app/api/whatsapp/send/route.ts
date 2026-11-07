@@ -47,8 +47,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ ok: false, error: "Invalid action" }, { status: 400 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error in /api/whatsapp/send:", err);
-    return NextResponse.json({ ok: false, error: err?.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "Internal server error" },
+      { status: 500 },
+    );
   }
 }

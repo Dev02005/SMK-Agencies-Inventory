@@ -56,7 +56,7 @@ async function FormForToday() {
   }));
   return (
     <NewSaleForm
-      key={`sale-form-${nextBillNo}-${Date.now()}`}
+      key={`sale-form-${nextBillNo}`}
       firms={firms.map((f) => ({ id: f.id, name: f.name, gstin: f.gstin }))}
       primaryFirmId={firm.id}
       products={products.filter((p) => p.active)}

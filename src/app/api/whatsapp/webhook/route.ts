@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     const payload = await request.json();
     const result = await handleMetaWebhook(payload);
     return NextResponse.json({ ok: true, result });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Webhook processing error:", err);
-    return NextResponse.json({ ok: false, error: err?.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

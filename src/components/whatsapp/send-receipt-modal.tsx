@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, ExternalLink, MessageSquare, Send, X } from "lucide-react";
+import { MessageSquare, Send, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -34,7 +34,6 @@ export function SendReceiptModal({
   const toast = useToast();
   const [mobile, setMobile] = useState(partyMobile ?? "");
   const [pending, startTransition] = useTransition();
-  const [sentLink, setSentLink] = useState<string | null>(null);
 
   const cleanPhone = mobile.replace(/\D/g, "").slice(-10);
 
@@ -88,7 +87,6 @@ _Sri Kameswari Agencies · Polaki_`;
 
         const json = await res.json();
         if (json.ok) {
-          setSentLink(json.waLink || waLink);
           toast("WhatsApp receipt generated!");
           window.open(json.waLink || waLink, "_blank", "noopener,noreferrer");
         } else {

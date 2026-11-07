@@ -39,7 +39,11 @@ export function AppShell({
   useEffect(() => {
     try {
       const saved = localStorage.getItem("ska_sidebar_collapsed");
-      if (saved !== null) setSidebarCollapsed(saved === "true");
+      if (saved !== null) {
+        queueMicrotask(() => {
+          setSidebarCollapsed(saved === "true");
+        });
+      }
     } catch {}
   }, []);
 
