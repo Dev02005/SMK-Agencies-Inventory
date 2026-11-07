@@ -2,79 +2,137 @@
 
 import {
   AlertCircle,
-  ArrowLeft,
-  ArrowRight,
-  Handshake,
+  Building2,
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
   Info,
+  Lock,
+  Phone,
+  Search,
   ShieldCheck,
   Truck,
   User,
+  Warehouse,
   X,
 } from "lucide-react";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useId, useRef, useState, useTransition } from "react";
-import { CODE_LENGTH, CodeInput } from "@/components/ui/code-input";
+import { Suspense, useEffect, useId, useRef, useState, useTransition } from "react";
+import { CODE_LENGTH } from "@/lib/password-rules";
 import { rememberSignedIn } from "@/lib/roles";
-import { lookUpLogin, signIn } from "./actions";
+import type { Profile } from "@/lib/data/types";
+import { signIn } from "./actions";
 
-type Person = { name: string; initials: string; designation: string };
+export type SignInPerson = Profile & { designation: string };
 
-export function LoginForm() {
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  if (parts.length === 1 && parts[0].length >= 2) return parts[0].slice(0, 2).toUpperCase();
+  return "SK";
+}
+
+export function LoginForm({ people }: { people: SignInPerson[] }) {
   const id = useId();
   const router = useRouter();
 
-  const [loginId, setLoginId] = useState("");
-  const [person, setPerson] = useState<Person | null>(null);
+  // Find the owner or first staff member as initial selection
+  const defaultPerson =
+    people.find((p) => p.role === "owner" || p.fullName.toLowerCase().includes("kamesh")) ??
+    people[0] ??
+    null;
+
+  const [selectedPerson, setSelectedPerson] = useState<SignInPerson | null>(defaultPerson);
+  const [isCustomInput, setIsCustomInput] = useState(false);
+  const [customLoginId, setCustomLoginId] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [problem, setProblem] = useState<string | null>(null);
   const [showForgotNotice, setShowForgotNotice] = useState(false);
-  const codeRef = useRef<HTMLInputElement>(null);
+
   const [pending, startTransition] = useTransition();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
-  function findPerson() {
-    const trimmed = loginId.trim();
-    if (!trimmed || pending) return;
-    setProblem(null);
-
-    startTransition(async () => {
-      const result = await lookUpLogin(trimmed);
-      if (result.ok) {
-        setPerson({
-          name: result.name,
-          initials: result.initials,
-          designation: result.designation,
-        });
-        // Auto focus the code input in next frame
-        setTimeout(() => codeRef.current?.focus(), 50);
-      } else {
-        setProblem(
-          result.reason === "too-many"
-            ? "Too many attempts from this device. Please wait 10 minutes and try again."
-            : "No user found with that mobile number. Please check the number or contact the owner.",
+  // Check remembered login on mount
+  useEffect(() => {
+    try {
+      const remembered = localStorage.getItem("ska_remembered_login");
+      if (remembered) {
+        const found = people.find(
+          (p) =>
+            p.mobile === remembered ||
+            p.fullName.toLowerCase() === remembered.toLowerCase() ||
+            p.id === remembered,
         );
+        if (found) {
+          setSelectedPerson(found);
+          setIsCustomInput(false);
+        } else {
+          setCustomLoginId(remembered);
+          setIsCustomInput(true);
+        }
       }
-    });
-  }
+    } catch {
+      // localStorage not available
+    }
+  }, [people]);
 
-  function signInNow(code = password) {
-    if (code.length !== CODE_LENGTH || pending) return;
+  // Click outside listener for dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDropdownOpen]);
+
+  function handleSignIn() {
     setProblem(null);
+    const effectiveLoginId = isCustomInput
+      ? customLoginId.trim()
+      : selectedPerson?.mobile || selectedPerson?.fullName || "";
+
+    if (!effectiveLoginId) {
+      setProblem("Please select an account or enter your mobile number.");
+      return;
+    }
+
+    if (!password) {
+      setProblem("Please enter your 6-digit sign-in code.");
+      passwordInputRef.current?.focus();
+      return;
+    }
+
+    if (password.length !== CODE_LENGTH) {
+      setProblem(`Code must be exactly ${CODE_LENGTH} digits. Default is 000000.`);
+      passwordInputRef.current?.focus();
+      return;
+    }
+
     const next = new URLSearchParams(window.location.search).get("next") ?? undefined;
 
     startTransition(async () => {
-      const result = await signIn(loginId.trim(), code, next);
+      const result = await signIn(effectiveLoginId, password, next);
       if (!result.ok) {
-        setProblem("That sign-in code is incorrect. Default is 000000.");
+        setProblem("That sign-in code is incorrect. Default code is 000000.");
         setPassword("");
-        codeRef.current?.focus();
+        passwordInputRef.current?.focus();
         return;
       }
 
       try {
         if (rememberMe) {
-          localStorage.setItem("ska_remembered_login", loginId.trim());
+          localStorage.setItem("ska_remembered_login", effectiveLoginId);
         } else {
           localStorage.removeItem("ska_remembered_login");
         }
@@ -87,26 +145,25 @@ export function LoginForm() {
     });
   }
 
-  function notYou() {
-    setPerson(null);
-    setPassword("");
-    setProblem(null);
-  }
+  const filteredPeople = people.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      p.fullName.toLowerCase().includes(q) ||
+      p.mobile.includes(q) ||
+      (p.designation && p.designation.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div className="w-full">
-      {/* Official Sri Kameswari Agencies Logo */}
-      <div className="flex flex-col items-center text-center">
-        <Image
-          src="/logo.png"
-          alt="Sri Kameswari Agencies"
-          width={240}
-          height={102}
-          priority
-          className="h-auto w-48 sm:w-56 object-contain"
-        />
-        <p className="mt-2 text-[11px] font-semibold tracking-[0.2em] text-ink-secondary uppercase">
-          Cement • Steel • Stronger Tomorrow
+      {/* Title & Subtitle matching reference */}
+      <div>
+        <h1 className="font-serif text-[32px] sm:text-[38px] font-semibold tracking-tight text-[#0f172a]">
+          Welcome back
+        </h1>
+        <p className="mt-1.5 text-[14.5px] text-[#64748b]">
+          Choose your login and enter your password.
         </p>
       </div>
 
@@ -114,21 +171,21 @@ export function LoginForm() {
         <SignedOutNotice />
       </Suspense>
 
-      {/* Forgot Password guidance */}
+      {/* Forgot Password guidance popup */}
       {showForgotNotice && (
-        <div className="mt-4 rounded-2xl bg-accent-soft/70 border border-accent/20 p-3.5 text-[13px] text-ink flex items-start gap-2.5">
-          <Info className="size-4.5 text-accent shrink-0 mt-0.5" />
+        <div className="mt-5 rounded-2xl bg-[#0068d1]/10 border border-[#0068d1]/20 p-4 text-[13px] text-[#0f172a] flex items-start gap-3">
+          <Info className="size-4.5 text-[#0068d1] shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold text-ink">Sign-in Code Help</p>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-ink-secondary">
-              Default code for all staff accounts is <span className="font-mono font-semibold text-ink">000000</span>.
-              If you changed your code and forgot it, please contact the administrator to reset it.
+            <p className="font-semibold text-[#0f172a]">Sign-in Code Help</p>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#475569]">
+              Default code for all staff accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
+              If you updated your code and forgot it, please contact the administrator (Kamesh Potnuru) to reset it.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowForgotNotice(false)}
-            className="text-ink-tertiary hover:text-ink p-0.5"
+            className="text-[#94a3b8] hover:text-[#0f172a] p-0.5 cursor-pointer"
             aria-label="Dismiss notice"
           >
             <X className="size-4" />
@@ -136,199 +193,235 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* Problem message */}
+      {/* Problem error banner */}
       {problem && (
         <div
           role="alert"
-          className="mt-4 rounded-2xl bg-danger-soft border border-danger/20 px-3.5 py-2.5 text-[13px] text-danger flex items-center gap-2"
+          className="mt-5 rounded-2xl bg-danger-soft border border-danger/20 px-4 py-3 text-[13.5px] text-danger flex items-center gap-2.5"
         >
           <AlertCircle className="size-4.5 shrink-0" />
           <span>{problem}</span>
         </div>
       )}
 
-      {/* Main 2-Step Form */}
+      {/* Form */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (person) signInNow();
-          else findPerson();
+          handleSignIn();
         }}
-        className="mt-6 space-y-4"
+        className="mt-7 space-y-5"
       >
-        {!person ? (
-          /* Step 1: User enters phone number */
-          <>
-            <div>
-              <label
-                htmlFor={`${id}-login`}
-                className="block text-[13px] font-medium text-ink-secondary mb-1.5"
-              >
-                Mobile number
-              </label>
-              <div className="relative">
-                <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4.5 text-ink-tertiary" aria-hidden />
-                <input
-                  id={`${id}-login`}
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  maxLength={100}
-                  value={loginId}
-                  onChange={(e) => {
-                    setLoginId(e.target.value);
-                    if (problem) setProblem(null);
-                  }}
-                  placeholder="Enter 10-digit mobile number"
-                  className="h-12 w-full rounded-2xl border border-hairline bg-card pl-10 pr-4 text-[14.5px] text-ink placeholder:text-ink-tertiary shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all focus:border-accent focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-accent/20"
-                  style={{ outline: "none" }}
-                  autoFocus
-                />
-              </div>
-              <p className="mt-1.5 px-1 text-[12px] text-ink-tertiary">
-                Enter your registered staff mobile number or username
-              </p>
-            </div>
+        {/* LOGIN AS FIELD */}
+        <div className="relative" ref={dropdownRef}>
+          <label
+            htmlFor={isCustomInput ? `${id}-custom-login` : undefined}
+            className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+          >
+            LOGIN AS
+          </label>
 
-            <div className="flex items-center justify-between text-[13px] px-0.5 pt-0.5">
-              <label className="flex items-center gap-2 text-ink-secondary cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="size-4 rounded border-divider text-accent accent-accent focus:ring-accent"
-                />
-                <span>Remember me</span>
-              </label>
+          {!isCustomInput ? (
+            /* Dropdown trigger matching reference screenshot */
+            <div>
               <button
                 type="button"
-                onClick={() => setShowForgotNotice(true)}
-                className="font-medium text-link hover:underline focus:outline-none"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                aria-expanded={isDropdownOpen}
+                aria-haspopup="listbox"
               >
-                Forgot code?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={!loginId.trim() || pending}
-              className="w-full h-12 rounded-2xl bg-accent hover:bg-accent/90 active:scale-[0.99] text-white font-semibold text-[15px] flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
-            >
-              <span>{pending ? "Finding user…" : "Continue"}</span>
-              {!pending && <ArrowRight className="size-4.5 stroke-[2.5]" aria-hidden />}
-            </button>
-          </>
-        ) : (
-          /* Step 2: User found! Displays name, designation, and prompts for 6-digit PIN */
-          <>
-            {/* User Profile Card */}
-            <div className="rounded-2xl bg-card-subtle border border-hairline p-4 text-center">
-              <div className="flex flex-col items-center">
-                <span
+                <div className="flex items-center gap-3 min-w-0">
+                  <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="text-[15px] font-medium text-[#0f172a] truncate">
+                      {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
+                    </span>
+                    {selectedPerson?.designation && (
+                      <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                        {selectedPerson.designation}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
+                    isDropdownOpen ? "rotate-180" : ""
+                  }`}
                   aria-hidden
-                  className="grid size-14 place-items-center rounded-full bg-gradient-to-tr from-accent to-teal text-[20px] font-bold text-white shadow-sm"
-                >
-                  {person.initials}
-                </span>
-                <p className="mt-2 text-[12px] font-medium text-ink-secondary">Welcome back</p>
-                <h2 className="text-[19px] font-semibold text-ink tracking-tight">{person.name}</h2>
-                {person.designation && (
-                  <span className="mt-1 inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-semibold text-accent">
-                    {person.designation}
-                  </span>
-                )}
-                <p className="mt-1 text-[13px] tabular-nums text-ink-tertiary">{loginId.trim()}</p>
+                />
+              </button>
 
+              {/* Dropdown menu */}
+              {isDropdownOpen && (
+                <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden animate-fade-up">
+                  {people.length > 5 && (
+                    <div className="p-2 border-b border-[#f1f5f9]">
+                      <div className="relative flex items-center">
+                        <Search className="size-4 text-[#94a3b8] absolute left-3 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search staff name..."
+                          className="w-full h-9 pl-9 pr-3 text-[13.5px] rounded-xl bg-[#f8fafc] border border-transparent focus:border-[#0068d1]/30 focus:outline-none"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <ul className="max-h-[260px] overflow-y-auto divide-y divide-[#f8fafc] p-1.5" role="listbox">
+                    {filteredPeople.map((p) => {
+                      const isSelected = selectedPerson?.id === p.id;
+                      return (
+                        <li
+                          key={p.id}
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            setSelectedPerson(p);
+                            setIsDropdownOpen(false);
+                            setSearchQuery("");
+                            if (problem) setProblem(null);
+                            setTimeout(() => passwordInputRef.current?.focus(), 50);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                            isSelected ? "bg-[#0068d1]/10 text-[#0068d1]" : "hover:bg-[#f8fafc] text-[#0f172a]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="grid size-8 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[12px] font-bold text-white shrink-0">
+                              {getInitials(p.fullName)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-[14px] font-medium truncate">{p.fullName}</p>
+                              <p className="text-[11.5px] text-[#64748b]">
+                                {p.designation || (p.role === "owner" ? "Admin" : p.role)} · {p.mobile}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="size-4 text-[#0068d1] shrink-0" />}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <div className="p-2 border-t border-[#f1f5f9] bg-[#fafafc]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomInput(true);
+                        setIsDropdownOpen(false);
+                        setCustomLoginId("");
+                      }}
+                      className="w-full py-1.5 px-2 text-[12.5px] font-semibold text-[#0068d1] hover:underline text-center cursor-pointer"
+                    >
+                      + Enter another mobile number or username
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Custom text input mode */
+            <div className="space-y-1.5">
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
+                <input
+                  id={`${id}-custom-login`}
+                  type="text"
+                  value={customLoginId}
+                  onChange={(e) => {
+                    setCustomLoginId(e.target.value);
+                    if (problem) setProblem(null);
+                  }}
+                  placeholder="Enter 10-digit mobile number or name"
+                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-24 text-[14.5px] text-[#0f172a] shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+                  autoFocus
+                />
                 <button
                   type="button"
-                  onClick={notYou}
-                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-link hover:underline"
+                  onClick={() => setIsCustomInput(false)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer"
                 >
-                  <ArrowLeft size={14} strokeWidth={2} aria-hidden />
-                  <span>Not you? Change number</span>
+                  List view
                 </button>
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Hidden field for password managers */}
-            <input type="text" name="username" autoComplete="username" value={loginId} readOnly hidden />
-
-            {/* 6-Digit PIN input boxes */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5 px-1">
-                <label htmlFor={`${id}-code`} className="text-[13px] font-medium text-ink-secondary">
-                  6-digit sign-in code
-                </label>
-                <span className="text-[12px] text-ink-tertiary">Default: 000000</span>
-              </div>
-
-              <CodeInput
-                id={`${id}-code`}
-                ref={codeRef}
-                autoComplete="current-password"
-                value={password}
-                onValueChange={(code) => {
-                  setPassword(code);
-                  if (problem) setProblem(null);
-                }}
-                onComplete={(code) => signInNow(code)}
-                invalid={Boolean(problem)}
-                autoFocus
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-[13px] px-0.5 pt-0.5">
-              <span className="text-[12px] text-ink-tertiary">Enter your 6-digit PIN</span>
-              <button
-                type="button"
-                onClick={() => setShowForgotNotice(true)}
-                className="font-medium text-link hover:underline focus:outline-none"
-              >
-                Forgot code?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={password.length !== CODE_LENGTH || pending}
-              className="w-full h-12 rounded-2xl bg-accent hover:bg-accent/90 active:scale-[0.99] text-white font-semibold text-[15px] flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+        {/* PASSWORD FIELD */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label
+              htmlFor={`${id}-password`}
+              className="text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase"
             >
-              <span>{pending ? "Signing in…" : "Sign in"}</span>
-              {!pending && <ArrowRight className="size-4.5 stroke-[2.5]" aria-hidden />}
-            </button>
-          </>
-        )}
-      </form>
+              PASSWORD
+            </label>
+            <span className="text-[11px] text-[#94a3b8] font-medium">Default: 000000</span>
+          </div>
 
-      {/* Service Pillars / Badges */}
-      <div className="mt-7 grid grid-cols-3 gap-2 pt-5 border-t border-hairline text-center">
-        <div className="flex flex-col items-center">
-          <div className="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent mb-1.5">
-            <Truck size={17} strokeWidth={2.2} />
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
+            <input
+              id={`${id}-password`}
+              ref={passwordInputRef}
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH);
+                setPassword(val);
+                if (problem) setProblem(null);
+              }}
+              placeholder="••••••"
+              maxLength={CODE_LENGTH}
+              inputMode="numeric"
+              autoComplete="current-password"
+              className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-12 text-[16px] text-[#0f172a] tracking-widest font-mono shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#475569] p-1 cursor-pointer transition-colors"
+            >
+              {showPassword ? <EyeOff className="size-[19px]" /> : <Eye className="size-[19px]" />}
+            </button>
           </div>
-          <span className="text-[10px] font-bold tracking-wider text-ink-secondary uppercase leading-[13px]">
-            Timely<br />Delivery
-          </span>
         </div>
-        <div className="flex flex-col items-center border-x border-hairline">
-          <div className="grid size-9 place-items-center rounded-xl bg-teal-soft text-teal mb-1.5">
-            <ShieldCheck size={17} strokeWidth={2.2} />
-          </div>
-          <span className="text-[10px] font-bold tracking-wider text-ink-secondary uppercase leading-[13px]">
-            Quality<br />Products
-          </span>
+
+        {/* REMEMBER ME & FORGOT CODE */}
+        <div className="flex items-center justify-between text-[13px] pt-1">
+          <label className="flex items-center gap-2 text-[#475569] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="size-4 rounded border-[#cbd5e1] text-[#0068d1] accent-[#0068d1] focus:ring-[#0068d1] cursor-pointer"
+            />
+            <span className="text-[13.5px]">Remember me</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowForgotNotice(true)}
+            className="font-medium text-[#0068d1] hover:underline focus:outline-none cursor-pointer text-[13px]"
+          >
+            Forgot code?
+          </button>
         </div>
-        <div className="flex flex-col items-center">
-          <div className="grid size-9 place-items-center rounded-xl bg-purple-soft text-purple mb-1.5">
-            <Handshake size={17} strokeWidth={2.2} />
-          </div>
-          <span className="text-[10px] font-bold tracking-wider text-ink-secondary uppercase leading-[13px]">
-            Strong<br />Relations
-          </span>
-        </div>
-      </div>
+
+        {/* SIGN IN BUTTON matching reference */}
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+        >
+          <span>{pending ? "Signing in…" : "Sign in"}</span>
+        </button>
+      </form>
     </div>
   );
 }
@@ -339,7 +432,7 @@ function SignedOutNotice() {
   return (
     <div
       role="status"
-      className="mt-4 rounded-2xl bg-warning-soft border border-warning/20 px-3.5 py-2.5 text-[13px] text-warning"
+      className="mt-4 rounded-2xl bg-warning-soft border border-warning/20 px-4 py-2.5 text-[13px] text-warning"
     >
       It&apos;s past 12 midnight, so your session expired. Please sign in again.
     </div>
