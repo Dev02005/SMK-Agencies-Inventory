@@ -38,7 +38,10 @@ export function ConfirmDelete({
     return (
       <button
         type="button"
-        onClick={() => setAsking(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setAsking(true);
+        }}
         aria-label={`Delete ${what}`}
         title={`Delete ${what}`}
         className={cn(
@@ -54,18 +57,31 @@ export function ConfirmDelete({
     );
   }
   return (
-    <div role="alertdialog" aria-label={`Delete ${what}?`} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-danger-soft px-3.5 py-2.5", className)}>
+    <div
+      role="alertdialog"
+      aria-label={`Delete ${what}?`}
+      onClick={(e) => e.stopPropagation()}
+      className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-danger-soft px-3.5 py-2.5", className)}
+    >
       <p className="min-w-0 flex-1 text-[14px] text-ink">
         Delete <span className="font-semibold">{what}</span>? It can&apos;t be undone.
       </p>
       <div className="flex gap-2">
-        <button type="button" onClick={() => setAsking(false)} className="rounded-full px-3 py-1.5 text-[14px] font-medium text-ink-secondary hover:bg-card">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setAsking(false);
+          }}
+          className="rounded-full px-3 py-1.5 text-[14px] font-medium text-ink-secondary hover:bg-card cursor-pointer"
+        >
           Keep
         </button>
         <button
           type="button"
           disabled={pending}
-          onClick={() =>
+          onClick={(e) => {
+            e.stopPropagation();
             startTransition(async () => {
               const result = await onDelete();
               if (!result.ok) {
@@ -76,9 +92,9 @@ export function ConfirmDelete({
               toast(`${what} deleted`);
               if (after) router.push(after);
               else router.refresh();
-            })
-          }
-          className="rounded-full bg-danger px-3.5 py-1.5 text-[14px] font-medium text-white disabled:opacity-50"
+            });
+          }}
+          className="rounded-full bg-danger px-3.5 py-1.5 text-[14px] font-medium text-white disabled:opacity-50 cursor-pointer hover:bg-danger/90"
         >
           {pending ? "Deleting…" : "Delete"}
         </button>

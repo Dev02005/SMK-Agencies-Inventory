@@ -11,6 +11,7 @@ import { inDateFilter } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { pageDateFilter } from "@/lib/page-dates";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
+import { DeletePurchaseButton } from "./[id]/delete-purchase-button";
 
 export const metadata: Metadata = { title: "Godown purchases" };
 
@@ -64,6 +65,11 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
           ),
           subtitle: `Receipt #${p.purchaseNo} · ${formatShortDate(p.invoiceDate)} · ${describeQuantities(p.lines, products)}`,
           value: formatINR(p.total),
+          meta: (
+            <div onClick={(e) => e.stopPropagation()} className="inline-flex justify-end">
+              <DeletePurchaseButton purchaseId={p.id} what={`Purchase #${p.purchaseNo}`} compact />
+            </div>
+          ),
         })}
         columns={[
           { key: "no", header: "Receipt no.", cell: (p) => `#${p.purchaseNo}`, className: "font-semibold text-ink whitespace-nowrap" },
@@ -75,6 +81,16 @@ async function PurchasesTable({ searchParams }: { searchParams: PageProps<"/purc
           { key: "godown", header: "Godown", cell: (p) => godownName(p.godownId), className: "hidden text-ink-secondary xl:table-cell" },
           { key: "qty", header: "Quantity", cell: (p) => describeQuantities(p.lines, products), className: "whitespace-nowrap text-ink-secondary" },
           { key: "total", header: "Amount", align: "right", cell: (p) => formatINR(p.total) },
+          {
+            key: "actions",
+            header: "",
+            className: "w-10 text-right",
+            cell: (p) => (
+              <div onClick={(e) => e.stopPropagation()} className="inline-flex justify-end">
+                <DeletePurchaseButton purchaseId={p.id} what={`Purchase #${p.purchaseNo}`} compact />
+              </div>
+            ),
+          },
         ]}
       />
     </div>

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addSale, approveSale, rejectSale, type AddSaleInput, type ApproveSaleInput } from "@/lib/data";
+import { addSale, approveSale, deleteSale, rejectSale, type AddSaleInput, type ApproveSaleInput } from "@/lib/data";
 
 export async function createSaleAction(input: AddSaleInput) {
   try {
@@ -52,6 +52,28 @@ export async function rejectSaleAction(saleId: string, reason?: string) {
     return {
       ok: false as const,
       error: err instanceof Error ? err.message : "Failed to reject sale",
+    };
+  }
+}
+
+export async function deleteSaleAction(saleId: string) {
+  try {
+    const success = await deleteSale(saleId);
+    if (!success) {
+      return { ok: false as const, error: "Sale not found" };
+    }
+    revalidatePath("/sales");
+    revalidatePath(`/sales/${saleId}`);
+    revalidatePath("/sales/new");
+    revalidatePath("/sales", "layout");
+    revalidatePath("/stock");
+    revalidatePath("/reports");
+    revalidatePath("/dashboard");
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: err instanceof Error ? err.message : "Failed to delete sale",
     };
   }
 }

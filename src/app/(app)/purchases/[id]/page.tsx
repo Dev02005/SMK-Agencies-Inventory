@@ -9,6 +9,7 @@ import { getFirms, getGodowns, getProducts, getPurchase } from "@/lib/data";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { lineQty } from "@/lib/quantities";
 import { toMT } from "@/lib/sales";
+import { DeletePurchaseButton } from "./delete-purchase-button";
 
 export const metadata: Metadata = { title: "Purchase receipt" };
 
@@ -42,7 +43,16 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
             </Link>
           </>
         }
-        actions={<SampleChip />}
+        actions={
+          <div className="flex items-center gap-2">
+            <SampleChip />
+            <DeletePurchaseButton
+              purchaseId={purchase.id}
+              what={`Purchase Receipt #${purchase.purchaseNo}`}
+              compact
+            />
+          </div>
+        }
       />
       <div className="grid gap-4 lg:grid-cols-3">
         <SectionCard title="Items" icon={Package} iconTone="accent" className="lg:col-span-2">
@@ -78,6 +88,12 @@ async function PurchaseDetail({ params }: { params: PageProps<"/purchases/[id]">
               { label: "Unloaded at", value: godowns.find((g) => g.id === purchase.godownId)?.name },
             ]}
           />
+          <div className="mt-4 pt-3 border-t border-hairline/60">
+            <DeletePurchaseButton
+              purchaseId={purchase.id}
+              what={`Purchase Receipt #${purchase.purchaseNo}`}
+            />
+          </div>
         </SectionCard>
       </div>
     </>

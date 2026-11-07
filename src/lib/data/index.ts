@@ -14,7 +14,7 @@ import * as base2 from "./sample-phase2";
 import * as base3 from "./sample-phase3";
 import * as base4 from "./sample-phase4";
 import { loadFirms } from "./firms";
-import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, clearStandardProducts, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalGodown, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalGodown, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank, localPurchases, saveLocalPurchase, localSales, saveLocalSale, localStockMovements, saveLocalStockMovements, updateLocalStockMovements, localOrders, saveLocalOrder, localQuotations, saveLocalQuotation, localExpenses, saveLocalExpense, localReceipts, saveLocalReceipt, localPayments, saveLocalPayment } from "./local-data";
+import { addLocalCustomer, addLocalDestination, addLocalNote, addLocalRentDriver, adminDesignations, clearStandardProducts, loadLocal, localRentDrivers, removeLocalChit, removeLocalDestination, removeLocalGodown, removeLocalLorry, removeLocalParty, removeLocalProduct, removeLocalRentDriver, removeLocalRental, localChits, localDestinations, localRentals, saveLocalChit, saveLocalGodown, saveLocalRental, localLorries, isLocalStaff, notesOf, ownerDesignation, profilePhoto, removeLocalNote, saveLocalDriverVehicle, saveLocalLorry, saveLocalProduct, saveLocalProfileEdit, saveLocalStaffFields, saveLocalVehicle, type VehicleChange, addLocalPersonalBank, localPurchases, saveLocalPurchase, localSales, saveLocalSale, localStockMovements, saveLocalStockMovements, updateLocalStockMovements, localOrders, saveLocalOrder, localQuotations, saveLocalQuotation, localExpenses, saveLocalExpense, localReceipts, saveLocalReceipt, localPayments, saveLocalPayment, deletedPurchases, removeLocalPurchase, deletedSales, removeLocalSale } from "./local-data";
 import { loadFleet } from "./sample-fleet";
 import * as phase5 from "./sample-phase5";
 import { saving, syncRecords, whenRecordsChange } from "./store";
@@ -752,7 +752,8 @@ export async function rejectSale(saleId: string, reason?: string): Promise<Sale>
 export async function getSales(): Promise<SaleWithParty[]> {
   await live();
   const visible = await visibleGodowns();
-  const combined = [...localSales(), ...sample.sales];
+  const deleted = deletedSales();
+  const combined = [...localSales(), ...sample.sales.filter((s) => !deleted.includes(s.id))];
   return combined
     .filter((s) => canSee(visible, s.godownId))
     .map((s) => ({ ...s, partyName: partyName(s.partyId) }))
@@ -762,9 +763,51 @@ export async function getSales(): Promise<SaleWithParty[]> {
 export async function getSale(id: string): Promise<SaleWithParty | undefined> {
   await live();
   const visible = await visibleGodowns();
-  const combined = [...localSales(), ...sample.sales];
+  const deleted = deletedSales();
+  if (deleted.includes(id)) return undefined;
+  const combined = [...localSales(), ...sample.sales.filter((s) => !deleted.includes(s.id))];
   const sale = combined.find((s) => s.id === id && canSee(visible, s.godownId));
   return sale && { ...sale, partyName: partyName(sale.partyId) };
+}
+
+export async function deleteSale(id: string): Promise<boolean> {
+  return saving(() => {
+    const all = [...localSales(), ...sample.sales];
+    const sale = all.find((s) => s.id === id);
+    if (!sale) return false;
+
+    // Restore stock if it was deducted from a godown
+    if (sale.godownId && sale.lines?.length) {
+      updateLocalStockMovements((movements) => {
+        const billRef = sale.billNo ? `Sale Bill #${sale.billNo}` : null;
+        let removed = false;
+        if (billRef) {
+          const before = movements.length;
+          const filtered = movements.filter((m) => m.ref !== billRef);
+          if (filtered.length < before) {
+            movements.length = 0;
+            movements.push(...filtered);
+            removed = true;
+          }
+        }
+        if (!removed && sale.status !== "cancelled") {
+          sale.lines.forEach((l, i) => {
+            movements.push({
+              id: `sm-del-sale-${Date.now()}-${i}`,
+              date: todayISO(),
+              godownId: sale.godownId!,
+              productId: l.productId,
+              qty: Math.abs(l.qty),
+              kind: "transfer",
+              ref: `Deleted Sale Bill #${sale.billNo || id}`,
+            });
+          });
+        }
+      });
+    }
+
+    return removeLocalSale(id);
+  });
 }
 
 export async function getQuotations(): Promise<Quotation[]> {
@@ -868,7 +911,8 @@ export async function getNextPurchaseReceiptNo(): Promise<number> {
 export async function getPurchases() {
   await live();
   const visible = await visibleGodowns();
-  const combined = [...localPurchases(), ...sample.purchases];
+  const deleted = deletedPurchases();
+  const combined = [...localPurchases(), ...sample.purchases.filter((p) => !deleted.includes(p.id))];
   return combined
     .filter((p) => canSee(visible, p.godownId))
     .map((p) => ({ ...p, companyName: partyName(p.companyId) }))
@@ -878,9 +922,46 @@ export async function getPurchases() {
 export async function getPurchase(id: string) {
   await live();
   const visible = await visibleGodowns();
-  const combined = [...localPurchases(), ...sample.purchases];
+  const deleted = deletedPurchases();
+  if (deleted.includes(id)) return undefined;
+  const combined = [...localPurchases(), ...sample.purchases.filter((p) => !deleted.includes(p.id))];
   const purchase = combined.find((p) => p.id === id && canSee(visible, p.godownId));
   return purchase && { ...purchase, companyName: partyName(purchase.companyId) };
+}
+
+export async function deletePurchase(id: string): Promise<boolean> {
+  return saving(() => {
+    const all = [...localPurchases(), ...sample.purchases];
+    const purchase = all.find((p) => p.id === id);
+    if (!purchase) return false;
+
+    // Remove inward stock movements or deduct from stock
+    if (purchase.godownId && purchase.lines?.length) {
+      updateLocalStockMovements((movements) => {
+        const purRef = `Purchase Receipt #${purchase.purchaseNo}`;
+        const before = movements.length;
+        const filtered = movements.filter((m) => !m.ref?.startsWith(purRef));
+        if (filtered.length < before) {
+          movements.length = 0;
+          movements.push(...filtered);
+        } else {
+          purchase.lines.forEach((l, i) => {
+            movements.push({
+              id: `sm-del-pur-${Date.now()}-${i}`,
+              date: todayISO(),
+              godownId: purchase.godownId,
+              productId: l.productId,
+              qty: -Math.abs(l.qty),
+              kind: "transfer",
+              ref: `Deleted Purchase Receipt #${purchase.purchaseNo}`,
+            });
+          });
+        }
+      });
+    }
+
+    return removeLocalPurchase(id);
+  });
 }
 
 export async function getReceipts(): Promise<(Receipt & { partyName: string })[]> {

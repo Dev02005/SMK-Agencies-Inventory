@@ -15,6 +15,7 @@ import { lineQty } from "@/lib/quantities";
 import { toMT, unitLabel } from "@/lib/sales";
 import { ConfirmRequest, type RequestLine } from "./confirm-request";
 import { CancelSaleButton } from "./cancel-sale-button";
+import { DeleteSaleButton } from "./delete-sale-button";
 
 export const metadata: Metadata = { title: "Bill" };
 
@@ -118,6 +119,7 @@ ${waBillItems}
                 <Printer size={19} strokeWidth={1.9} aria-hidden />
               </IconButtonLink>
             )}
+            <DeleteSaleButton saleId={sale.id} what={billName(sale)} compact />
           </div>
         }
       />
@@ -207,9 +209,12 @@ ${waBillItems}
                 { label: "Reason", value: sale.overrideReason },
               ]}
             />
-            {sale.status === "saved" && (
-              <CancelSaleButton saleId={sale.id} billNo={sale.billNo} />
-            )}
+            <div className="mt-3 flex flex-col gap-2 pt-2 border-t border-hairline/60">
+              {sale.status === "saved" && (
+                <CancelSaleButton saleId={sale.id} billNo={sale.billNo} />
+              )}
+              <DeleteSaleButton saleId={sale.id} what={billName(sale)} />
+            </div>
           </SectionCard>
         </div>
       </div>

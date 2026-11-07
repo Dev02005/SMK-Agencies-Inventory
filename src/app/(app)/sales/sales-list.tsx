@@ -13,6 +13,7 @@ import { inDateFilter, salesPresets } from "@/lib/date-filter";
 import { formatDate, formatINR, formatNumber, formatShortDate } from "@/lib/format";
 import { billName, saleStatus } from "@/lib/labels";
 import { describeQuantities, sumQuantities } from "@/lib/quantities";
+import { DeleteSaleButton } from "./[id]/delete-sale-button";
 
 export function SalesList({ sales, products }: { sales: SaleWithParty[]; products: Product[] }) {
   const dates = useDateFilter(salesPresets);
@@ -75,7 +76,12 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
           ),
           subtitle: `${billName(s)} · ${formatShortDate(s.billDate)} · ${describeQuantities(s.lines, products)}`,
           value: <SaleTotal sale={s} />,
-          meta: s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>,
+          meta: (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>}
+              <DeleteSaleButton saleId={s.id} what={billName(s)} compact />
+            </div>
+          ),
         })}
         columns={[
           { key: "bill", header: "Bill no.", cell: (s) => (s.billNo ? `#${s.billNo}` : "No bill no. yet"), className: "whitespace-nowrap font-medium text-ink" },
@@ -98,6 +104,16 @@ export function SalesList({ sales, products }: { sales: SaleWithParty[]; product
             key: "status",
             header: "",
             cell: (s) => s.status !== "saved" && <Chip tone={saleStatus[s.status].tone}>{saleStatus[s.status].label}</Chip>,
+          },
+          {
+            key: "actions",
+            header: "",
+            className: "w-10 text-right",
+            cell: (s) => (
+              <div onClick={(e) => e.stopPropagation()} className="inline-flex justify-end">
+                <DeleteSaleButton saleId={s.id} what={billName(s)} compact />
+              </div>
+            ),
           },
         ]}
       />

@@ -516,17 +516,21 @@ export function removeLocalLorry(id: string): boolean {
 
 // ── Purchases: local-data/purchases.json ──────────────────────────────────────────────────────────────────────────
 let purchases: Purchase[] = [];
+let deletedPurchaseIds: string[] = [];
 
 export const localPurchases = () => purchases;
+export const deletedPurchases = () => deletedPurchaseIds;
 
 function writePurchases() {
   writeRecord("purchases.json", {
     about: "Purchases recorded in the app.",
     purchases,
+    deleted: deletedPurchaseIds,
   });
 }
 
 export function saveLocalPurchase(purchase: Purchase): Purchase {
+  deletedPurchaseIds = deletedPurchaseIds.filter((id) => id !== purchase.id);
   const at = purchases.findIndex((p) => p.id === purchase.id);
   if (at >= 0) purchases[at] = purchase;
   else purchases.unshift(purchase);
@@ -534,24 +538,42 @@ export function saveLocalPurchase(purchase: Purchase): Purchase {
   return purchase;
 }
 
+export function removeLocalPurchase(id: string): boolean {
+  if (!deletedPurchaseIds.includes(id)) deletedPurchaseIds.push(id);
+  const removed = removeFrom(purchases, (p) => p.id === id);
+  writePurchases();
+  return removed || true;
+}
+
 // ── Sales: local-data/sales.json ──────────────────────────────────────────────────────────────────────────────────
 let sales: Sale[] = [];
+let deletedSaleIds: string[] = [];
 
 export const localSales = () => sales;
+export const deletedSales = () => deletedSaleIds;
 
 function writeSales() {
   writeRecord("sales.json", {
     about: "Sales bills recorded in the app.",
     sales,
+    deleted: deletedSaleIds,
   });
 }
 
 export function saveLocalSale(sale: Sale): Sale {
+  deletedSaleIds = deletedSaleIds.filter((id) => id !== sale.id);
   const at = sales.findIndex((s) => s.id === sale.id);
   if (at >= 0) sales[at] = sale;
   else sales.unshift(sale);
   writeSales();
   return sale;
+}
+
+export function removeLocalSale(id: string): boolean {
+  if (!deletedSaleIds.includes(id)) deletedSaleIds.push(id);
+  const removed = removeFrom(sales, (s) => s.id === id);
+  writeSales();
+  return removed || true;
 }
 
 // ── Stock movements: local-data/stock-movements.json ─────────────────────────────────────────────────────────────
@@ -989,11 +1011,16 @@ export function loadLocal() {
   notes = listIn("notes.json", "notes").filter(isNote);
   vehicles = listIn("vehicles.json", "vehicles").filter(isVehicle);
   profileEdits = readProfileEdits();
+  const purchDoc = readRecord("purchases.json") as { purchases?: unknown[]; deleted?: unknown[] } | undefined;
+  deletedPurchaseIds = (Array.isArray(purchDoc?.deleted) ? purchDoc.deleted : []).filter(isText);
   purchases = (listIn("purchases.json", "purchases") as Purchase[])
-    .filter((p) => p && isText(p.id))
+    .filter((p) => p && isText(p.id) && !deletedPurchaseIds.includes(p.id))
     .map((p) => ({ ...p, original: true }));
+
+  const salesDoc = readRecord("sales.json") as { sales?: unknown[]; deleted?: unknown[] } | undefined;
+  deletedSaleIds = (Array.isArray(salesDoc?.deleted) ? salesDoc.deleted : []).filter(isText);
   sales = (listIn("sales.json", "sales") as Sale[])
-    .filter((s) => s && isText(s.id))
+    .filter((s) => s && isText(s.id) && !deletedSaleIds.includes(s.id))
     .map((s) => ({ ...s, original: true }));
   stockMovements = (listIn("stock-movements.json", "movements") as StockMovement[])
     .filter((m) => m && isText(m.id));
