@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Suspense } from "react";
-import { Receipt, Truck, Warehouse } from "lucide-react";
+import { BadgePercent, Receipt, ShieldCheck, Truck } from "lucide-react";
 import { getFirm, getSignInPeople } from "@/lib/data";
 import { siteDescriptionFor, siteUrl } from "@/lib/site";
 import { LoginForm } from "./login-form";
@@ -76,11 +76,6 @@ function LoginFormSkeleton() {
           <div className="h-3 w-20 bg-slate-100 rounded mb-2" />
           <div className="h-[52px] w-full bg-slate-100 rounded-2xl" />
         </div>
-        <div>
-          <div className="h-3 w-20 bg-slate-100 rounded mb-2" />
-          <div className="h-[52px] w-full bg-slate-100 rounded-2xl" />
-        </div>
-        <div className="h-4 w-28 bg-slate-100 rounded" />
         <div className="h-[50px] w-full bg-slate-200 rounded-2xl" />
       </div>
     </div>
@@ -114,9 +109,9 @@ export default async function LoginPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(business).replace(/</g, "\u003c") }}
       />
 
-      {/* LEFT COLUMN: Brand Showcase with Geometric Wireframe (Dark Executive Suite) */}
+      {/* LEFT COLUMN: Customer-Facing Brand Showcase with Geometric Wireframe (Dark Executive Theme) */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#061224] via-[#091b36] to-[#040d1a] text-white lg:col-span-7 xl:col-span-7 flex flex-col justify-between p-6 sm:p-10 lg:p-14 min-h-[500px] lg:min-h-dvh selection:bg-[#0068d1] selection:text-white">
-        {/* Subtle Ambient Radial Lighting */}
+        {/* Ambient Radial Lighting */}
         <div
           className="absolute -top-32 -left-32 size-96 rounded-full bg-[#0068d1]/15 blur-3xl pointer-events-none"
           aria-hidden="true"
@@ -126,7 +121,7 @@ export default async function LoginPage() {
           aria-hidden="true"
         />
 
-        {/* Geometric Spirograph Graphic in bottom right matching reference */}
+        {/* Geometric Spirograph Graphic in bottom right */}
         <div className="absolute -bottom-24 -right-24 w-[480px] sm:w-[560px] text-white/30 pointer-events-none select-none">
           <SpirographMesh className="w-full h-auto" />
         </div>
@@ -158,13 +153,13 @@ export default async function LoginPage() {
           </div>
         </div>
 
-        {/* MIDDLE HERO CONTENT & FEATURE CARDS */}
+        {/* MIDDLE HERO CONTENT & CUSTOMER-FACING HIGHLIGHT CARDS */}
         <div className="relative z-10 my-8 sm:my-10 lg:my-0 max-w-xl">
           {/* Eyebrow */}
           <div className="inline-flex items-center gap-2 mb-3">
             <span className="size-1.5 rounded-full bg-[#38bdf8]" />
             <span className="text-[11px] font-bold tracking-[0.25em] text-[#38bdf8] uppercase">
-              MANAGEMENT SUITE
+              DEALERSHIP PORTAL
             </span>
           </div>
 
@@ -174,56 +169,59 @@ export default async function LoginPage() {
             <span className="italic font-serif text-[#93c5fd]">flawlessly</span> managed.
           </h1>
 
-          {/* Location & Contact Subtitle */}
+          {/* Location & Dealership Subtitle */}
           <p className="mt-3.5 text-[13px] sm:text-[13.5px] leading-relaxed text-slate-300/80">
             Authorized Dealer: UltraTech · Maha · Deccan · Sagar Cements · Premium TMT Steel &amp; MS Bars ·
-            Godowns at Polaki &amp; Srikakulam · Mill-direct dispatches · {firm.phone} / 99636 84551
+            Godowns at Polaki &amp; Srikakulam · Direct Mill Supplies · {firm.phone} / 99636 84551
           </p>
 
-          {/* 3 Translucent Feature Cards matching reference */}
+          {/* 3 Customer-Facing Benefit Cards */}
           <div className="mt-8 space-y-3">
+            {/* Card 1: 100% Genuine Brands */}
             <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
               <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#38bdf8] shrink-0">
-                <Warehouse className="size-5" />
+                <ShieldCheck className="size-5" />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">Multi-Godown Inventory</p>
+                <p className="text-[14.5px] font-semibold text-white">100% Genuine Certified Brands</p>
                 <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Live stock tracking across Polaki, Srikakulam &amp; company depot godowns
+                  Direct authorized supply of UltraTech, Maha, Deccan &amp; Sagar Cements with certified ISI TMT Steel
                 </p>
               </div>
             </div>
 
+            {/* Card 2: Wholesale Rates & Clear Billing */}
             <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
               <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#4ade80] shrink-0">
                 <Receipt className="size-5" />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">Wholesale &amp; Retail Billing</p>
+                <p className="text-[14.5px] font-semibold text-white">Wholesale Rates &amp; GST Invoices</p>
                 <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Instant counter sales, wholesale orders &amp; owner price approval workflow
+                  Direct competitive pricing for builders, contractors &amp; dealers with formal GST tax invoices
                 </p>
               </div>
             </div>
 
+            {/* Card 3: Direct Mill & Site Delivery */}
             <div className="rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 p-3.5 sm:p-4 backdrop-blur-sm transition-all flex items-start gap-3.5">
               <div className="size-10 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-[#fbbf24] shrink-0">
                 <Truck className="size-5" />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-white">Mill Dispatches &amp; Fleet</p>
+                <p className="text-[14.5px] font-semibold text-white">Direct Mill &amp; Site Delivery</p>
                 <p className="text-[12px] text-slate-300/70 leading-relaxed mt-0.5">
-                  Direct mill lorry shipments, freight tracking &amp; driver cash management
+                  Full-truckload mill dispatches and prompt local godown deliveries across Srikakulam district
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* BOTTOM FOOTER */}
+        {/* BOTTOM FOOTER: Official Sri Kameswari Agencies footer (No D2W) */}
         <div className="relative z-10 pt-4 text-[12px] text-slate-400/70 font-medium flex items-center justify-between">
-          <p>© 2026 {firm.name} · Polaki</p>
-          <p className="hidden sm:block text-slate-500/60">Inventory &amp; Commercial Suite</p>
+          <p>© 2026 {firm.name} · Polaki, Srikakulam</p>
+          <p className="hidden sm:block text-slate-500/60">Authorized Commercial Dealership</p>
         </div>
       </section>
 

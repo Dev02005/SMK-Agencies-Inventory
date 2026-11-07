@@ -2,19 +2,16 @@
 
 import {
   AlertCircle,
-  Building2,
+  ArrowLeft,
+  ArrowRight,
   Check,
   ChevronDown,
   Eye,
   EyeOff,
   Info,
   Lock,
-  Phone,
   Search,
-  ShieldCheck,
-  Truck,
   User,
-  Warehouse,
   X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +19,7 @@ import { Suspense, useEffect, useId, useRef, useState, useTransition } from "rea
 import { CODE_LENGTH } from "@/lib/password-rules";
 import { rememberSignedIn } from "@/lib/roles";
 import type { Profile } from "@/lib/data/types";
-import { signIn } from "./actions";
+import { lookUpLogin, signIn } from "./actions";
 
 export type SignInPerson = Profile & { designation: string };
 
@@ -37,18 +34,31 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
   const id = useId();
   const router = useRouter();
 
-  // Find the owner or first staff member as initial selection
+  // Find owner or default person
   const defaultPerson =
     people.find((p) => p.role === "owner" || p.fullName.toLowerCase().includes("kamesh")) ??
     people[0] ??
     null;
 
+  // Step 1 = Account / Mobile selection; Step 2 = PIN code entry
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Step 1 state
   const [selectedPerson, setSelectedPerson] = useState<SignInPerson | null>(defaultPerson);
   const [isCustomInput, setIsCustomInput] = useState(false);
   const [customLoginId, setCustomLoginId] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Confirmed person for Step 2
+  const [confirmedPerson, setConfirmedPerson] = useState<{
+    name: string;
+    initials: string;
+    designation: string;
+    loginId: string;
+  } | null>(null);
+
+  // Step 2 state (PIN)
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -96,25 +106,75 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
+  // Auto focus PIN when step 2 is active
+  useEffect(() => {
+    if (step === 2) {
+      const timer = setTimeout(() => passwordInputRef.current?.focus(), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  // Step 1: Proceed to PIN
+  function handleContinueToPin() {
+    setProblem(null);
+
+    if (isCustomInput) {
+      const trimmed = customLoginId.trim();
+      if (!trimmed) {
+        setProblem("Please enter your mobile number or username.");
+        return;
+      }
+
+      startTransition(async () => {
+        const result = await lookUpLogin(trimmed);
+        if (result.ok) {
+          setConfirmedPerson({
+            name: result.name,
+            initials: result.initials,
+            designation: result.designation,
+            loginId: trimmed,
+          });
+          setStep(2);
+        } else {
+          setProblem(
+            result.reason === "too-many"
+              ? "Too many attempts from this device. Please wait 10 minutes."
+              : "No account found with that number. Please check or choose from the list.",
+          );
+        }
+      });
+    } else {
+      if (!selectedPerson) {
+        setProblem("Please select an account.");
+        return;
+      }
+
+      setConfirmedPerson({
+        name: selectedPerson.fullName,
+        initials: getInitials(selectedPerson.fullName),
+        designation: selectedPerson.designation || (selectedPerson.role === "owner" ? "Admin" : selectedPerson.role),
+        loginId: selectedPerson.mobile || selectedPerson.fullName,
+      });
+      setStep(2);
+    }
+  }
+
+  // Step 2: Sign in with PIN
   function handleSignIn() {
     setProblem(null);
-    const effectiveLoginId = isCustomInput
-      ? customLoginId.trim()
-      : selectedPerson?.mobile || selectedPerson?.fullName || "";
-
-    if (!effectiveLoginId) {
-      setProblem("Please select an account or enter your mobile number.");
+    if (!confirmedPerson) {
+      setStep(1);
       return;
     }
 
     if (!password) {
-      setProblem("Please enter your 6-digit sign-in code.");
+      setProblem("Please enter your 6-digit PIN code.");
       passwordInputRef.current?.focus();
       return;
     }
 
     if (password.length !== CODE_LENGTH) {
-      setProblem(`Code must be exactly ${CODE_LENGTH} digits. Default is 000000.`);
+      setProblem(`PIN code must be exactly ${CODE_LENGTH} digits. Default is 000000.`);
       passwordInputRef.current?.focus();
       return;
     }
@@ -122,7 +182,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
     const next = new URLSearchParams(window.location.search).get("next") ?? undefined;
 
     startTransition(async () => {
-      const result = await signIn(effectiveLoginId, password, next);
+      const result = await signIn(confirmedPerson.loginId, password, next);
       if (!result.ok) {
         setProblem("That sign-in code is incorrect. Default code is 000000.");
         setPassword("");
@@ -132,7 +192,7 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
 
       try {
         if (rememberMe) {
-          localStorage.setItem("ska_remembered_login", effectiveLoginId);
+          localStorage.setItem("ska_remembered_login", confirmedPerson.loginId);
         } else {
           localStorage.removeItem("ska_remembered_login");
         }
@@ -157,13 +217,15 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
 
   return (
     <div className="w-full">
-      {/* Title & Subtitle matching reference */}
+      {/* Title & Subtitle */}
       <div>
         <h1 className="font-serif text-[32px] sm:text-[38px] font-semibold tracking-tight text-[#0f172a]">
-          Welcome back
+          {step === 1 ? "Welcome back" : "Enter your PIN"}
         </h1>
         <p className="mt-1.5 text-[14.5px] text-[#64748b]">
-          Choose your login and enter your password.
+          {step === 1
+            ? "Choose your staff account or enter your mobile number."
+            : "Enter your 6-digit sign-in code to open your dashboard."}
         </p>
       </div>
 
@@ -171,15 +233,15 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
         <SignedOutNotice />
       </Suspense>
 
-      {/* Forgot Password guidance popup */}
+      {/* Forgot Password guidance */}
       {showForgotNotice && (
         <div className="mt-5 rounded-2xl bg-[#0068d1]/10 border border-[#0068d1]/20 p-4 text-[13px] text-[#0f172a] flex items-start gap-3">
           <Info className="size-4.5 text-[#0068d1] shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold text-[#0f172a]">Sign-in Code Help</p>
+            <p className="font-semibold text-[#0f172a]">Sign-in PIN Help</p>
             <p className="mt-0.5 text-[12.5px] leading-relaxed text-[#475569]">
-              Default code for all staff accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
-              If you updated your code and forgot it, please contact the administrator (Kamesh Potnuru) to reset it.
+              Default PIN for all staff accounts is <span className="font-mono font-bold text-[#0f172a]">000000</span>.
+              If you updated your PIN and forgot it, please contact the administrator (Kamesh Potnuru) to reset it.
             </p>
           </div>
           <button
@@ -204,224 +266,295 @@ export function LoginForm({ people }: { people: SignInPerson[] }) {
         </div>
       )}
 
-      {/* Form */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSignIn();
-        }}
-        className="mt-7 space-y-5"
-      >
-        {/* LOGIN AS FIELD */}
-        <div className="relative" ref={dropdownRef}>
-          <label
-            htmlFor={isCustomInput ? `${id}-custom-login` : undefined}
-            className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
-          >
-            LOGIN AS
-          </label>
+      {/* STEP 1: Select User / Enter Mobile */}
+      {step === 1 ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleContinueToPin();
+          }}
+          className="mt-7 space-y-5"
+        >
+          <div className="relative" ref={dropdownRef}>
+            <label
+              htmlFor={isCustomInput ? `${id}-custom-login` : undefined}
+              className="block text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase mb-2"
+            >
+              LOGIN ACCOUNT / MOBILE
+            </label>
 
-          {!isCustomInput ? (
-            /* Dropdown trigger matching reference screenshot */
-            <div>
-              <button
-                type="button"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
-                aria-expanded={isDropdownOpen}
-                aria-haspopup="listbox"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="text-[15px] font-medium text-[#0f172a] truncate">
-                      {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
-                    </span>
-                    {selectedPerson?.designation && (
-                      <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
-                        {selectedPerson.designation}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
-                    isDropdownOpen ? "rotate-180" : ""
-                  }`}
-                  aria-hidden
-                />
-              </button>
-
-              {/* Dropdown menu */}
-              {isDropdownOpen && (
-                <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden animate-fade-up">
-                  {people.length > 5 && (
-                    <div className="p-2 border-b border-[#f1f5f9]">
-                      <div className="relative flex items-center">
-                        <Search className="size-4 text-[#94a3b8] absolute left-3 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search staff name..."
-                          className="w-full h-9 pl-9 pr-3 text-[13.5px] rounded-xl bg-[#f8fafc] border border-transparent focus:border-[#0068d1]/30 focus:outline-none"
-                          autoFocus
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <ul className="max-h-[260px] overflow-y-auto divide-y divide-[#f8fafc] p-1.5" role="listbox">
-                    {filteredPeople.map((p) => {
-                      const isSelected = selectedPerson?.id === p.id;
-                      return (
-                        <li
-                          key={p.id}
-                          role="option"
-                          aria-selected={isSelected}
-                          onClick={() => {
-                            setSelectedPerson(p);
-                            setIsDropdownOpen(false);
-                            setSearchQuery("");
-                            if (problem) setProblem(null);
-                            setTimeout(() => passwordInputRef.current?.focus(), 50);
-                          }}
-                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
-                            isSelected ? "bg-[#0068d1]/10 text-[#0068d1]" : "hover:bg-[#f8fafc] text-[#0f172a]"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="grid size-8 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[12px] font-bold text-white shrink-0">
-                              {getInitials(p.fullName)}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-[14px] font-medium truncate">{p.fullName}</p>
-                              <p className="text-[11.5px] text-[#64748b]">
-                                {p.designation || (p.role === "owner" ? "Admin" : p.role)} · {p.mobile}
-                              </p>
-                            </div>
-                          </div>
-                          {isSelected && <Check className="size-4 text-[#0068d1] shrink-0" />}
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  <div className="p-2 border-t border-[#f1f5f9] bg-[#fafafc]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCustomInput(true);
-                        setIsDropdownOpen(false);
-                        setCustomLoginId("");
-                      }}
-                      className="w-full py-1.5 px-2 text-[12.5px] font-semibold text-[#0068d1] hover:underline text-center cursor-pointer"
-                    >
-                      + Enter another mobile number or username
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Custom text input mode */
-            <div className="space-y-1.5">
-              <div className="relative">
-                <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
-                <input
-                  id={`${id}-custom-login`}
-                  type="text"
-                  value={customLoginId}
-                  onChange={(e) => {
-                    setCustomLoginId(e.target.value);
-                    if (problem) setProblem(null);
-                  }}
-                  placeholder="Enter 10-digit mobile number or name"
-                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-24 text-[14.5px] text-[#0f172a] shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
-                  autoFocus
-                />
+            {!isCustomInput ? (
+              /* Dropdown trigger */
+              <div>
                 <button
                   type="button"
-                  onClick={() => setIsCustomInput(false)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white px-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-[#cbd5e1] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                  aria-expanded={isDropdownOpen}
+                  aria-haspopup="listbox"
                 >
-                  List view
+                  <div className="flex items-center gap-3 min-w-0">
+                    <User className="size-[19px] text-[#94a3b8] shrink-0" aria-hidden />
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="text-[15px] font-medium text-[#0f172a] truncate">
+                        {selectedPerson ? selectedPerson.fullName : "Choose staff account"}
+                      </span>
+                      {selectedPerson?.designation && (
+                        <span className="shrink-0 text-[11.5px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                          {selectedPerson.designation}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`size-[17px] text-[#94a3b8] shrink-0 transition-transform duration-200 ${
+                      isDropdownOpen ? "rotate-180" : ""
+                    }`}
+                    aria-hidden
+                  />
                 </button>
+
+                {/* Dropdown menu */}
+                {isDropdownOpen && (
+                  <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden animate-fade-up">
+                    {people.length > 5 && (
+                      <div className="p-2 border-b border-[#f1f5f9]">
+                        <div className="relative flex items-center">
+                          <Search className="size-4 text-[#94a3b8] absolute left-3 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search staff name..."
+                            className="w-full h-9 pl-9 pr-3 text-[13.5px] rounded-xl bg-[#f8fafc] border border-transparent focus:border-[#0068d1]/30 focus:outline-none"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <ul className="max-h-[260px] overflow-y-auto divide-y divide-[#f8fafc] p-1.5" role="listbox">
+                      {filteredPeople.map((p) => {
+                        const isSelected = selectedPerson?.id === p.id;
+                        return (
+                          <li
+                            key={p.id}
+                            role="option"
+                            aria-selected={isSelected}
+                            onClick={() => {
+                              setSelectedPerson(p);
+                              setIsDropdownOpen(false);
+                              setSearchQuery("");
+                              if (problem) setProblem(null);
+                            }}
+                            className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                              isSelected ? "bg-[#0068d1]/10 text-[#0068d1]" : "hover:bg-[#f8fafc] text-[#0f172a]"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="grid size-8 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[12px] font-bold text-white shrink-0">
+                                {getInitials(p.fullName)}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-[14px] font-medium truncate">{p.fullName}</p>
+                                <p className="text-[11.5px] text-[#64748b]">
+                                  {p.designation || (p.role === "owner" ? "Admin" : p.role)} · {p.mobile}
+                                </p>
+                              </div>
+                            </div>
+                            {isSelected && <Check className="size-4 text-[#0068d1] shrink-0" />}
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    <div className="p-2 border-t border-[#f1f5f9] bg-[#fafafc]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomInput(true);
+                          setIsDropdownOpen(false);
+                          setCustomLoginId("");
+                        }}
+                        className="w-full py-1.5 px-2 text-[12.5px] font-semibold text-[#0068d1] hover:underline text-center cursor-pointer"
+                      >
+                        + Enter another mobile number or username
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+            ) : (
+              /* Custom text input */
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
+                  <input
+                    id={`${id}-custom-login`}
+                    type="text"
+                    value={customLoginId}
+                    onChange={(e) => {
+                      setCustomLoginId(e.target.value);
+                      if (problem) setProblem(null);
+                    }}
+                    placeholder="Enter 10-digit mobile number or name"
+                    className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-24 text-[14.5px] text-[#0f172a] shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomInput(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer"
+                  >
+                    List view
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CONTINUE BUTTON */}
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <span>{pending ? "Checking account…" : "Continue"}</span>
+            {!pending && <ArrowRight className="size-4.5" />}
+          </button>
+        </form>
+      ) : (
+        /* STEP 2: Enter PIN */
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSignIn();
+          }}
+          className="mt-6 space-y-5"
+        >
+          {/* Confirmed Person Card */}
+          {confirmedPerson && (
+            <div className="rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="grid size-10 place-items-center rounded-full bg-gradient-to-tr from-[#0068d1] to-[#38bdf8] text-[13px] font-bold text-white shrink-0 shadow-sm">
+                  {confirmedPerson.initials}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[14.5px] font-semibold text-[#0f172a] truncate">
+                    {confirmedPerson.name}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {confirmedPerson.designation && (
+                      <span className="text-[11px] font-semibold text-[#0068d1] bg-[#0068d1]/10 px-2 py-0.5 rounded-full">
+                        {confirmedPerson.designation}
+                      </span>
+                    )}
+                    <span className="text-[12px] text-[#64748b] truncate">{confirmedPerson.loginId}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setPassword("");
+                  setProblem(null);
+                }}
+                className="text-[12px] font-semibold text-[#0068d1] hover:underline cursor-pointer shrink-0 px-2 py-1"
+              >
+                Change
+              </button>
             </div>
           )}
-        </div>
 
-        {/* PASSWORD FIELD */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label
-              htmlFor={`${id}-password`}
-              className="text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase"
-            >
-              PASSWORD
-            </label>
-            <span className="text-[11px] text-[#94a3b8] font-medium">Default: 000000</span>
+          {/* 6-DIGIT PIN INPUT */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor={`${id}-password`}
+                className="text-[11px] font-bold tracking-[0.1em] text-[#64748b] uppercase"
+              >
+                6-DIGIT SIGN-IN PIN
+              </label>
+              <span className="text-[11px] text-[#94a3b8] font-medium">Default: 000000</span>
+            </div>
+
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
+              <input
+                id={`${id}-password`}
+                ref={passwordInputRef}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH);
+                  setPassword(val);
+                  if (problem) setProblem(null);
+                }}
+                placeholder="••••••"
+                maxLength={CODE_LENGTH}
+                inputMode="numeric"
+                autoComplete="current-password"
+                className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-12 text-[18px] text-[#0f172a] tracking-widest font-mono shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide PIN" : "Show PIN"}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#475569] p-1 cursor-pointer transition-colors"
+              >
+                {showPassword ? <EyeOff className="size-[19px]" /> : <Eye className="size-[19px]" />}
+              </button>
+            </div>
           </div>
 
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-[19px] text-[#94a3b8]" />
-            <input
-              id={`${id}-password`}
-              ref={passwordInputRef}
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, CODE_LENGTH);
-                setPassword(val);
-                if (problem) setProblem(null);
-              }}
-              placeholder="••••••"
-              maxLength={CODE_LENGTH}
-              inputMode="numeric"
-              autoComplete="current-password"
-              className="h-[52px] w-full rounded-2xl border border-[#e2e8f0] bg-white pl-11 pr-12 text-[16px] text-[#0f172a] tracking-widest font-mono shadow-[0_1px_2px_rgba(0,0,0,0.03)] focus:border-[#0068d1] focus:ring-2 focus:ring-[#0068d1]/15 focus:outline-none transition-all"
-            />
+          {/* REMEMBER ME & FORGOT PIN */}
+          <div className="flex items-center justify-between text-[13px] pt-1">
+            <label className="flex items-center gap-2 text-[#475569] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="size-4 rounded border-[#cbd5e1] text-[#0068d1] accent-[#0068d1] focus:ring-[#0068d1] cursor-pointer"
+              />
+              <span className="text-[13.5px]">Remember me</span>
+            </label>
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#475569] p-1 cursor-pointer transition-colors"
+              onClick={() => setShowForgotNotice(true)}
+              className="font-medium text-[#0068d1] hover:underline focus:outline-none cursor-pointer text-[13px]"
             >
-              {showPassword ? <EyeOff className="size-[19px]" /> : <Eye className="size-[19px]" />}
+              Forgot PIN?
             </button>
           </div>
-        </div>
 
-        {/* REMEMBER ME & FORGOT CODE */}
-        <div className="flex items-center justify-between text-[13px] pt-1">
-          <label className="flex items-center gap-2 text-[#475569] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="size-4 rounded border-[#cbd5e1] text-[#0068d1] accent-[#0068d1] focus:ring-[#0068d1] cursor-pointer"
-            />
-            <span className="text-[13.5px]">Remember me</span>
-          </label>
+          {/* SIGN IN BUTTON */}
           <button
-            type="button"
-            onClick={() => setShowForgotNotice(true)}
-            className="font-medium text-[#0068d1] hover:underline focus:outline-none cursor-pointer text-[13px]"
+            type="submit"
+            disabled={pending || password.length !== CODE_LENGTH}
+            className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
           >
-            Forgot code?
+            <span>{pending ? "Signing in…" : "Sign in"}</span>
           </button>
-        </div>
 
-        {/* SIGN IN BUTTON matching reference */}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full h-[50px] rounded-2xl bg-[#0c192c] hover:bg-[#15253e] active:scale-[0.99] text-white font-semibold text-[15px] shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-        >
-          <span>{pending ? "Signing in…" : "Sign in"}</span>
-        </button>
-      </form>
+          {/* Back button */}
+          <div className="text-center pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setStep(1);
+                setPassword("");
+                setProblem(null);
+              }}
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#64748b] hover:text-[#0f172a] cursor-pointer"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to choose account</span>
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
